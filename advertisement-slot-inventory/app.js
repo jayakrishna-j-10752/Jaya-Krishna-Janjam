@@ -6,35 +6,55 @@
    DATA
    ───────────────────────────────────────────── */
 const SLOT_TYPES = [
-  { key: 'Home Feed',              color: '#E53935' },
-  { key: 'Article Page',           color: '#1E88E5' },
-  { key: 'Storypage / Impact Pla...', color: '#8E24AA' },
-  { key: 'Native Content Stream', color: '#FB8C00' },
-  { key: 'Banner Slots',           color: '#43A047' },
-  { key: 'Video Slots',            color: '#00ACC1' },
-  { key: 'Roadblock / Takeover S...', color: '#212121' },
+  { key: 'Home Feed',                   color: '#E53935' },
+  { key: 'Article Page',                color: '#1E88E5' },
+  { key: 'Storypage / Impact Placement',color: '#8E24AA' },
+  { key: 'Native Content Stream',       color: '#FB8C00' },
+  { key: 'Banner Slots',                color: '#43A047' },
+  { key: 'Video Slots',                 color: '#00ACC1' },
+  { key: 'Roadblock / Takeover Slots',  color: '#212121' },
 ];
 
-/** Generate random slot inventory for June 2026 (30 days) */
-function generateInventory() {
-  return Array.from({ length: 30 }, (_, i) => {
-    const day = i + 1;
-    // Force some sold-out / limited days for variety
-    const forceSoldOut  = [4, 11, 19].includes(day);
-    const forceLimited  = [3, 17, 18].includes(day);
+/** Fixed slot inventory for June 2026 (30 days) */
+const RAW_DAYS = [
+  /* day  HF  AP  SP  NCS  BS  VS  RT */
+  [  1,   8, 12,  3,   7, 10,  5,  1 ],
+  [  2,   7, 10,  2,   6,  8,  4,  1 ],
+  [  3,   3,  5,  1,   3,  4,  2,  0 ],
+  [  4,   0,  0,  0,   0,  0,  0,  0 ],
+  [  5,   5,  8,  3,   5,  6,  3,  1 ],
+  [  6,   7,  9,  3,   6,  9,  4,  1 ],
+  [  7,   7,  9,  3,   6,  9,  4,  1 ],
+  [  8,   8, 11,  3,   7, 10,  4,  1 ],
+  [  9,   6,  9,  2,   5,  8,  3,  1 ],
+  [ 10,   8, 12,  2,   5, 10,  4,  1 ],
+  [ 11,   0,  0,  0,   0,  0,  0,  0 ],
+  [ 12,   5,  8,  2,   5,  7,  3,  1 ],
+  [ 13,   4,  7,  1,   4,  6,  3,  0 ],
+  [ 14,   5,  7,  2,   4,  7,  3,  0 ],
+  [ 15,   8, 12,  2,   5, 10,  4,  1 ],
+  [ 16,   9, 13,  3,   7, 12,  5,  1 ],
+  [ 17,   3,  5,  1,   2,  4,  2,  1 ],
+  [ 18,   1,  2,  1,   1,  1,  1,  0 ],
+  [ 19,   0,  0,  0,   0,  0,  0,  0 ],
+  [ 20,   6,  8,  2,   5,  7,  3,  1 ],
+  [ 21,   5,  7,  2,   4,  7,  3,  0 ],
+  [ 22,   6,  9,  2,   5,  9,  3,  1 ],
+  [ 23,   7, 11,  3,   6,  9,  4,  1 ],
+  [ 24,   2,  4,  1,   3,  3,  2,  0 ],
+  [ 25,   0,  0,  0,   0,  0,  0,  0 ],
+  [ 26,   7,  9,  2,   6,  8,  4,  1 ],
+  [ 27,   8, 11,  3,   7, 10,  4,  1 ],
+  [ 28,   5,  7,  2,   4,  8,  3,  0 ],
+  [ 29,   2,  3,  1,   2,  3,  1,  0 ],
+  [ 30,   8, 12,  3,   7, 10,  4,  1 ],
+];
 
-    const slots = SLOT_TYPES.map(({ key }) => {
-      if (forceSoldOut)  return { name: key, count: 0 };
-      if (forceLimited)  return { name: key, count: Math.floor(Math.random() * 3) };
-      return { name: key, count: Math.floor(Math.random() * 12) + 1 };
-    });
-
-    const total = slots.reduce((s, r) => s + r.count, 0);
-    return { day, slots, total };
-  });
-}
-
-const INVENTORY = generateInventory();
+const INVENTORY = RAW_DAYS.map(([day, hf, ap, sp, ncs, bs, vs, rt]) => {
+  const counts = [hf, ap, sp, ncs, bs, vs, rt];
+  const slots  = SLOT_TYPES.map((t, i) => ({ name: t.key, count: counts[i] }));
+  return { day, slots, total: counts.reduce((a, b) => a + b, 0) };
+});
 
 /* ─────────────────────────────────────────────
    AVAILABILITY HELPERS

@@ -18,10 +18,11 @@
   --zoho-text:       #333333;
   --zoho-text-light: #5F6368;
   --zoho-border:     #DADCE0;
-  --zoho-bg:         #F8F9FA;
+  --zoho-bg:         #F0F2F5;
   --zoho-card-bg:    #FFFFFF;
-  --zoho-shadow:     0 1px 4px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
-  --zoho-shadow-md:  0 2px 8px rgba(0,0,0,.14), 0 4px 16px rgba(0,0,0,.08);
+  --zoho-shadow:     0 1px 3px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+  --zoho-shadow-md:  0 4px 12px rgba(0,0,0,.13), 0 8px 20px rgba(0,0,0,.07);
+  --zoho-shadow-lg:  0 8px 24px rgba(0,0,0,.15), 0 16px 40px rgba(0,0,0,.08);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -34,7 +35,7 @@
   --c-native:     #FB8C00;
   --c-banner:     #43A047;
   --c-video:      #00ACC1;
-  --c-roadblock:  #212121;
+  --c-roadblock:  #37474F;
 }
 
 html { font-size: 14px; }
@@ -46,9 +47,10 @@ body {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #BDBDBD; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #C5C9CC; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #A8ADB2; }
 
 /* ============================================================
    LAYOUT
@@ -67,19 +69,40 @@ body {
   flex-shrink: 0;
   background: var(--zoho-card-bg);
   border-right: 1px solid var(--zoho-border);
-  padding: 24px 20px 32px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+}
+
+/* Accent header strip */
+.campaign-panel-header {
+  background: linear-gradient(135deg, #1565C0 0%, #1976D2 60%, #0D47A1 100%);
+  padding: 18px 20px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .panel-title {
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--zoho-dark);
-  margin-bottom: 4px;
+  color: #fff;
   letter-spacing: .01em;
+}
+
+.panel-subtitle {
+  font-size: .72rem;
+  color: rgba(255,255,255,.72);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.campaign-panel-body {
+  padding: 18px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
 }
 
 .field-group {
@@ -90,33 +113,41 @@ body {
 }
 
 .field-group label {
-  font-size: .75rem;
+  font-size: .72rem;
   font-weight: 600;
   color: var(--zoho-text-light);
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .05em;
 }
 
 .field-group input,
 .field-group select,
 .field-group textarea {
-  border: 1px solid var(--zoho-border);
+  border: 1.5px solid var(--zoho-border);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   font-size: .85rem;
   font-family: var(--font);
   color: var(--zoho-text);
-  background: #fff;
-  transition: border-color .2s, box-shadow .2s;
+  background: #FAFBFC;
+  transition: border-color .2s, box-shadow .2s, background .2s;
   outline: none;
   width: 100%;
+}
+
+.field-group input:hover,
+.field-group select:hover,
+.field-group textarea:hover {
+  border-color: #B0B8C4;
+  background: #fff;
 }
 
 .field-group input:focus,
 .field-group select:focus,
 .field-group textarea:focus {
   border-color: var(--zoho-blue);
-  box-shadow: 0 0 0 3px rgba(21,101,192,.12);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(21,101,192,.13);
 }
 
 .field-group select {
@@ -124,7 +155,13 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%235F6368' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
+  background-color: #FAFBFC;
   padding-right: 28px;
+  cursor: pointer;
+}
+
+.field-group select:focus {
+  background-color: #fff;
 }
 
 .field-row {
@@ -155,7 +192,7 @@ body {
 }
 
 .inventory-title {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--zoho-dark);
   letter-spacing: .01em;
@@ -164,29 +201,35 @@ body {
 /* ── View Toggle ── */
 .view-toggle {
   display: flex;
-  background: #F1F3F4;
-  border-radius: 20px;
+  background: #E8EAED;
+  border-radius: 22px;
   padding: 3px;
   gap: 2px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.10);
 }
 
 .toggle-btn {
   border: none;
   background: transparent;
-  padding: 6px 18px;
-  border-radius: 17px;
+  padding: 7px 18px;
+  border-radius: 19px;
   font-size: .82rem;
   font-weight: 500;
   cursor: pointer;
   color: var(--zoho-text-light);
-  transition: background .2s, color .2s, box-shadow .2s;
+  transition: background .22s, color .22s, box-shadow .22s;
 }
 
 .toggle-btn.active {
-  background: var(--zoho-card-bg);
-  color: var(--zoho-orange);
-  box-shadow: var(--zoho-shadow);
+  background: var(--zoho-orange);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(230,81,0,.35);
   font-weight: 600;
+}
+
+.toggle-btn:not(.active):hover {
+  background: rgba(0,0,0,.06);
+  color: var(--zoho-text);
 }
 
 /* ── Filter Bar ── */
@@ -200,14 +243,14 @@ body {
   position: relative;
   flex: 1 1 140px;
   min-width: 130px;
-  max-width: 200px;
+  max-width: 210px;
 }
 
 .filter-select-wrap select {
   width: 100%;
-  border: 1px solid var(--zoho-border);
-  border-radius: 20px;
-  padding: 7px 30px 7px 14px;
+  border: 1.5px solid var(--zoho-border);
+  border-radius: 22px;
+  padding: 7px 30px 7px 15px;
   font-size: .82rem;
   font-family: var(--font);
   background: var(--zoho-card-bg);
@@ -216,28 +259,42 @@ body {
   outline: none;
   cursor: pointer;
   transition: border-color .2s, box-shadow .2s;
+  box-shadow: var(--zoho-shadow);
+}
+
+.filter-select-wrap select:hover {
+  border-color: #B0B8C4;
 }
 
 .filter-select-wrap select:focus {
   border-color: var(--zoho-blue);
-  box-shadow: 0 0 0 3px rgba(21,101,192,.12);
+  box-shadow: 0 0 0 3px rgba(21,101,192,.13);
 }
 
 .filter-arrow {
   position: absolute;
-  right: 11px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  font-size: .7rem;
+  font-size: .68rem;
   color: var(--zoho-text-light);
 }
 
 /* ── Legend Section ── */
-.legend-section { display: flex; flex-direction: column; gap: 8px; }
+.legend-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--zoho-card-bg);
+  border: 1px solid var(--zoho-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  box-shadow: var(--zoho-shadow);
+}
 
 .legend-label {
-  font-size: .75rem;
+  font-size: .74rem;
   color: var(--zoho-text-light);
   font-weight: 500;
 }
@@ -250,12 +307,14 @@ body {
 
 .pill {
   display: inline-block;
-  padding: 4px 13px;
+  padding: 4px 12px;
   border-radius: 14px;
-  font-size: .75rem;
+  font-size: .73rem;
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
+  letter-spacing: .01em;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
 }
 
 .pill-homefeed  { background: var(--c-homefeed); }
@@ -270,15 +329,18 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  font-size: .78rem;
+  gap: 14px;
+  font-size: .77rem;
   color: var(--zoho-text-light);
+  padding-top: 4px;
+  border-top: 1px solid #F1F3F4;
+  margin-top: 2px;
 }
 
 .avail-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   margin-right: 4px;
   vertical-align: middle;
@@ -287,7 +349,7 @@ body {
 .avail-dot.high    { background: var(--zoho-green); }
 .avail-dot.medium  { background: var(--zoho-amber); }
 .avail-dot.limited { background: var(--zoho-red);   }
-.avail-dot.soldout { background: #212121;            }
+.avail-dot.soldout { background: #37474F;            }
 
 /* ── Category Tabs ── */
 .category-tabs {
@@ -297,28 +359,31 @@ body {
 }
 
 .cat-tab {
-  border: 1px solid var(--zoho-border);
+  border: 1.5px solid var(--zoho-border);
   background: var(--zoho-card-bg);
   border-radius: 18px;
   padding: 5px 14px;
-  font-size: .78rem;
+  font-size: .77rem;
   font-weight: 500;
   cursor: pointer;
   color: var(--zoho-text);
   transition: all .18s;
+  box-shadow: var(--zoho-shadow);
 }
 
 .cat-tab:hover {
-  border-color: var(--zoho-blue);
+  border-color: var(--zoho-blue-light);
   color: var(--zoho-blue);
   background: var(--zoho-blue-pale);
+  box-shadow: 0 2px 8px rgba(21,101,192,.12);
 }
 
 .cat-tab.active {
-  background: var(--zoho-orange-pale);
+  background: var(--zoho-orange);
   border-color: var(--zoho-orange);
-  color: var(--zoho-orange);
+  color: #fff;
   font-weight: 700;
+  box-shadow: 0 2px 8px rgba(230,81,0,.30);
 }
 
 /* ============================================================
@@ -326,7 +391,7 @@ body {
    ============================================================ */
 .slot-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
   gap: 14px;
 }
 
@@ -334,9 +399,9 @@ body {
   background: var(--zoho-card-bg);
   border: 1px solid var(--zoho-border);
   border-radius: var(--radius-md);
-  padding: 12px 14px 14px;
+  padding: 12px 14px 14px 18px;
   box-shadow: var(--zoho-shadow);
-  transition: box-shadow .2s, transform .18s;
+  transition: box-shadow .22s, transform .2s;
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -344,7 +409,7 @@ body {
 
 .slot-card:hover {
   box-shadow: var(--zoho-shadow-md);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
 /* coloured left-border by availability */
@@ -352,13 +417,13 @@ body {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 4px;
+  width: 5px;
   border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 .slot-card.avail-high::before    { background: var(--zoho-green); }
 .slot-card.avail-medium::before  { background: var(--zoho-amber); }
 .slot-card.avail-limited::before { background: var(--zoho-red);   }
-.slot-card.avail-soldout::before { background: #212121;           }
+.slot-card.avail-soldout::before { background: #37474F;           }
 
 .card-header {
   display: flex;
@@ -368,23 +433,25 @@ body {
 }
 
 .card-day {
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: var(--zoho-dark);
+  line-height: 1;
 }
 
 .card-open {
-  font-size: .7rem;
-  font-weight: 600;
+  font-size: .68rem;
+  font-weight: 700;
   padding: 2px 8px;
   border-radius: 10px;
   white-space: nowrap;
+  letter-spacing: .01em;
 }
 
-.card-open.high    { background: #E8F5E9; color: var(--zoho-green); }
-.card-open.medium  { background: #FFF8E1; color: #E65100;           }
-.card-open.limited { background: #FFEBEE; color: var(--zoho-red);   }
-.card-open.soldout { background: #F5F5F5; color: #757575;           }
+.card-open.high    { background: #E8F5E9; color: #2E7D32; }
+.card-open.medium  { background: #FFF8E1; color: #E65100; }
+.card-open.limited { background: #FFEBEE; color: #C62828; }
+.card-open.soldout { background: #ECEFF1; color: #546E7A; }
 
 .card-rows { display: flex; flex-direction: column; gap: 4px; }
 
@@ -392,7 +459,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: .72rem;
+  font-size: .71rem;
   color: var(--zoho-text);
 }
 
@@ -400,13 +467,15 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 70%;
+  max-width: 72%;
   color: var(--zoho-text-light);
 }
 
 .card-row .slot-count {
   font-weight: 700;
   color: var(--zoho-dark);
+  min-width: 14px;
+  text-align: right;
 }
 
 /* ============================================================
@@ -428,7 +497,7 @@ body {
   box-shadow: var(--zoho-shadow);
   min-height: 70px;
   cursor: pointer;
-  transition: box-shadow .18s, transform .18s;
+  transition: box-shadow .2s, transform .2s;
 }
 
 .cal-day-card:hover {
@@ -476,13 +545,14 @@ body {
     border-right: none;
     border-bottom: 1px solid var(--zoho-border);
   }
+  .campaign-panel-header { position: static; }
   .field-row { flex-wrap: wrap; }
   .calendar-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 @media (max-width: 600px) {
-  .inventory-panel { padding: 16px 12px 32px; }
-  .campaign-panel  { padding: 16px 12px 20px; }
+  .inventory-panel { padding: 14px 12px 32px; }
+  .campaign-panel-body { padding: 14px 12px 20px; }
   .filter-select-wrap { max-width: 100%; }
   .slot-cards-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .calendar-grid   { grid-template-columns: repeat(3, 1fr); }
