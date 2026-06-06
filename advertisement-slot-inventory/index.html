@@ -3,105 +3,106 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Advertisement Slot Inventory – Zoho CRM Widget</title>
+  <title>Advertisement Slot Inventory</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+          integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+          crossorigin="anonymous"></script>
+  <!-- Zoho Embedded App SDK -->
+  <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
 </head>
 <body>
   <div class="crm-widget-wrapper">
 
     <!-- ───────────────────────── LEFT PANEL ───────────────────────── -->
     <aside class="campaign-panel">
-      <h2 class="panel-title">Campaign Attributes</h2>
-
-      <div class="field-group">
-        <label>Campaign ID</label>
-        <input type="text" id="campaignId" value="DH-2026-041" />
+      <div class="campaign-panel-header">
+        <h2 class="panel-title">Campaign Attributes</h2>
+        <p class="panel-subtitle"></p>
       </div>
 
-      <div class="field-group">
-        <label>Campaign Name</label>
-        <input type="text" id="campaignName" value="Monsoon Launch Push" />
-      </div>
-
-      <div class="field-row">
+      <div class="campaign-panel-body">
         <div class="field-group">
-          <label>Brand</label>
-          <input type="text" id="brand" value="Aster Health" />
+          <label>Campaign ID</label>
+          <input type="text" id="campaignId" value="" />
         </div>
-        <div class="field-group">
-          <label>Agency</label>
-          <input type="text" id="agency" value="Blue Pixel Media" />
-        </div>
-      </div>
 
-      <div class="field-row">
         <div class="field-group">
-          <label>Category</label>
-          <select id="category">
-            <option>Healthcare</option>
-            <option>Finance</option>
-            <option>Technology</option>
-            <option>Retail</option>
+          <label>Campaign Name</label>
+          <input type="text" id="campaignName" value="" />
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Brand</label>
+            <select id="brand"></select>
+          </div>
+          <div class="field-group">
+            <label>Agency</label>
+            <input type="text" id="agency" value="" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Category</label>
+            <select id="category">
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Subcategory</label>
+            <input type="text" id="subcategory" value="" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Campaign Type</label>
+          <select id="campaignType">
           </select>
         </div>
-        <div class="field-group">
-          <label>Subcategory</label>
-          <input type="text" id="subcategory" value="Diagnostics" />
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Creative Type</label>
+            <select id="creativeType">
+              <option>Display</option>
+              <option>Video</option>
+              <option>Native</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Billing Type</label>
+            <select id="billingType">
+            </select>
+          </div>
         </div>
-      </div>
 
-      <div class="field-group">
-        <label>Campaign Type</label>
-        <select id="campaignType">
-          <option>Programmatic Guaranteed (PG)</option>
-          <option>Preferred Deal</option>
-          <option>Open Auction</option>
-        </select>
-      </div>
-
-      <div class="field-row">
         <div class="field-group">
-          <label>Creative Type</label>
-          <select id="creativeType">
-            <option>Display</option>
-            <option>Video</option>
-            <option>Native</option>
+          <label>Optimization Type</label>
+          <select id="optimizationType">
           </select>
         </div>
-        <div class="field-group">
-          <label>Billing Type</label>
-          <select id="billingType">
-            <option>CPM</option>
-            <option>CPC</option>
-            <option>CPV</option>
-          </select>
-        </div>
-      </div>
 
-      <div class="field-group">
-        <label>Optimization Type</label>
-        <select id="optimizationType">
-          <option>Leads</option>
-          <option>Clicks</option>
-          <option>Impressions</option>
-          <option>Conversions</option>
-        </select>
-      </div>
-
-      <div class="field-row">
-        <div class="field-group">
-          <label>Start Date</label>
-          <input type="date" id="startDate" value="2026-06-10" />
+        <div class="field-row">
+          <div class="field-group">
+            <label>Start Date</label>
+            <input type="date" id="startDate" value="" />
+          </div>
+          <div class="field-group">
+            <label>End Date</label>
+            <input type="date" id="endDate" value="" />
+          </div>
         </div>
-        <div class="field-group">
-          <label>End Date</label>
-          <input type="date" id="endDate" value="2026-06-20" />
-        </div>
-      </div>
 
-      <div class="field-group">
-        <label>Campaign Deliverables</label>
-        <textarea id="deliverables" rows="4">Reach, engagement, and lead generation deliverables for Tamil Nadu audience.</textarea>
+        <div class="field-group">
+          <label>Campaign Deliverables</label>
+          <textarea id="deliverables" rows="4"></textarea>
+        </div>
+
+        <button class="book-slot-btn" id="bookSlotBtn" onclick="bookSelectedSlot()">
+          Book Selected Slot
+        </button>
       </div>
     </aside>
 
@@ -121,25 +122,27 @@
       <div class="filter-bar">
         <div class="filter-select-wrap">
           <select id="filterPlatform" onchange="applyFilters()">
-            <option value="all">All Platforms</option>
+            <option value="dailyhunt-web" selected>Dailyhunt Web</option>
+            <option value="dailyhunt-app">Dailyhunt App</option>
             <option value="mobile">Mobile</option>
             <option value="desktop">Desktop</option>
             <option value="ctv">CTV</option>
+            <option value="all">All Platforms</option>
           </select>
           <span class="filter-arrow">▾</span>
         </div>
         <div class="filter-select-wrap">
           <select id="filterType" onchange="applyFilters()">
-            <option value="all">All Types</option>
+            <option value="display" selected>Display</option>
             <option value="video">Video</option>
-            <option value="display">Display</option>
             <option value="native">Native</option>
+            <option value="all">All Types</option>
           </select>
           <span class="filter-arrow">▾</span>
         </div>
         <div class="filter-select-wrap">
           <select id="filterContent" onchange="applyFilters()">
-            <option value="all">PG + Non-PG</option>
+            <option value="all" selected>PG + Non-PG</option>
             <option value="pg">PG Only</option>
             <option value="nonpg">Non-PG Only</option>
           </select>
@@ -147,21 +150,44 @@
         </div>
         <div class="filter-select-wrap">
           <select id="filterLanguage" onchange="applyFilters()">
-            <option value="all">All Languages</option>
+            <option value="kn" selected>Kannada</option>
             <option value="en">English</option>
             <option value="ta">Tamil</option>
             <option value="hi">Hindi</option>
+            <option value="te">Telugu</option>
+            <option value="all">All Languages</option>
           </select>
           <span class="filter-arrow">▾</span>
         </div>
         <div class="filter-select-wrap">
           <select id="filterRegion" onchange="applyFilters()">
-            <option value="all">All Regions</option>
+            <option value="karnataka" selected>Karnataka</option>
             <option value="south">South India</option>
             <option value="north">North India</option>
             <option value="west">West India</option>
+            <option value="all">All Regions</option>
           </select>
           <span class="filter-arrow">▾</span>
+        </div>
+      </div>
+
+      <!-- Metric Stat Cards -->
+      <div class="metric-cards" id="metricCards">
+        <div class="metric-card">
+          <p class="metric-label">Billable Impressions</p>
+          <p class="metric-value" id="statImpressions">1.2M</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">Billable Clicks</p>
+          <p class="metric-value" id="statClicks">18.4K</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">Delivered Impressions</p>
+          <p class="metric-value" id="statDelivered">1.1M</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">CTR</p>
+          <p class="metric-value" id="statCtr">1.53%</p>
         </div>
       </div>
 
