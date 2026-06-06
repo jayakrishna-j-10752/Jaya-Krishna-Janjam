@@ -194,10 +194,10 @@ function openDayDetail(day) {
   const billing      = $('#billingType').val()  || '';
   const creative     = $('#creativeType').val() || '';
 
-  const langMap   = { all: 'All Languages', en: 'English', ta: 'Tamil', hi: 'Hindi' };
-  const regionMap = { all: 'All Regions', south: 'South India', north: 'North India', west: 'West India' };
-  const lang      = langMap[$('#filterLanguage').val()] || 'Tamil';
-  const region    = regionMap[$('#filterRegion').val()] || 'Tamil Nadu';
+  const langMap   = { all: 'All Languages', en: 'English', ta: 'Tamil', hi: 'Hindi', kn: 'Kannada', te: 'Telugu' };
+  const regionMap = { all: 'All Regions', south: 'South India', north: 'North India', west: 'West India', karnataka: 'Karnataka' };
+  const lang      = langMap[$('#filterLanguage').val()] || 'Kannada';
+  const region    = regionMap[$('#filterRegion').val()] || 'Karnataka';
 
   /* Info rows */
   const INFO_ROWS = [
@@ -231,7 +231,7 @@ function openDayDetail(day) {
 
   /* Build overlay + drawer */
   const $overlay = $('<div>').attr('id', 'slotDrawerOverlay').html(`
-    <div class="slot-drawer" id="slotDrawer" role="dialog" aria-modal="true" aria-label="Slot Detail Drawer">
+    <div class="slot-drawer" id="slotDrawer" role="dialog" aria-modal="true" aria-label="Slot Details for June ${day}, 2026">
       <div class="drawer-header">
         <h2 class="drawer-title">Slot Detail Drawer</h2>
         <button class="drawer-close" onclick="closeDrawer()" aria-label="Close">&#x2715;</button>
@@ -304,6 +304,7 @@ function confirmBooking(day) {
   /* Success toast */
   const $toast = $('<div>')
     .addClass('booking-toast')
+    .attr({ role: 'status', 'aria-live': 'polite' })
     .html(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for June ${day}, 2026`);
   $('body').append($toast);
   requestAnimationFrame(function () { $toast.addClass('show'); });
