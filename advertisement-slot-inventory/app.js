@@ -380,25 +380,46 @@ function bookSelectedSlot() {
 
 /* ─────────────────────────────────────────────
    FIELD MAP  (Deals API name → select element ID)
+   Picklist fields whose options come from metadata.
    ───────────────────────────────────────────── */
 const PICKLIST_FIELD_MAP = {
-  'Category':          'category',
-  'Campaign_Type':     'campaignType',
-  'Billing_Type':      'billingType',
-  'Optimization_Type': 'optimizationType',
+  'Category':                  'category',
+  'Campaign_Type':             'campaignType',
+  'Billing_Type':              'billingType',
+  'Optimization_Type':         'optimizationType',
+  'Host_Application_Platform': 'brand',
+};
+
+/* ─────────────────────────────────────────────
+   DEAL FIELD MAP  (Deals API name → widget element ID)
+   All fields that are populated from the Deal record.
+   ───────────────────────────────────────────── */
+const DEAL_FIELD_MAP = {
+  'Deal_Name':                 'campaignId',
+  'Campaign_Name':             'campaignName',
+  'Agency':                    'agency',
+  'Category':                  'category',
+  'Subcategory':               'subcategory',
+  'Campaign_Type':             'campaignType',
+  'Billing_Type':              'billingType',
+  'Optimization_Type':         'optimizationType',
+  'Start_Date':                'startDate',
+  'End_Date':                  'endDate',
+  'Campaign_Deliverables':     'deliverables',
+  'Host_Application_Platform': 'brand',
 };
 
 /**
- * Populate a <select> element with picklist values from
+ * Populate <select> elements with picklist values from
  * Zoho CRM Deals field metadata.
  */
 function populatePicklistsFromMeta(fields) {
   fields.forEach(function (field) {
     const elementId = PICKLIST_FIELD_MAP[field.api_name];
     if (!elementId) return;
-    const $select    = $('#' + elementId);
+    const $select  = $('#' + elementId);
     if (!$select.length) return;
-    const pickList   = field.pick_list_values || [];
+    const pickList = field.pick_list_values || [];
     if (!pickList.length) return;
     $select.empty();
     pickList.forEach(function (opt) {
@@ -406,6 +427,42 @@ function populatePicklistsFromMeta(fields) {
       $select.append($('<option>').val(displayVal).text(displayVal));
     });
   });
+}
+
+/**
+ * Set widget field values from a fetched Deal record.
+ * Handles <input>, <textarea>, and <select> elements.
+ * For selects, dynamically adds the option if not already present.
+ */
+function populateDealRecord(record) {
+  $.each(DEAL_FIELD_MAP, function (crmField, elementId) {
+    const $el  = $('#' + elementId);
+    if (!$el.length) return;
+    const value = record[crmField];
+    if (value === null || value === undefined || value === '') return;
+
+    if ($el.is('select')) {
+      const strVal = String(value);
+      const $match = $el.find('option').filter(function () {
+        return $(this).val() === strVal || $(this).text() === strVal;
+      });
+      if ($match.length) {
+        $el.val($match.first().val());
+      } else {
+        $el.append($('<option>').val(strVal).text(strVal).prop('selected', true));
+      }
+    } else {
+      $el.val(value);
+    }
+  });
+
+  /* Update left-panel subtitle with deal name + date range */
+  const name      = record['Deal_Name'] || record['Campaign_Name'] || '';
+  const startRaw  = record['Start_Date'];
+  const monthYear = startRaw
+    ? new Date(startRaw).toLocaleString('default', { month: 'long', year: 'numeric' })
+    : 'June 2026';
+  if (name) $('.panel-subtitle').text(monthYear + ' · ' + name);
 }
 
 /* ─────────────────────────────────────────────
@@ -417,12 +474,30 @@ $(document).ready(function () {
     console.log(data);
     if (data) {
       const entity = data.Entity; // Deals, Contacts, Accounts, etc.
-      ZOHO.CRM.META.getFields({ Entity: entity }).then(function (metaData) {
+      const dealId = data.EntityId;
+
+      // Fetch field metadata and Deal record in parallel
+      $.when(
+        ZOHO.CRM.META.getFields({ Entity: 'Deals' }),
+        ZOHO.CRM.API.getRecord({ Entity: 'Deals', RecordID: dealId })
+      ).then(function (metaData, recordData) {
         console.log(metaData);
+        console.log(recordData);
+
         const fields = metaData && metaData.fields ? metaData.fields : [];
         if (fields.length) {
           populatePicklistsFromMeta(fields);
         }
+
+        const record = recordData && recordData.data && recordData.data[0]
+          ? recordData.data[0]
+          : null;
+        if (record) {
+          populateDealRecord(record);
+        }
+
+        // Re-render with populated campaign data
+        renderSlotCards(INVENTORY);
       });
     }
   });
