@@ -808,6 +808,10 @@ body {
   white-space: nowrap;
 }
 
+.booking-toast.error {
+  background: #B71C1C;
+}
+
 .booking-toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);

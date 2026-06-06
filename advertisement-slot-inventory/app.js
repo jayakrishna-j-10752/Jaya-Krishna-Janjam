@@ -76,6 +76,8 @@ function availLabel(total) {
 let currentView    = 'slot';
 let activeCategory = 'all';
 let coqlRecords    = [];
+let currentDealId  = null;   // EntityId from PageLoad – used for Ad_Bookings Deal lookup
+let currentSlotRecord = null; // Selected Ad_Slots CRM record – used when confirming a booking
 
 /* ─────────────────────────────────────────────
    SLOT CARDS RENDERER
@@ -182,6 +184,9 @@ const SLOT_META = {
 function openDayDetail(day) {
   const entry = INVENTORY.find(d => d.day === day);
   if (!entry) return;
+
+  /* Clear any previously selected COQL slot record */
+  currentSlotRecord = null;
 
   /* Remove any existing drawer */
   $('#slotDrawerOverlay').remove();
@@ -301,14 +306,69 @@ function confirmBooking(dateLabel) {
     setTimeout(function () { $btn.removeClass('shake'); }, 450);
     return;
   }
-  closeDrawer();
 
-  /* Success toast */
+  /* If a COQL slot record is selected, create an Ad_Bookings record */
+  if (currentSlotRecord) {
+    const record = currentSlotRecord;
+    const slotCrmId = record.id || record.ID || null;
+
+    if (!slotCrmId) {
+      console.error('Ad_Bookings creation failed: slot record ID is missing.', record);
+      showToast('Booking failed — slot record ID is unavailable.', true);
+      return;
+    }
+
+    const bookingData = {
+      Name:                  record.Name                 || '',
+      Ad_Slot:               { id: slotCrmId },
+      Selected_Date:         record.Slot_Date            || '',
+      Platform:              record.Platform             || '',
+      Language:              record.Language             || '',
+      Campaign_Type:         record.Campaign_Type        || '',
+      Billing:               record.Billing              || '',
+      Home_Feed:             record.Home_Feed            || 0,
+      Article_Page:          record.Article_Page         || 0,
+      Storypage_Impact:      record.Storypage_Impact     || 0,
+      Native_Content_Stream: record.Native_Content_Stream || 0,
+      Banner_Slots:          record.Banner_Slots         || 0,
+      Video_Slots:           record.Video_Slots          || 0,
+    };
+
+    if (currentDealId) {
+      bookingData.Deal = { id: currentDealId };
+    }
+
+    closeDrawer();
+
+    ZOHO.CRM.API.insertRecord({ Entity: 'Ad_Bookings', APIData: bookingData })
+      .then(function (response) {
+        console.log('Ad_Bookings created:', response);
+        const label = record.Slot_Date || dateLabel;
+        showToast(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for `, false, label);
+      })
+      .catch(function (err) {
+        console.error('Ad_Bookings creation failed:', err);
+        showToast('Booking failed — please try again.', true);
+      });
+
+    return;
+  }
+
+  /* Fallback for static inventory drawer (no CRM record) */
+  closeDrawer();
   const label = typeof dateLabel === 'number' ? `June ${dateLabel}, 2026` : dateLabel;
+  showToast(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for `, false, label);
+}
+
+function showToast(htmlPrefix, isError, textSuffix) {
   const $toast = $('<div>')
-    .addClass('booking-toast')
-    .attr({ role: 'status', 'aria-live': 'polite' })
-    .html(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for ${label}`);
+    .addClass('booking-toast' + (isError ? ' error' : ''))
+    .attr({ role: 'status', 'aria-live': 'polite' });
+  if (textSuffix !== undefined) {
+    $toast.html(htmlPrefix).append(document.createTextNode(textSuffix));
+  } else {
+    $toast.html(htmlPrefix);
+  }
   $('body').append($toast);
   requestAnimationFrame(function () { $toast.addClass('show'); });
   setTimeout(function () {
@@ -445,6 +505,9 @@ function renderCoqlSlotCards(records) {
 function openCoqlRecordDetail(record) {
   $('#slotDrawerOverlay').remove();
 
+  /* Store the selected record so confirmBooking can access it */
+  currentSlotRecord = record;
+
   const slotName  = record.Name            || '';
   const slotDate  = record.Slot_Date       || '';
   const platform  = record.Platform        || '';
@@ -454,8 +517,8 @@ function openCoqlRecordDetail(record) {
   const billing   = record.Billing         || '';
   const approval  = record.Approval_Status || '';
 
-  /* Dummy Slot ID until backend integration is ready */
-  const slotId = `SLOT-${slotDate.replace(/-/g, '').slice(2)}`;
+  /* Use Placement_Code from the CRM record as the Slot ID */
+  const slotId = record.Placement_Code || '';
 
   const slotCounts = slotCountsFromRecord(record);
   const total      = slotCounts.reduce((sum, s) => sum + s.count, 0);
@@ -518,11 +581,12 @@ function openCoqlRecordDetail(record) {
       </div>
 
       <div class="drawer-footer">
-        <button class="drawer-confirm-btn" onclick="confirmBooking('${slotDate}')">Confirm Booking</button>
+        <button class="drawer-confirm-btn">Confirm Booking</button>
       </div>
     </div>`);
 
   $overlay.on('click', function (e) { if (e.target === this) closeDrawer(); });
+  $overlay.find('.drawer-confirm-btn').on('click', function () { confirmBooking(slotDate); });
   $('body').append($overlay);
 
   requestAnimationFrame(function () {
@@ -539,7 +603,10 @@ function fetchAndRenderSlotCards(startDate, endDate) {
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   if (!startDate || !endDate || !DATE_RE.test(startDate) || !DATE_RE.test(endDate)) return;
   const config = {
-    select_query: `select Name, Slot_Date, Platform, Language, Region, Campaign_Type, Billing, Approval_Status, Home_Feed, Article_Page, Storypage_Impact, Native_Content_Stream, Banner_Slots, Video_Slots, Roadblock_Takeover from Ad_Slots where Slot_Date between '${startDate}' and '${endDate}' limit 200`,
+    select_query: `select Name, Placement_Code, Slot_Date, Platform, Language, Region, Campaign_Type, Billing, Approval_Status, Home_Feed, Article_Page, Storypage_Impact, Native_Content_Stream, Banner_Slots, Video_Slots, Roadblock_Takeover
+  from Ad_Slots
+  where Slot_Date between '${startDate}' and '${endDate}'
+  limit 200`,
   };
   ZOHO.CRM.API.coql(config).then(function (data) {
     console.log(data);
@@ -657,6 +724,9 @@ $(document).ready(function () {
     if (data) {
       const entity = data.Entity; // Deals, Contacts, Accounts, etc.
       const dealId = data.EntityId;
+
+      /* Store the Deal ID globally for Ad_Bookings creation */
+      currentDealId = dealId || null;
 
       // Fetch field metadata and Deal record in parallel
       $.when(
