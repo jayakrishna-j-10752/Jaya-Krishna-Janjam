@@ -379,8 +379,56 @@ function bookSelectedSlot() {
 }
 
 /* ─────────────────────────────────────────────
+   FIELD MAP  (Deals API name → select element ID)
+   ───────────────────────────────────────────── */
+const PICKLIST_FIELD_MAP = {
+  'Category':          'category',
+  'Campaign_Type':     'campaignType',
+  'Billing_Type':      'billingType',
+  'Optimization_Type': 'optimizationType',
+};
+
+/**
+ * Populate a <select> element with picklist values from
+ * Zoho CRM Deals field metadata.
+ */
+function populatePicklistsFromMeta(fields) {
+  fields.forEach(function (field) {
+    const elementId = PICKLIST_FIELD_MAP[field.api_name];
+    if (!elementId) return;
+    const $select    = $('#' + elementId);
+    if (!$select.length) return;
+    const pickList   = field.pick_list_values || [];
+    if (!pickList.length) return;
+    $select.empty();
+    pickList.forEach(function (opt) {
+      const displayVal = opt.display_value || opt.actual_value || opt.value || '';
+      $select.append($('<option>').val(displayVal).text(displayVal));
+    });
+  });
+}
+
+/* ─────────────────────────────────────────────
    INIT
    ───────────────────────────────────────────── */
 $(document).ready(function () {
+  // Subscribe to the EmbeddedApp PageLoad event before initializing
+  ZOHO.embeddedApp.on('PageLoad', function (data) {
+    console.log(data);
+    if (data) {
+      const entity = data.Entity; // Deals, Contacts, Accounts, etc.
+      ZOHO.CRM.META.getFields({ Entity: entity }).then(function (metaData) {
+        console.log(metaData);
+        const fields = metaData && metaData.fields ? metaData.fields : [];
+        if (fields.length) {
+          populatePicklistsFromMeta(fields);
+        }
+      });
+    }
+  });
+
+  // Initialize the widget
+  ZOHO.embeddedApp.init();
+
   renderSlotCards(INVENTORY);
 });
