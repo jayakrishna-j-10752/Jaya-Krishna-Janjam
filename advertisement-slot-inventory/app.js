@@ -408,6 +408,14 @@ function confirmBooking(dateLabel) {
           console.log('Ad_Slots update API response:', JSON.stringify(updateResponse, null, 2));
           const label = record.Slot_Date || dateLabel;
           showToast(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for `, false, label);
+
+          /* Reflect updated inventory values in the local records array
+             and re-render the slot cards so counts stay in sync with CRM. */
+          const idx = coqlRecords.findIndex(function (r) { return (r.id || r.ID) === slotCrmId; });
+          if (idx !== -1) {
+            Object.assign(coqlRecords[idx], updatedInventory);
+            renderCoqlSlotCards(coqlRecords);
+          }
         });
       })
       .catch(function (err) {
