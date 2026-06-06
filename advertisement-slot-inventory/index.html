@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Advertisement Slot Inventory – Zoho CRM Widget</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Zoho Embedded App SDK (vendor URL; note the intentional single-'b' spelling in the filename) -->
+  <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
 </head>
 <body>
   <div class="crm-widget-wrapper">
@@ -107,6 +109,13 @@
           <label>Campaign Deliverables</label>
           <textarea id="deliverables" rows="4">Reach, engagement, and lead generation deliverables for Tamil Nadu audience.</textarea>
         </div>
+
+        <button class="book-slot-btn" id="bookSlotBtn" onclick="bookSelectedSlot()">
+          Book Selected Slot
+        </button>
+        <div class="prototype-notice">
+          Prototype data only. Connect this UI to real inventory, rate card, RO and finance APIs before production use.
+        </div>
       </div>
     </aside>
 
@@ -126,25 +135,27 @@
       <div class="filter-bar">
         <div class="filter-select-wrap">
           <select id="filterPlatform" onchange="applyFilters()">
-            <option value="all">All Platforms</option>
+            <option value="dailyhunt-web" selected>Dailyhunt Web</option>
+            <option value="dailyhunt-app">Dailyhunt App</option>
             <option value="mobile">Mobile</option>
             <option value="desktop">Desktop</option>
             <option value="ctv">CTV</option>
+            <option value="all">All Platforms</option>
           </select>
           <span class="filter-arrow">▾</span>
         </div>
         <div class="filter-select-wrap">
           <select id="filterType" onchange="applyFilters()">
-            <option value="all">All Types</option>
+            <option value="display" selected>Display</option>
             <option value="video">Video</option>
-            <option value="display">Display</option>
             <option value="native">Native</option>
+            <option value="all">All Types</option>
           </select>
           <span class="filter-arrow">▾</span>
         </div>
         <div class="filter-select-wrap">
           <select id="filterContent" onchange="applyFilters()">
-            <option value="all">PG + Non-PG</option>
+            <option value="all" selected>PG + Non-PG</option>
             <option value="pg">PG Only</option>
             <option value="nonpg">Non-PG Only</option>
           </select>
@@ -152,21 +163,44 @@
         </div>
         <div class="filter-select-wrap">
           <select id="filterLanguage" onchange="applyFilters()">
-            <option value="all">All Languages</option>
+            <option value="kn" selected>Kannada</option>
             <option value="en">English</option>
             <option value="ta">Tamil</option>
             <option value="hi">Hindi</option>
+            <option value="te">Telugu</option>
+            <option value="all">All Languages</option>
           </select>
           <span class="filter-arrow">▾</span>
         </div>
         <div class="filter-select-wrap">
           <select id="filterRegion" onchange="applyFilters()">
-            <option value="all">All Regions</option>
+            <option value="karnataka" selected>Karnataka</option>
             <option value="south">South India</option>
             <option value="north">North India</option>
             <option value="west">West India</option>
+            <option value="all">All Regions</option>
           </select>
           <span class="filter-arrow">▾</span>
+        </div>
+      </div>
+
+      <!-- Metric Stat Cards -->
+      <div class="metric-cards" id="metricCards">
+        <div class="metric-card">
+          <p class="metric-label">Billable Impressions</p>
+          <p class="metric-value" id="statImpressions">1.2M</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">Billable Clicks</p>
+          <p class="metric-value" id="statClicks">18.4K</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">Delivered Impressions</p>
+          <p class="metric-value" id="statDelivered">1.1M</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">CTR</p>
+          <p class="metric-value" id="statCtr">1.53%</p>
         </div>
       </div>
 

@@ -380,3 +380,132 @@ function applyFilters() {
 document.addEventListener('DOMContentLoaded', () => {
   renderSlotCards(INVENTORY);
 });
+
+/* ─────────────────────────────────────────────
+   ZOHO CRM INTEGRATION
+   ───────────────────────────────────────────── */
+
+/** Maps Deals module API field names to widget element IDs */
+const DEAL_FIELD_MAP = {
+  'Deal_Name':             'campaignId',
+  'Campaign_Name':         'campaignName',
+  'Agency':                'agency',
+  'Category':              'category',
+  'Subcategory':           'subcategory',
+  'Campaign_Type':         'campaignType',
+  'Billing_Type':          'billingType',
+  'Optimization_Type':     'optimizationType',
+  'Start_Date':            'startDate',
+  'End_Date':              'endDate',
+  'Campaign_Deliverables': 'deliverables',
+};
+
+/**
+ * Populate select option lists from Deals field metadata.
+ * For every picklist field that maps to a <select>, replace
+ * the hard-coded options with the live CRM picklist values.
+ */
+function populateFieldsFromMeta(fields) {
+  fields.forEach(field => {
+    const elementId = DEAL_FIELD_MAP[field.api_name];
+    if (!elementId) return;
+    const el = document.getElementById(elementId);
+    if (!el || el.tagName !== 'SELECT') return;
+    const pickList = field.pick_list_values || [];
+    if (!pickList.length) return;
+    el.innerHTML = '';
+    pickList.forEach(opt => {
+      /* Zoho API v2 uses display_value; v8 may use actual_value or value */
+      const displayVal = opt.display_value || opt.actual_value || opt.value || '';
+      const option = document.createElement('option');
+      option.value       = displayVal;
+      option.textContent = displayVal;
+      el.appendChild(option);
+    });
+  });
+}
+
+/**
+ * Set each widget field value from the fetched Deal record.
+ * Handles <input>, <textarea>, and <select> elements.
+ * For selects, adds an option dynamically if the CRM value
+ * does not already exist in the list.
+ */
+function populateDealRecord(record) {
+  Object.entries(DEAL_FIELD_MAP).forEach(([crmField, elementId]) => {
+    const el    = document.getElementById(elementId);
+    if (!el) return;
+    const value = record[crmField];
+    if (value === null || value === undefined || value === '') return;
+
+    if (el.tagName === 'SELECT') {
+      const opts  = Array.from(el.options);
+      const match = opts.find(o => o.value === String(value) || o.textContent === String(value));
+      if (match) {
+        el.value = match.value;
+      } else {
+        const newOpt = new Option(value, value, true, true);
+        el.add(newOpt);
+      }
+    } else {
+      el.value = value;
+    }
+  });
+
+  /* Update left-panel subtitle with deal name + date range */
+  const subtitle = document.querySelector('.panel-subtitle');
+  if (subtitle) {
+    const name      = record['Deal_Name'] || record['Campaign_Name'] || '';
+    const startRaw  = record['Start_Date'];
+    const monthYear = startRaw
+      ? new Date(startRaw).toLocaleString('default', { month: 'long', year: 'numeric' })
+      : 'June 2026';
+    if (name) subtitle.textContent = `${monthYear} · ${name}`;
+  }
+}
+
+/** Fetch Deals field metadata + Deal record in parallel, then populate the widget */
+function fetchDealData() {
+  /* RecordID specified in the task requirements; in production retrieve via
+     ZOHO.CRM.UI.Record.get() to support any Deal opened in the CRM context. */
+  Promise.all([
+    ZOHO.CRM.META.getFields({ Entity: 'Deals' }),
+    ZOHO.CRM.API.getRecord({ Entity: 'Deals', RecordID: '1000000030132' }),
+  ])
+    .then(([metaResponse, recordResponse]) => {
+      const fields = metaResponse && metaResponse.fields ? metaResponse.fields : [];
+      const record = recordResponse && recordResponse.data && recordResponse.data[0]
+        ? recordResponse.data[0]
+        : null;
+      if (fields.length) populateFieldsFromMeta(fields);
+      if (record)        populateDealRecord(record);
+    })
+    .catch(err => {
+      console.error('[Slot Widget] Error loading Deal data:', err);
+    });
+}
+
+/** "Book Selected Slot" button handler – opens the day-detail drawer for the campaign start date */
+function bookSelectedSlot() {
+  const startVal = document.getElementById('startDate')?.value;
+  if (startVal) {
+    const parts = startVal.split('-');
+    if (parts.length === 3) {
+      const day = parseInt(parts[2], 10);
+      if (day >= 1 && day <= 30) { openDayDetail(day); return; }
+    }
+  }
+  /* Fallback: open first available day */
+  const firstAvail = INVENTORY.find(d => d.total > 0);
+  if (firstAvail) openDayDetail(firstAvail.day);
+}
+
+/* Bootstrap Zoho Embedded App SDK when running inside Zoho CRM */
+if (typeof ZOHO !== 'undefined' && ZOHO.embeddedApp) {
+  try {
+    ZOHO.embeddedApp.init();
+    ZOHO.embeddedApp.on('PageLoad', fetchDealData);
+  } catch (e) {
+    console.error('[Slot Widget] SDK initialisation failed:', e);
+  }
+}
