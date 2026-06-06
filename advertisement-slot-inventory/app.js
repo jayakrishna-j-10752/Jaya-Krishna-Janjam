@@ -472,7 +472,7 @@ async function onPageLoad(data) {
 
   try {
     const [metaResponse, recordResponse] = await Promise.all([
-      ZOHO.CRM.META.getFields({ Entity: entity }),
+      ZOHO.CRM.META.getFields({ Entity: 'Deals' }),
       ZOHO.CRM.API.getRecord({ Entity: entity, RecordID: recordId }),
     ]);
 
@@ -483,6 +483,10 @@ async function onPageLoad(data) {
 
     if (fields.length) populateFieldsFromMeta(fields);
     if (record)        populateDealRecord(record);
+
+    /* Re-render both views so they reflect the populated campaign data */
+    renderSlotCards(INVENTORY);
+    renderCalendar(INVENTORY);
   } catch (err) {
     console.error('[Slot Widget] Error loading Deal data:', err);
   }
