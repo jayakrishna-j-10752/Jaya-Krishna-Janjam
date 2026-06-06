@@ -375,14 +375,14 @@ function applyFilters() {
 }
 
 /* ─────────────────────────────────────────────
-   INIT  (jQuery ready)
+   INIT
    ───────────────────────────────────────────── */
-$(function () {
+document.addEventListener('DOMContentLoaded', function () {
   renderSlotCards(INVENTORY);
 });
 
 /* ─────────────────────────────────────────────
-   ZOHO CRM INTEGRATION  (jQuery + async/await)
+   ZOHO CRM INTEGRATION
    ───────────────────────────────────────────── */
 
 /** Maps Deals module API field names to widget element IDs */
@@ -406,18 +406,21 @@ const DEAL_FIELD_MAP = {
  * the hard-coded options with the live CRM picklist values.
  */
 function populateFieldsFromMeta(fields) {
-  $.each(fields, function (_, field) {
+  fields.forEach(function (field) {
     const elementId = DEAL_FIELD_MAP[field.api_name];
     if (!elementId) return;
-    const $el = $('#' + elementId);
-    if (!$el.length || $el.prop('tagName') !== 'SELECT') return;
+    const el = document.getElementById(elementId);
+    if (!el || el.tagName !== 'SELECT') return;
     const pickList = field.pick_list_values || [];
     if (!pickList.length) return;
-    $el.empty();
-    $.each(pickList, function (_, opt) {
+    el.innerHTML = '';
+    pickList.forEach(function (opt) {
       /* Zoho API v2 uses display_value; v8 may use actual_value or value */
       const displayVal = opt.display_value || opt.actual_value || opt.value || '';
-      $el.append($('<option>', { value: displayVal, text: displayVal }));
+      const option = document.createElement('option');
+      option.value = displayVal;
+      option.textContent = displayVal;
+      el.appendChild(option);
     });
   });
 }
@@ -429,24 +432,28 @@ function populateFieldsFromMeta(fields) {
  * does not already exist in the list.
  */
 function populateDealRecord(record) {
-  $.each(DEAL_FIELD_MAP, function (crmField, elementId) {
-    const $el   = $('#' + elementId);
-    if (!$el.length) return;
+  Object.entries(DEAL_FIELD_MAP).forEach(function ([crmField, elementId]) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
     const value = record[crmField];
     if (value === null || value === undefined || value === '') return;
 
-    if ($el.prop('tagName') === 'SELECT') {
+    if (el.tagName === 'SELECT') {
       const strVal = String(value);
-      const $match = $el.find('option').filter(function () {
-        return $(this).val() === strVal || $(this).text() === strVal;
+      const match  = Array.from(el.options).find(function (o) {
+        return o.value === strVal || o.text === strVal;
       });
-      if ($match.length) {
-        $el.val($match.val());
+      if (match) {
+        el.value = match.value;
       } else {
-        $el.append($('<option>', { value: strVal, text: strVal, selected: true }));
+        const option = document.createElement('option');
+        option.value = strVal;
+        option.textContent = strVal;
+        option.selected = true;
+        el.appendChild(option);
       }
     } else {
-      $el.val(value);
+      el.value = value;
     }
   });
 
@@ -456,7 +463,8 @@ function populateDealRecord(record) {
   const monthYear = startRaw
     ? new Date(startRaw).toLocaleString('default', { month: 'long', year: 'numeric' })
     : 'June 2026';
-  if (name) $('.panel-subtitle').text(`${monthYear} · ${name}`);
+  const subtitle = document.querySelector('.panel-subtitle');
+  if (name && subtitle) subtitle.textContent = `${monthYear} · ${name}`;
 }
 
 /**
@@ -495,7 +503,7 @@ async function onPageLoad(data) {
 
 /** "Book Selected Slot" button handler – opens the slot-detail drawer for the campaign start date */
 function bookSelectedSlot() {
-  const startVal = $('#startDate').val();
+  const startVal = document.getElementById('startDate').value;
   if (startVal) {
     const parts = startVal.split('-');
     if (parts.length === 3) {
