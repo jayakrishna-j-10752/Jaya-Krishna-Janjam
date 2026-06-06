@@ -340,9 +340,10 @@ function confirmBooking(dateLabel) {
 
     closeDrawer();
 
+    console.log('Ad_Bookings payload:', JSON.stringify(bookingData, null, 2));
     ZOHO.CRM.API.insertRecord({ Entity: 'Ad_Bookings', APIData: bookingData })
       .then(function (response) {
-        console.log('Ad_Bookings created:', response);
+        console.log('Ad_Bookings API response:', JSON.stringify(response, null, 2));
         const label = record.Slot_Date || dateLabel;
         showToast(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for `, false, label);
       })
@@ -725,8 +726,10 @@ $(document).ready(function () {
       const entity = data.Entity; // Deals, Contacts, Accounts, etc.
       const dealId = data.EntityId;
 
-      /* Store the Deal ID globally for Ad_Bookings creation */
-      currentDealId = dealId || null;
+      /* Store the Deal ID globally for Ad_Bookings creation.
+         EntityId may arrive as an array in some widget contexts; always
+         extract a plain string so the CRM lookup payload is valid. */
+      currentDealId = Array.isArray(dealId) ? (dealId[0] || null) : (dealId || null);
 
       // Fetch field metadata and Deal record in parallel
       $.when(
