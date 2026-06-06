@@ -399,11 +399,11 @@ function confirmBooking(dateLabel) {
       .then(function (bookingResponse) {
         console.log('Ad_Bookings API response:', JSON.stringify(bookingResponse, null, 2));
 
-        /* Update Ad_Slots record to deduct booked quantities */
+        /* Update Ad_Slots record to deduct booked quantities.
+           The Zoho CRM JS SDK requires the record id inside APIData. */
         return ZOHO.CRM.API.updateRecord({
-          Entity:   'Ad_Slots',
-          RecordID: slotCrmId,
-          APIData:  updatedInventory,
+          Entity:  'Ad_Slots',
+          APIData: Object.assign({ id: slotCrmId }, updatedInventory),
         }).then(function (updateResponse) {
           console.log('Ad_Slots update API response:', JSON.stringify(updateResponse, null, 2));
           const label = record.Slot_Date || dateLabel;
