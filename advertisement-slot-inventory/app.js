@@ -197,9 +197,9 @@ function openDayDetail(day) {
   const meta     = SLOT_META[dominant.name] || { name: dominant.name, id: 'DH-000' };
 
   /* Pull live values from campaign form */
-  const campaignType = document.getElementById('campaignType')?.value || 'Programmatic Guaranteed (PG)';
-  const billing      = document.getElementById('billingType')?.value  || 'CPM';
-  const creative     = document.getElementById('creativeType')?.value || 'Display';
+  const campaignType = document.getElementById('campaignType')?.value || '';
+  const billing      = document.getElementById('billingType')?.value  || '';
+  const creative     = document.getElementById('creativeType')?.value || '';
 
   const langMap   = { all: 'All Languages', en: 'English', ta: 'Tamil', hi: 'Hindi' };
   const regionMap = { all: 'All Regions', south: 'South India', north: 'North India', west: 'West India' };
@@ -472,6 +472,7 @@ async function onPageLoad(data) {
 
   try {
     const [metaResponse, recordResponse] = await Promise.all([
+      /* Entity is fixed to 'Deals' because this widget is purpose-built for the Deals module */
       ZOHO.CRM.META.getFields({ Entity: 'Deals' }),
       ZOHO.CRM.API.getRecord({ Entity: entity, RecordID: recordId }),
     ]);
