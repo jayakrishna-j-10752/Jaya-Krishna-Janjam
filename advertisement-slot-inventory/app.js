@@ -375,14 +375,14 @@ function applyFilters() {
 }
 
 /* ─────────────────────────────────────────────
-   INIT
+   INIT  (jQuery ready)
    ───────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+$(function () {
   renderSlotCards(INVENTORY);
 });
 
 /* ─────────────────────────────────────────────
-   ZOHO CRM INTEGRATION
+   ZOHO CRM INTEGRATION  (jQuery + async/await)
    ───────────────────────────────────────────── */
 
 /** Maps Deals module API field names to widget element IDs */
@@ -406,21 +406,18 @@ const DEAL_FIELD_MAP = {
  * the hard-coded options with the live CRM picklist values.
  */
 function populateFieldsFromMeta(fields) {
-  fields.forEach(field => {
+  $.each(fields, function (_, field) {
     const elementId = DEAL_FIELD_MAP[field.api_name];
     if (!elementId) return;
-    const el = document.getElementById(elementId);
-    if (!el || el.tagName !== 'SELECT') return;
+    const $el = $('#' + elementId);
+    if (!$el.length || $el.prop('tagName') !== 'SELECT') return;
     const pickList = field.pick_list_values || [];
     if (!pickList.length) return;
-    el.innerHTML = '';
-    pickList.forEach(opt => {
+    $el.empty();
+    $.each(pickList, function (_, opt) {
       /* Zoho API v2 uses display_value; v8 may use actual_value or value */
       const displayVal = opt.display_value || opt.actual_value || opt.value || '';
-      const option = document.createElement('option');
-      option.value       = displayVal;
-      option.textContent = displayVal;
-      el.appendChild(option);
+      $el.append($('<option>', { value: displayVal, text: displayVal }));
     });
   });
 }
@@ -432,62 +429,68 @@ function populateFieldsFromMeta(fields) {
  * does not already exist in the list.
  */
 function populateDealRecord(record) {
-  Object.entries(DEAL_FIELD_MAP).forEach(([crmField, elementId]) => {
-    const el    = document.getElementById(elementId);
-    if (!el) return;
+  $.each(DEAL_FIELD_MAP, function (crmField, elementId) {
+    const $el   = $('#' + elementId);
+    if (!$el.length) return;
     const value = record[crmField];
     if (value === null || value === undefined || value === '') return;
 
-    if (el.tagName === 'SELECT') {
-      const opts  = Array.from(el.options);
-      const match = opts.find(o => o.value === String(value) || o.textContent === String(value));
-      if (match) {
-        el.value = match.value;
+    if ($el.prop('tagName') === 'SELECT') {
+      const strVal = String(value);
+      const $match = $el.find('option').filter(function () {
+        return $(this).val() === strVal || $(this).text() === strVal;
+      });
+      if ($match.length) {
+        $el.val($match.val());
       } else {
-        const newOpt = new Option(value, value, true, true);
-        el.add(newOpt);
+        $el.append($('<option>', { value: strVal, text: strVal, selected: true }));
       }
     } else {
-      el.value = value;
+      $el.val(value);
     }
   });
 
   /* Update left-panel subtitle with deal name + date range */
-  const subtitle = document.querySelector('.panel-subtitle');
-  if (subtitle) {
-    const name      = record['Deal_Name'] || record['Campaign_Name'] || '';
-    const startRaw  = record['Start_Date'];
-    const monthYear = startRaw
-      ? new Date(startRaw).toLocaleString('default', { month: 'long', year: 'numeric' })
-      : 'June 2026';
-    if (name) subtitle.textContent = `${monthYear} · ${name}`;
+  const name      = record['Deal_Name'] || record['Campaign_Name'] || '';
+  const startRaw  = record['Start_Date'];
+  const monthYear = startRaw
+    ? new Date(startRaw).toLocaleString('default', { month: 'long', year: 'numeric' })
+    : 'June 2026';
+  if (name) $('.panel-subtitle').text(`${monthYear} · ${name}`);
+}
+
+/**
+ * PageLoad handler – receives the current record context from Zoho CRM,
+ * then fetches field metadata and the Deal record using async/await.
+ * Entity and RecordID are read dynamically from the event data.
+ */
+async function onPageLoad(data) {
+  console.log('[Slot Widget] PageLoad data:', data);
+
+  const entity   = data.Entity;
+  const recordId = data.EntityId;
+
+  try {
+    const [metaResponse, recordResponse] = await Promise.all([
+      ZOHO.CRM.META.getFields({ Entity: entity }),
+      ZOHO.CRM.API.getRecord({ Entity: entity, RecordID: recordId }),
+    ]);
+
+    const fields = metaResponse && metaResponse.fields ? metaResponse.fields : [];
+    const record = recordResponse && recordResponse.data && recordResponse.data[0]
+      ? recordResponse.data[0]
+      : null;
+
+    if (fields.length) populateFieldsFromMeta(fields);
+    if (record)        populateDealRecord(record);
+  } catch (err) {
+    console.error('[Slot Widget] Error loading Deal data:', err);
   }
 }
 
-/** Fetch Deals field metadata + Deal record in parallel, then populate the widget */
-function fetchDealData() {
-  /* RecordID specified in the task requirements; in production retrieve via
-     ZOHO.CRM.UI.Record.get() to support any Deal opened in the CRM context. */
-  Promise.all([
-    ZOHO.CRM.META.getFields({ Entity: 'Deals' }),
-    ZOHO.CRM.API.getRecord({ Entity: 'Deals', RecordID: '1000000030132' }),
-  ])
-    .then(([metaResponse, recordResponse]) => {
-      const fields = metaResponse && metaResponse.fields ? metaResponse.fields : [];
-      const record = recordResponse && recordResponse.data && recordResponse.data[0]
-        ? recordResponse.data[0]
-        : null;
-      if (fields.length) populateFieldsFromMeta(fields);
-      if (record)        populateDealRecord(record);
-    })
-    .catch(err => {
-      console.error('[Slot Widget] Error loading Deal data:', err);
-    });
-}
-
-/** "Book Selected Slot" button handler – opens the day-detail drawer for the campaign start date */
+/** "Book Selected Slot" button handler – opens the slot-detail drawer for the campaign start date */
 function bookSelectedSlot() {
-  const startVal = document.getElementById('startDate')?.value;
+  const startVal = $('#startDate').val();
   if (startVal) {
     const parts = startVal.split('-');
     if (parts.length === 3) {
@@ -500,11 +503,12 @@ function bookSelectedSlot() {
   if (firstAvail) openDayDetail(firstAvail.day);
 }
 
-/* Bootstrap Zoho Embedded App SDK when running inside Zoho CRM */
+/* Bootstrap Zoho Embedded App SDK when running inside Zoho CRM.
+   The PageLoad handler must be registered before calling init(). */
 if (typeof ZOHO !== 'undefined' && ZOHO.embeddedApp) {
   try {
+    ZOHO.embeddedApp.on('PageLoad', onPageLoad);
     ZOHO.embeddedApp.init();
-    ZOHO.embeddedApp.on('PageLoad', fetchDealData);
   } catch (e) {
     console.error('[Slot Widget] SDK initialisation failed:', e);
   }
