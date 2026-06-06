@@ -450,9 +450,11 @@ function renderCoqlSlotCards(records) {
 
 /**
  * Execute the COQL query for the given date range and re-render slot cards.
+ * Date values must match YYYY-MM-DD format (from <input type="date">).
  */
 function fetchAndRenderSlotCards(startDate, endDate) {
-  if (!startDate || !endDate) return;
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  if (!startDate || !endDate || !DATE_RE.test(startDate) || !DATE_RE.test(endDate)) return;
   const config = {
     select_query: `select Slot_Date, Platform, Language, Region, Campaign_Type, Billing, Approval_Status, Home_Feed, Article_Page, Storypage_Impact, Native_Content_Stream, Banner_Slots, Video_Slots, Roadblock_Takeover from Deals where Slot_Date between '${startDate}' and '${endDate}' limit 2`,
   };
@@ -460,6 +462,9 @@ function fetchAndRenderSlotCards(startDate, endDate) {
     console.log(data);
     const records = (data && data.data) ? data.data : [];
     renderCoqlSlotCards(records);
+  }).catch(function (err) {
+    console.error('COQL fetch failed:', err);
+    $('#slotCardsView').html('<p style="color:#C62828;padding:20px 0;grid-column:1/-1;">Failed to load slot data. Please try again.</p>');
   });
 }
 

@@ -454,6 +454,7 @@ body {
 .card-open.soldout { background: #ECEFF1; color: #546E7A; }
 
 .card-rows { display: flex; flex-direction: column; gap: 4px; }
+.card-info  { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
 
 .card-row {
   display: flex;
