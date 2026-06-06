@@ -98,10 +98,10 @@ body {
 }
 
 .campaign-panel-body {
-  padding: 12px 16px 24px;
+  padding: 18px 20px 28px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   flex: 1;
 }
 
@@ -113,20 +113,21 @@ body {
 }
 
 .field-group label {
-  font-size: .72rem;
-  font-weight: 600;
+  font-size: .68rem;
+  font-weight: 700;
   color: var(--zoho-text-light);
   text-transform: uppercase;
-  letter-spacing: .05em;
+  letter-spacing: .07em;
+  margin-bottom: 2px;
 }
 
 .field-group input,
 .field-group select,
 .field-group textarea {
   border: 1.5px solid var(--zoho-border);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  font-size: .85rem;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: .88rem;
   font-family: var(--font);
   color: var(--zoho-text);
   background: #FAFBFC;
@@ -154,9 +155,9 @@ body {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%235F6368' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 10px center;
+  background-position: right 12px center;
   background-color: #FAFBFC;
-  padding-right: 28px;
+  padding-right: 32px;
   cursor: pointer;
 }
 
@@ -166,7 +167,7 @@ body {
 
 .field-row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 .field-group textarea { resize: vertical; min-height: 80px; }
@@ -941,4 +942,41 @@ body {
   color: #BF360C;
   line-height: 1.55;
   font-weight: 500;
+}
+
+/* ============================================================
+   STICKY SLOT CARDS – desktop viewport-fit layout
+   On screens ≥ 861 px the entire app sits in 100 vh.
+   The campaign panel and inventory panel each scroll
+   internally; only the slot-cards area scrolls within the
+   right panel while the header / filters / tabs stay fixed.
+   ============================================================ */
+@media (min-width: 861px) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .crm-widget-wrapper {
+    height: 100vh;
+    min-height: unset;
+    overflow: hidden;
+  }
+
+  .inventory-panel {
+    overflow: hidden;
+    padding-bottom: 16px;
+  }
+
+  #slotCardsView {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 180px;
+  }
+
+  #calendarView {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 180px;
+  }
 }
