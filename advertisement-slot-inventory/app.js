@@ -338,6 +338,37 @@ function confirmBooking(dateLabel) {
       if (field) selectedSlots[field] = val;
     });
 
+    /* Current Ad_Slots inventory values (from COQL record) */
+    const currentInventory = {
+      Home_Feed:             parseInt(record.Home_Feed,             10) || 0,
+      Article_Page:          parseInt(record.Article_Page,          10) || 0,
+      Storypage_Impact:      parseInt(record.Storypage_Impact,      10) || 0,
+      Native_Content_Stream: parseInt(record.Native_Content_Stream, 10) || 0,
+      Banner_Slots:          parseInt(record.Banner_Slots,          10) || 0,
+      Video_Slots:           parseInt(record.Video_Slots,           10) || 0,
+      Roadblock_Takeover:    parseInt(record.Roadblock_Takeover,    10) || 0,
+    };
+
+    console.log('Ad_Slots original inventory:', JSON.stringify(currentInventory, null, 2));
+    console.log('Selected quantities:', JSON.stringify(selectedSlots, null, 2));
+
+    /* Validate: selected quantities must not exceed available inventory */
+    const exceeded = Object.keys(SLOT_LABEL_TO_FIELD).filter(function (label) {
+      const field = SLOT_LABEL_TO_FIELD[label];
+      return (selectedSlots[field] || 0) > (currentInventory[field] || 0);
+    });
+    if (exceeded.length) {
+      showToast('Booking failed — selected quantity exceeds available inventory for: ' + exceeded.join(', '), true);
+      return;
+    }
+
+    /* Calculate updated inventory values */
+    const updatedInventory = {};
+    Object.keys(currentInventory).forEach(function (field) {
+      updatedInventory[field] = currentInventory[field] - (selectedSlots[field] || 0);
+    });
+    console.log('Calculated Ad_Slots inventory after booking:', JSON.stringify(updatedInventory, null, 2));
+
     const bookingData = {
       Name:                  record.Name          || '',
       Ad_Slot:               { id: slotCrmId },
@@ -365,13 +396,22 @@ function confirmBooking(dateLabel) {
 
     console.log('Ad_Bookings payload:', JSON.stringify(bookingData, null, 2));
     ZOHO.CRM.API.insertRecord({ Entity: 'Ad_Bookings', APIData: bookingData })
-      .then(function (response) {
-        console.log('Ad_Bookings API response:', JSON.stringify(response, null, 2));
-        const label = record.Slot_Date || dateLabel;
-        showToast(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for `, false, label);
+      .then(function (bookingResponse) {
+        console.log('Ad_Bookings API response:', JSON.stringify(bookingResponse, null, 2));
+
+        /* Update Ad_Slots record to deduct booked quantities */
+        return ZOHO.CRM.API.updateRecord({
+          Entity:   'Ad_Slots',
+          RecordID: slotCrmId,
+          APIData:  updatedInventory,
+        }).then(function (updateResponse) {
+          console.log('Ad_Slots update API response:', JSON.stringify(updateResponse, null, 2));
+          const label = record.Slot_Date || dateLabel;
+          showToast(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for `, false, label);
+        });
       })
       .catch(function (err) {
-        console.error('Ad_Bookings creation failed:', err);
+        console.error('Booking process failed:', err);
         showToast('Booking failed — please try again.', true);
       });
 
