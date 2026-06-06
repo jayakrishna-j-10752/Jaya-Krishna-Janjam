@@ -75,6 +75,7 @@ function availLabel(total) {
    ───────────────────────────────────────────── */
 let currentView    = 'slot';
 let activeCategory = 'all';
+let coqlRecords    = [];
 
 /* ─────────────────────────────────────────────
    SLOT CARDS RENDERER
@@ -292,7 +293,7 @@ function updateDrawerTotal() {
   $('#drawerTotalCount').text(total);
 }
 
-function confirmBooking(day) {
+function confirmBooking(dateLabel) {
   const total = parseInt($('#drawerTotalCount').text(), 10) || 0;
   if (total === 0) {
     const $btn = $('.drawer-confirm-btn');
@@ -303,10 +304,11 @@ function confirmBooking(day) {
   closeDrawer();
 
   /* Success toast */
+  const label = typeof dateLabel === 'number' ? `June ${dateLabel}, 2026` : dateLabel;
   const $toast = $('<div>')
     .addClass('booking-toast')
     .attr({ role: 'status', 'aria-live': 'polite' })
-    .html(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for June ${day}, 2026`);
+    .html(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for ${label}`);
   $('body').append($toast);
   requestAnimationFrame(function () { $toast.addClass('show'); });
   setTimeout(function () {
@@ -326,7 +328,11 @@ function switchView(view) {
     $('#calendarView').addClass('hidden');
     $('#btnSlotCards').addClass('active');
     $('#btnCalendar').removeClass('active');
-    renderSlotCards(INVENTORY);
+    if (coqlRecords.length) {
+      renderCoqlSlotCards(coqlRecords);
+    } else {
+      renderSlotCards(INVENTORY);
+    }
   } else {
     $('#slotCardsView').addClass('hidden');
     $('#calendarView').removeClass('hidden');
@@ -343,7 +349,11 @@ function filterCategory(btn, cat) {
   $('.cat-tab').removeClass('active');
   $(btn).addClass('active');
   activeCategory = cat;
-  if (currentView === 'slot') renderSlotCards(INVENTORY);
+  if (coqlRecords.length) {
+    renderCoqlSlotCards(coqlRecords);
+  } else if (currentView === 'slot') {
+    renderSlotCards(INVENTORY);
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -367,9 +377,26 @@ function applyFilters() {
    ───────────────────────────────────────────── */
 
 /**
+ * Build a normalised array of slot-count objects from an API record.
+ */
+function slotCountsFromRecord(record) {
+  return [
+    { name: 'Home Feed',                    count: record.Home_Feed             || 0 },
+    { name: 'Article Page',                 count: record.Article_Page          || 0 },
+    { name: 'Storypage / Impact Placement', count: record.Storypage_Impact      || 0 },
+    { name: 'Native Content Stream',        count: record.Native_Content_Stream || 0 },
+    { name: 'Banner Slots',                 count: record.Banner_Slots          || 0 },
+    { name: 'Video Slots',                  count: record.Video_Slots           || 0 },
+    { name: 'Roadblock / Takeover Slots',   count: record.Roadblock_Takeover    || 0 },
+  ];
+}
+
+/**
  * Build slot cards from COQL API records and replace the grid contents.
+ * Respects the activeCategory filter the same way renderSlotCards does.
  */
 function renderCoqlSlotCards(records) {
+  coqlRecords = records;
   const $grid = $('#slotCardsView');
   $grid.empty();
 
@@ -379,59 +406,22 @@ function renderCoqlSlotCards(records) {
   }
 
   records.forEach(function (record) {
-    const slotDate = record.Slot_Date       || '';
-    const platform = record.Platform        || '';
-    const language = record.Language        || '';
-    const region   = record.Region          || '';
-    const campType = record.Campaign_Type   || '';
-    const billing  = record.Billing         || '';
-    const approval = record.Approval_Status || '';
+    const slotDate  = record.Slot_Date || '';
+    const slotCounts = slotCountsFromRecord(record);
+    const total      = slotCounts.reduce((sum, s) => sum + s.count, 0);
+    const ac         = availClass(total);
+    const lbl        = availLabel(total);
 
-    const slotCounts = [
-      { name: 'Home Feed',                    count: record.Home_Feed             || 0 },
-      { name: 'Article Page',                 count: record.Article_Page          || 0 },
-      { name: 'Storypage / Impact Placement', count: record.Storypage_Impact      || 0 },
-      { name: 'Native Content Stream',        count: record.Native_Content_Stream || 0 },
-      { name: 'Banner Slots',                 count: record.Banner_Slots          || 0 },
-      { name: 'Video Slots',                  count: record.Video_Slots           || 0 },
-      { name: 'Roadblock / Takeover Slots',   count: record.Roadblock_Takeover    || 0 },
-    ];
+    /* filter rows by active category */
+    const visibleSlots = activeCategory === 'all'
+      ? slotCounts
+      : slotCounts.filter(s => s.name.toLowerCase().startsWith(activeCategory.toLowerCase()));
 
-    const total = slotCounts.reduce((sum, s) => sum + s.count, 0);
-    const ac    = availClass(total);
-    const lbl   = availLabel(total);
-
-    const rowsHTML = slotCounts.map(s => `
+    const rowsHTML = visibleSlots.map(s => `
       <div class="card-row">
         <span class="slot-name" title="${s.name}">${s.name}</span>
         <span class="slot-count">${s.count}</span>
       </div>`).join('');
-
-    const infoHTML = `
-      <div class="drawer-info-row">
-        <span class="drawer-info-label">Platform</span>
-        <span class="drawer-info-value">${platform}</span>
-      </div>
-      <div class="drawer-info-row">
-        <span class="drawer-info-label">Language</span>
-        <span class="drawer-info-value">${language}</span>
-      </div>
-      <div class="drawer-info-row">
-        <span class="drawer-info-label">Region</span>
-        <span class="drawer-info-value">${region}</span>
-      </div>
-      <div class="drawer-info-row">
-        <span class="drawer-info-label">Campaign Type</span>
-        <span class="drawer-info-value">${campType}</span>
-      </div>
-      <div class="drawer-info-row">
-        <span class="drawer-info-label">Billing</span>
-        <span class="drawer-info-value">${billing}</span>
-      </div>
-      <div class="drawer-info-row">
-        <span class="drawer-info-label">Approval Status</span>
-        <span class="drawer-info-value">${approval}</span>
-      </div>`;
 
     const $card = $('<div>')
       .addClass(`slot-card avail-${ac}`)
@@ -441,10 +431,103 @@ function renderCoqlSlotCards(records) {
           <span class="card-day">${slotDate}</span>
           <span class="card-open ${ac}">${lbl}</span>
         </div>
-        <div class="card-info">${infoHTML}</div>
         <div class="card-rows">${rowsHTML}</div>`);
 
+    $card.on('click', function () { openCoqlRecordDetail(record); });
     $grid.append($card);
+  });
+}
+
+/**
+ * Open the detail drawer for a COQL record.
+ * Uses the Name field as Selected Slot and generates a dummy Slot ID.
+ */
+function openCoqlRecordDetail(record) {
+  $('#slotDrawerOverlay').remove();
+
+  const slotName  = record.Name            || '';
+  const slotDate  = record.Slot_Date       || '';
+  const platform  = record.Platform        || '';
+  const language  = record.Language        || '';
+  const region    = record.Region          || '';
+  const campType  = record.Campaign_Type   || '';
+  const billing   = record.Billing         || '';
+  const approval  = record.Approval_Status || '';
+
+  /* Dummy Slot ID until backend integration is ready */
+  const slotId = `SLOT-${slotDate.replace(/-/g, '').slice(2)}`;
+
+  const slotCounts = slotCountsFromRecord(record);
+  const total      = slotCounts.reduce((sum, s) => sum + s.count, 0);
+
+  const INFO_ROWS = [
+    { label: 'Selected Slot',             value: slotName },
+    { label: 'Slot ID',                   value: slotId   },
+    { label: 'Selected Date',             value: slotDate },
+    { label: 'Platform',                  value: platform },
+    { label: 'Language',                  value: language },
+    { label: 'Region',                    value: region   },
+    { label: 'Campaign Type',             value: campType },
+    { label: 'Billing',                   value: billing  },
+    { label: 'Total Category Slots Open', value: total    },
+  ];
+
+  const infoHTML = INFO_ROWS.map(r => `
+    <div class="drawer-info-row">
+      <span class="drawer-info-label">${r.label}</span>
+      <span class="drawer-info-value">${r.value}</span>
+    </div>`).join('');
+
+  const selectorHTML = slotCounts.map(s => `
+    <div class="drawer-slot-row">
+      <span class="drawer-slot-label">${s.name}</span>
+      <input class="drawer-slot-input" type="number"
+             min="0" max="${s.count}" value="0" data-max="${s.count}"
+             ${s.count === 0 ? 'disabled' : ''}
+             oninput="updateDrawerTotal()" onchange="updateDrawerTotal()" />
+      <span class="drawer-slot-avail">Avail ${s.count}</span>
+    </div>`).join('');
+
+  const approvalClass = approval && approval.toLowerCase() === 'approved' ? 'approved' : 'pending';
+  const approvalLabel = approval || 'Pending';
+
+  const $overlay = $('<div>').attr('id', 'slotDrawerOverlay').html(`
+    <div class="slot-drawer" id="slotDrawer" role="dialog" aria-modal="true" aria-label="Slot Details for ${slotDate}">
+      <div class="drawer-header">
+        <h2 class="drawer-title">Slot Detail Drawer</h2>
+        <button class="drawer-close" onclick="closeDrawer()" aria-label="Close">&#x2715;</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="drawer-info-section">
+          ${infoHTML}
+          <div class="drawer-info-row">
+            <span class="drawer-info-label">Approval Status</span>
+            <span class="approval-badge ${approvalClass}">${approvalLabel}</span>
+          </div>
+        </div>
+
+        <div class="drawer-selector-section">
+          <p class="drawer-section-title">Select slots by category</p>
+          ${selectorHTML}
+          <div class="drawer-total-bar">
+            <span class="drawer-total-label">Total slots selected</span>
+            <span class="drawer-total-count" id="drawerTotalCount">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <button class="drawer-confirm-btn" onclick="confirmBooking('${slotDate}')">Confirm Booking</button>
+      </div>
+    </div>`);
+
+  $overlay.on('click', function (e) { if (e.target === this) closeDrawer(); });
+  $('body').append($overlay);
+
+  requestAnimationFrame(function () {
+    $overlay.addClass('active');
+    $('#slotDrawer').addClass('open');
   });
 }
 
@@ -456,7 +539,7 @@ function fetchAndRenderSlotCards(startDate, endDate) {
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   if (!startDate || !endDate || !DATE_RE.test(startDate) || !DATE_RE.test(endDate)) return;
   const config = {
-    select_query: `select Slot_Date, Platform, Language, Region, Campaign_Type, Billing, Approval_Status, Home_Feed, Article_Page, Storypage_Impact, Native_Content_Stream, Banner_Slots, Video_Slots, Roadblock_Takeover from Deals where Slot_Date between '${startDate}' and '${endDate}' limit 2`,
+    select_query: `select Name, Slot_Date, Platform, Language, Region, Campaign_Type, Billing, Approval_Status, Home_Feed, Article_Page, Storypage_Impact, Native_Content_Stream, Banner_Slots, Video_Slots, Roadblock_Takeover from Ad_Slots where Slot_Date between '${startDate}' and '${endDate}' limit 200`,
   };
   ZOHO.CRM.API.coql(config).then(function (data) {
     console.log(data);
