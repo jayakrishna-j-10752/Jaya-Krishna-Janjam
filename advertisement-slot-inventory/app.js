@@ -298,6 +298,17 @@ function updateDrawerTotal() {
   $('#drawerTotalCount').text(total);
 }
 
+/* Maps drawer selector label text → Ad_Bookings CRM field name */
+const SLOT_LABEL_TO_FIELD = {
+  'Home Feed':                    'Home_Feed',
+  'Article Page':                 'Article_Page',
+  'Storypage / Impact Placement': 'Storypage_Impact',
+  'Native Content Stream':        'Native_Content_Stream',
+  'Banner Slots':                 'Banner_Slots',
+  'Video Slots':                  'Video_Slots',
+  'Roadblock / Takeover Slots':   'Roadblock_Takeover',
+};
+
 function confirmBooking(dateLabel) {
   const total = parseInt($('#drawerTotalCount').text(), 10) || 0;
   if (total === 0) {
@@ -318,20 +329,32 @@ function confirmBooking(dateLabel) {
       return;
     }
 
+    /* Collect user-selected slot counts from the drawer selector section */
+    const selectedSlots = {};
+    $('.drawer-selector-section .drawer-slot-row').each(function () {
+      const label = $(this).find('.drawer-slot-label').text().trim();
+      const val   = parseInt($(this).find('.drawer-slot-input').val(), 10) || 0;
+      const field = SLOT_LABEL_TO_FIELD[label];
+      if (field) selectedSlots[field] = val;
+    });
+
     const bookingData = {
-      Name:                  record.Name                 || '',
+      Name:                  record.Name          || '',
       Ad_Slot:               { id: slotCrmId },
-      Selected_Date:         record.Slot_Date            || '',
-      Platform:              record.Platform             || '',
-      Language:              record.Language             || '',
-      Campaign_Type:         record.Campaign_Type        || '',
-      Billing:               record.Billing              || '',
-      Home_Feed:             record.Home_Feed            || 0,
-      Article_Page:          record.Article_Page         || 0,
-      Storypage_Impact:      record.Storypage_Impact     || 0,
-      Native_Content_Stream: record.Native_Content_Stream || 0,
-      Banner_Slots:          record.Banner_Slots         || 0,
-      Video_Slots:           record.Video_Slots          || 0,
+      Selected_Date:         record.Slot_Date      || '',
+      Platform:              record.Platform       || '',
+      Language:              record.Language       || '',
+      Region:                record.Region         || '',
+      Slot_ID:               record.Placement_Code || '',
+      Campaign_Type:         record.Campaign_Type  || '',
+      Billing:               record.Billing        || '',
+      Home_Feed:             selectedSlots.Home_Feed             || 0,
+      Article_Page:          selectedSlots.Article_Page          || 0,
+      Storypage_Impact:      selectedSlots.Storypage_Impact      || 0,
+      Native_Content_Stream: selectedSlots.Native_Content_Stream || 0,
+      Banner_Slots:          selectedSlots.Banner_Slots          || 0,
+      Video_Slots:           selectedSlots.Video_Slots           || 0,
+      Roadblock_Takeover:    selectedSlots.Roadblock_Takeover    || 0,
     };
 
     if (currentDealId) {
