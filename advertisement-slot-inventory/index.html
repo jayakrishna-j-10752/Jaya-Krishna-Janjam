@@ -3,21 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Advertisement Slot Inventory – Zoho CRM Widget</title>
+  <title>Advertisement Slot Inventory</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Suppress the deprecated 'unload' event listener that the Zoho SDK registers
-       internally to avoid the browser Permissions Policy console violation. -->
-  <script>
-    (function () {
-      var _add = EventTarget.prototype.addEventListener;
-      EventTarget.prototype.addEventListener = function (type, listener, options) {
-        if (type === 'unload') return;
-        return _add.call(this, type, listener, options);
-      };
-    }());
-  </script>
-  <!-- Zoho Embedded App SDK (vendor URL; note the intentional single-'b' spelling in the filename) -->
-  <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 </head>
 <body>
   <div class="crm-widget-wrapper">

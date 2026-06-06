@@ -1,18 +1,18 @@
 /* =============================================================
-   Zoho CRM – Advertisement Slot Inventory Widget  |  app.js
+   Advertisement Slot Inventory Widget  |  app.js
    ============================================================= */
 
 /* ─────────────────────────────────────────────
    DATA
    ───────────────────────────────────────────── */
 const SLOT_TYPES = [
-  { key: 'Home Feed',                   color: '#E53935' },
-  { key: 'Article Page',                color: '#1E88E5' },
-  { key: 'Storypage / Impact Placement',color: '#8E24AA' },
-  { key: 'Native Content Stream',       color: '#FB8C00' },
-  { key: 'Banner Slots',                color: '#43A047' },
-  { key: 'Video Slots',                 color: '#00ACC1' },
-  { key: 'Roadblock / Takeover Slots',  color: '#212121' },
+  { key: 'Home Feed',                    color: '#E53935' },
+  { key: 'Article Page',                 color: '#1E88E5' },
+  { key: 'Storypage / Impact Placement', color: '#8E24AA' },
+  { key: 'Native Content Stream',        color: '#FB8C00' },
+  { key: 'Banner Slots',                 color: '#43A047' },
+  { key: 'Video Slots',                  color: '#00ACC1' },
+  { key: 'Roadblock / Takeover Slots',   color: '#212121' },
 ];
 
 /** Fixed slot inventory for June 2026 (30 days) */
@@ -60,37 +60,35 @@ const INVENTORY = RAW_DAYS.map(([day, hf, ap, sp, ncs, bs, vs, rt]) => {
    AVAILABILITY HELPERS
    ───────────────────────────────────────────── */
 function availClass(total) {
-  if (total === 0)   return 'soldout';
-  if (total <= 10)   return 'limited';
-  if (total <= 25)   return 'medium';
+  if (total === 0)  return 'soldout';
+  if (total <= 10)  return 'limited';
+  if (total <= 25)  return 'medium';
   return 'high';
 }
 
 function availLabel(total) {
-  const c = availClass(total);
-  const map = { high: 'High', medium: 'Medium', limited: 'Limited', soldout: '0 open' };
-  return c === 'soldout' ? '0 open' : `${total} open`;
+  return total === 0 ? '0 open' : `${total} open`;
 }
 
 /* ─────────────────────────────────────────────
    STATE
    ───────────────────────────────────────────── */
-let currentView     = 'slot';
-let activeCategory  = 'all';
+let currentView    = 'slot';
+let activeCategory = 'all';
 
 /* ─────────────────────────────────────────────
    SLOT CARDS RENDERER
    ───────────────────────────────────────────── */
 function renderSlotCards(data) {
-  const grid = document.getElementById('slotCardsView');
-  grid.innerHTML = '';
+  const $grid = $('#slotCardsView');
+  $grid.empty();
 
   if (!data.length) {
-    grid.innerHTML = '<p style="color:#9E9E9E;padding:20px 0;grid-column:1/-1;">No slots match the current filters.</p>';
+    $grid.html('<p style="color:#9E9E9E;padding:20px 0;grid-column:1/-1;">No slots match the current filters.</p>');
     return;
   }
 
-  data.forEach(({ day, slots, total }) => {
+  data.forEach(function ({ day, slots, total }) {
     const ac  = availClass(total);
     const lbl = availLabel(total);
 
@@ -105,18 +103,18 @@ function renderSlotCards(data) {
         <span class="slot-count">${s.count}</span>
       </div>`).join('');
 
-    const card = document.createElement('div');
-    card.className = `slot-card avail-${ac}`;
-    card.setAttribute('data-day', day);
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="card-day">${day}</span>
-        <span class="card-open ${ac}">${lbl}</span>
-      </div>
-      <div class="card-rows">${rowsHTML}</div>`;
+    const $card = $('<div>')
+      .addClass(`slot-card avail-${ac}`)
+      .attr('data-day', day)
+      .html(`
+        <div class="card-header">
+          <span class="card-day">${day}</span>
+          <span class="card-open ${ac}">${lbl}</span>
+        </div>
+        <div class="card-rows">${rowsHTML}</div>`);
 
-    card.addEventListener('click', () => openDayDetail(day));
-    grid.appendChild(card);
+    $card.on('click', function () { openDayDetail(day); });
+    $grid.append($card);
   });
 }
 
@@ -124,47 +122,43 @@ function renderSlotCards(data) {
    CALENDAR RENDERER
    ───────────────────────────────────────────── */
 function renderCalendar(data) {
-  const grid = document.getElementById('calendarGrid');
-  grid.innerHTML = '';
+  const $grid = $('#calendarGrid');
+  $grid.empty();
 
   // Day-of-week header
-  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
-    const h = document.createElement('div');
-    h.style.cssText = 'text-align:center;font-size:.7rem;font-weight:700;color:#9E9E9E;padding:4px 0;';
-    h.textContent = d;
-    grid.appendChild(h);
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function (d) {
+    $grid.append(
+      $('<div>').css({ textAlign: 'center', fontSize: '.7rem', fontWeight: 700, color: '#9E9E9E', padding: '4px 0' }).text(d)
+    );
   });
 
   // June 2026 starts on Monday (index 1)
   const startOffset = 1;
   for (let i = 0; i < startOffset; i++) {
-    grid.appendChild(document.createElement('div'));
+    $grid.append($('<div>'));
   }
 
-  data.forEach(({ day, slots, total }) => {
+  data.forEach(function ({ day, slots, total }) {
     const ac = availClass(total);
-    const card = document.createElement('div');
-    card.className = 'cal-day-card';
-    card.setAttribute('title', `Day ${day} – ${total} open`);
+    const $card = $('<div>').addClass('cal-day-card').attr('title', `Day ${day} – ${total} open`);
 
     const dotColors = slots
       .filter(s => s.count > 0)
       .slice(0, 5)
-      .map(s => SLOT_TYPES.find(t => t.key === s.name)?.color || '#BDBDBD');
+      .map(s => (SLOT_TYPES.find(t => t.key === s.name) || {}).color || '#BDBDBD');
 
     const dotsHTML = dotColors.map(c => `<span class="cal-dot" style="background:${c}"></span>`).join('');
 
-    // availability accent band at top
     const bandColor = { high: '#2E7D32', medium: '#F57F17', limited: '#C62828', soldout: '#212121' }[ac];
 
-    card.innerHTML = `
+    $card.html(`
       <div style="height:3px;background:${bandColor};border-radius:3px 3px 0 0;margin:-8px -10px 6px;"></div>
       <div class="cal-day-num">${day}</div>
       <div class="cal-dot-row">${dotsHTML || '<span style="font-size:.65rem;color:#BDBDBD;">–</span>'}</div>
-      <div style="font-size:.68rem;color:#9E9E9E;margin-top:4px;">${total > 0 ? total + ' open' : 'Sold Out'}</div>`;
+      <div style="font-size:.68rem;color:#9E9E9E;margin-top:4px;">${total > 0 ? total + ' open' : 'Sold Out'}</div>`);
 
-    card.addEventListener('click', () => openDayDetail(day));
-    grid.appendChild(card);
+    $card.on('click', function () { openDayDetail(day); });
+    $grid.append($card);
   });
 }
 
@@ -189,22 +183,21 @@ function openDayDetail(day) {
   if (!entry) return;
 
   /* Remove any existing drawer */
-  const existing = document.getElementById('slotDrawerOverlay');
-  if (existing) existing.remove();
+  $('#slotDrawerOverlay').remove();
 
   /* Dominant slot type (highest count) drives the header info */
   const dominant = entry.slots.reduce((a, b) => b.count > a.count ? b : a, entry.slots[0]);
   const meta     = SLOT_META[dominant.name] || { name: dominant.name, id: 'DH-000' };
 
   /* Pull live values from campaign form */
-  const campaignType = document.getElementById('campaignType')?.value || '';
-  const billing      = document.getElementById('billingType')?.value  || '';
-  const creative     = document.getElementById('creativeType')?.value || '';
+  const campaignType = $('#campaignType').val() || '';
+  const billing      = $('#billingType').val()  || '';
+  const creative     = $('#creativeType').val() || '';
 
   const langMap   = { all: 'All Languages', en: 'English', ta: 'Tamil', hi: 'Hindi' };
   const regionMap = { all: 'All Regions', south: 'South India', north: 'North India', west: 'West India' };
-  const lang      = langMap[document.getElementById('filterLanguage')?.value] || 'Tamil';
-  const region    = regionMap[document.getElementById('filterRegion')?.value]  || 'Tamil Nadu';
+  const lang      = langMap[$('#filterLanguage').val()] || 'Tamil';
+  const region    = regionMap[$('#filterRegion').val()] || 'Tamil Nadu';
 
   /* Info rows */
   const INFO_ROWS = [
@@ -237,9 +230,7 @@ function openDayDetail(day) {
     </div>`).join('');
 
   /* Build overlay + drawer */
-  const overlay = document.createElement('div');
-  overlay.id = 'slotDrawerOverlay';
-  overlay.innerHTML = `
+  const $overlay = $('<div>').attr('id', 'slotDrawerOverlay').html(`
     <div class="slot-drawer" id="slotDrawer" role="dialog" aria-modal="true" aria-label="Slot Detail Drawer">
       <div class="drawer-header">
         <h2 class="drawer-title">Slot Detail Drawer</h2>
@@ -268,56 +259,58 @@ function openDayDetail(day) {
       <div class="drawer-footer">
         <button class="drawer-confirm-btn" onclick="confirmBooking(${day})">Confirm Booking</button>
       </div>
-    </div>`;
+    </div>`);
 
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeDrawer(); });
-  document.body.appendChild(overlay);
+  $overlay.on('click', function (e) { if (e.target === this) closeDrawer(); });
+  $('body').append($overlay);
 
   /* Animate in on next frame */
-  requestAnimationFrame(() => {
-    overlay.classList.add('active');
-    document.getElementById('slotDrawer').classList.add('open');
+  requestAnimationFrame(function () {
+    $overlay.addClass('active');
+    $('#slotDrawer').addClass('open');
   });
 }
 
 function closeDrawer() {
-  const overlay = document.getElementById('slotDrawerOverlay');
-  if (!overlay) return;
-  overlay.classList.remove('active');
-  const drawer = document.getElementById('slotDrawer');
-  if (drawer) drawer.classList.remove('open');
-  setTimeout(() => overlay.remove(), 320);
+  const $overlay = $('#slotDrawerOverlay');
+  if (!$overlay.length) return;
+  $overlay.removeClass('active');
+  $('#slotDrawer').removeClass('open');
+  setTimeout(function () { $overlay.remove(); }, 320);
 }
 
 function updateDrawerTotal() {
   let total = 0;
-  document.querySelectorAll('.drawer-slot-input').forEach(inp => {
-    const max = parseInt(inp.dataset.max, 10) || 0;
-    let val   = parseInt(inp.value, 10)       || 0;
-    if (val < 0)   { val = 0;   inp.value = 0;   }
-    if (val > max) { val = max; inp.value = max;  }
+  $('.drawer-slot-input').each(function () {
+    const max = parseInt($(this).data('max'), 10) || 0;
+    let val   = parseInt($(this).val(), 10)       || 0;
+    if (val < 0)   { val = 0;   $(this).val(0);   }
+    if (val > max) { val = max; $(this).val(max);  }
     total += val;
   });
-  const el = document.getElementById('drawerTotalCount');
-  if (el) el.textContent = total;
+  $('#drawerTotalCount').text(total);
 }
 
 function confirmBooking(day) {
-  const total = parseInt(document.getElementById('drawerTotalCount')?.textContent, 10) || 0;
+  const total = parseInt($('#drawerTotalCount').text(), 10) || 0;
   if (total === 0) {
-    const btn = document.querySelector('.drawer-confirm-btn');
-    if (btn) { btn.classList.add('shake'); setTimeout(() => btn.classList.remove('shake'), 450); }
+    const $btn = $('.drawer-confirm-btn');
+    $btn.addClass('shake');
+    setTimeout(function () { $btn.removeClass('shake'); }, 450);
     return;
   }
   closeDrawer();
 
   /* Success toast */
-  const toast = document.createElement('div');
-  toast.className = 'booking-toast';
-  toast.innerHTML = `&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for June ${day}, 2026`;
-  document.body.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add('show'));
-  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3200);
+  const $toast = $('<div>')
+    .addClass('booking-toast')
+    .html(`&#10003; &nbsp;Booking confirmed — ${total} slot${total > 1 ? 's' : ''} for June ${day}, 2026`);
+  $('body').append($toast);
+  requestAnimationFrame(function () { $toast.addClass('show'); });
+  setTimeout(function () {
+    $toast.removeClass('show');
+    setTimeout(function () { $toast.remove(); }, 400);
+  }, 3200);
 }
 
 /* ─────────────────────────────────────────────
@@ -326,22 +319,17 @@ function confirmBooking(day) {
 function switchView(view) {
   currentView = view;
 
-  const slotView = document.getElementById('slotCardsView');
-  const calView  = document.getElementById('calendarView');
-  const btnSlot  = document.getElementById('btnSlotCards');
-  const btnCal   = document.getElementById('btnCalendar');
-
   if (view === 'slot') {
-    slotView.classList.remove('hidden');
-    calView.classList.add('hidden');
-    btnSlot.classList.add('active');
-    btnCal.classList.remove('active');
+    $('#slotCardsView').removeClass('hidden');
+    $('#calendarView').addClass('hidden');
+    $('#btnSlotCards').addClass('active');
+    $('#btnCalendar').removeClass('active');
     renderSlotCards(INVENTORY);
   } else {
-    slotView.classList.add('hidden');
-    calView.classList.remove('hidden');
-    btnCal.classList.add('active');
-    btnSlot.classList.remove('active');
+    $('#slotCardsView').addClass('hidden');
+    $('#calendarView').removeClass('hidden');
+    $('#btnCalendar').addClass('active');
+    $('#btnSlotCards').removeClass('active');
     renderCalendar(INVENTORY);
   }
 }
@@ -350,8 +338,8 @@ function switchView(view) {
    CATEGORY FILTER
    ───────────────────────────────────────────── */
 function filterCategory(btn, cat) {
-  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  $('.cat-tab').removeClass('active');
+  $(btn).addClass('active');
   activeCategory = cat;
   if (currentView === 'slot') renderSlotCards(INVENTORY);
 }
@@ -360,9 +348,7 @@ function filterCategory(btn, cat) {
    FILTER BAR  (dropdowns – cosmetic refresh)
    ───────────────────────────────────────────── */
 function applyFilters() {
-  /* In a real Zoho widget these would call ZOHO.CRM APIs.
-     Here we do a lightweight shuffle to show filter feedback. */
-  const freshData = INVENTORY.map(entry => {
+  const freshData = INVENTORY.map(function (entry) {
     const multiplier = Math.random() > 0.3 ? 1 : 0;
     return {
       ...entry,
@@ -375,135 +361,10 @@ function applyFilters() {
 }
 
 /* ─────────────────────────────────────────────
-   INIT
+   BOOK SLOT BUTTON
    ───────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', function () {
-  renderSlotCards(INVENTORY);
-});
-
-/* ─────────────────────────────────────────────
-   ZOHO CRM INTEGRATION
-   ───────────────────────────────────────────── */
-
-/** Maps Deals module API field names to widget element IDs */
-const DEAL_FIELD_MAP = {
-  'Deal_Name':             'campaignId',
-  'Campaign_Name':         'campaignName',
-  'Agency':                'agency',
-  'Category':              'category',
-  'Subcategory':           'subcategory',
-  'Campaign_Type':         'campaignType',
-  'Billing_Type':          'billingType',
-  'Optimization_Type':     'optimizationType',
-  'Start_Date':            'startDate',
-  'End_Date':              'endDate',
-  'Campaign_Deliverables': 'deliverables',
-};
-
-/**
- * Populate select option lists from Deals field metadata.
- * For every picklist field that maps to a <select>, replace
- * the hard-coded options with the live CRM picklist values.
- */
-function populateFieldsFromMeta(fields) {
-  fields.forEach(function (field) {
-    const elementId = DEAL_FIELD_MAP[field.api_name];
-    if (!elementId) return;
-    const el = document.getElementById(elementId);
-    if (!el || el.tagName !== 'SELECT') return;
-    const pickList = field.pick_list_values || [];
-    if (!pickList.length) return;
-    el.innerHTML = '';
-    pickList.forEach(function (opt) {
-      /* Zoho API v2 uses display_value; v8 may use actual_value or value */
-      const displayVal = opt.display_value || opt.actual_value || opt.value || '';
-      const option = document.createElement('option');
-      option.value = displayVal;
-      option.textContent = displayVal;
-      el.appendChild(option);
-    });
-  });
-}
-
-/**
- * Set each widget field value from the fetched Deal record.
- * Handles <input>, <textarea>, and <select> elements.
- * For selects, adds an option dynamically if the CRM value
- * does not already exist in the list.
- */
-function populateDealRecord(record) {
-  Object.entries(DEAL_FIELD_MAP).forEach(function ([crmField, elementId]) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    const value = record[crmField];
-    if (value === null || value === undefined || value === '') return;
-
-    if (el.tagName === 'SELECT') {
-      const strVal = String(value);
-      const match  = Array.from(el.options).find(function (o) {
-        return o.value === strVal || o.text === strVal;
-      });
-      if (match) {
-        el.value = match.value;
-      } else {
-        const option = document.createElement('option');
-        option.value = strVal;
-        option.textContent = strVal;
-        option.selected = true;
-        el.appendChild(option);
-      }
-    } else {
-      el.value = value;
-    }
-  });
-
-  /* Update left-panel subtitle with deal name + date range */
-  const name      = record['Deal_Name'] || record['Campaign_Name'] || '';
-  const startRaw  = record['Start_Date'];
-  const monthYear = startRaw
-    ? new Date(startRaw).toLocaleString('default', { month: 'long', year: 'numeric' })
-    : 'June 2026';
-  const subtitle = document.querySelector('.panel-subtitle');
-  if (name && subtitle) subtitle.textContent = `${monthYear} · ${name}`;
-}
-
-/**
- * PageLoad handler – receives the current record context from Zoho CRM,
- * then fetches field metadata and the Deal record using async/await.
- * Entity and RecordID are read dynamically from the event data.
- */
-async function onPageLoad(data) {
-  console.log('[Slot Widget] PageLoad data:', data);
-
-  const entity   = data.Entity;
-  const recordId = data.EntityId;
-
-  try {
-    const [metaResponse, recordResponse] = await Promise.all([
-      /* Entity is fixed to 'Deals' because this widget is purpose-built for the Deals module */
-      ZOHO.CRM.META.getFields({ Entity: 'Deals' }),
-      ZOHO.CRM.API.getRecord({ Entity: entity, RecordID: recordId }),
-    ]);
-
-    const fields = metaResponse && metaResponse.fields ? metaResponse.fields : [];
-    const record = recordResponse && recordResponse.data && recordResponse.data[0]
-      ? recordResponse.data[0]
-      : null;
-
-    if (fields.length) populateFieldsFromMeta(fields);
-    if (record)        populateDealRecord(record);
-
-    /* Re-render both views so they reflect the populated campaign data */
-    renderSlotCards(INVENTORY);
-    renderCalendar(INVENTORY);
-  } catch (err) {
-    console.error('[Slot Widget] Error loading Deal data:', err);
-  }
-}
-
-/** "Book Selected Slot" button handler – opens the slot-detail drawer for the campaign start date */
 function bookSelectedSlot() {
-  const startVal = document.getElementById('startDate').value;
+  const startVal = $('#startDate').val();
   if (startVal) {
     const parts = startVal.split('-');
     if (parts.length === 3) {
@@ -516,13 +377,9 @@ function bookSelectedSlot() {
   if (firstAvail) openDayDetail(firstAvail.day);
 }
 
-/* Bootstrap Zoho Embedded App SDK when running inside Zoho CRM.
-   The PageLoad handler must be registered before calling init(). */
-if (typeof ZOHO !== 'undefined' && ZOHO.embeddedApp) {
-  try {
-    ZOHO.embeddedApp.on('PageLoad', onPageLoad);
-    ZOHO.embeddedApp.init();
-  } catch (e) {
-    console.error('[Slot Widget] SDK initialisation failed:', e);
-  }
-}
+/* ─────────────────────────────────────────────
+   INIT
+   ───────────────────────────────────────────── */
+$(document).ready(function () {
+  renderSlotCards(INVENTORY);
+});
