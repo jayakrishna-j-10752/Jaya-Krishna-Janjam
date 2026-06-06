@@ -206,7 +206,8 @@ function openDayDetail(day) {
     { label: 'Selected Date',             value: `June ${day}, 2026`                          },
     { label: 'Platform',                  value: 'Dailyhunt App'                              },
     { label: 'Creative',                  value: creative                                     },
-    { label: 'Language / Region',         value: `${lang} / ${region}`                       },
+    { label: 'Language',                  value: lang                                         },
+    { label: 'Region',                    value: region                                       },
     { label: 'Campaign Type',             value: campaignType                                 },
     { label: 'Billing',                   value: billing                                      },
     { label: 'Total Category Slots Open', value: entry.total                                  },
@@ -362,20 +363,113 @@ function applyFilters() {
 }
 
 /* ─────────────────────────────────────────────
+   COQL SLOT FETCH + RENDER
+   ───────────────────────────────────────────── */
+
+/**
+ * Build slot cards from COQL API records and replace the grid contents.
+ */
+function renderCoqlSlotCards(records) {
+  const $grid = $('#slotCardsView');
+  $grid.empty();
+
+  if (!records.length) {
+    $grid.html('<p style="color:#9E9E9E;padding:20px 0;grid-column:1/-1;">No slots found for the selected date range.</p>');
+    return;
+  }
+
+  records.forEach(function (record) {
+    const slotDate = record.Slot_Date       || '';
+    const platform = record.Platform        || '';
+    const language = record.Language        || '';
+    const region   = record.Region          || '';
+    const campType = record.Campaign_Type   || '';
+    const billing  = record.Billing         || '';
+    const approval = record.Approval_Status || '';
+
+    const slotCounts = [
+      { name: 'Home Feed',                    count: record.Home_Feed             || 0 },
+      { name: 'Article Page',                 count: record.Article_Page          || 0 },
+      { name: 'Storypage / Impact Placement', count: record.Storypage_Impact      || 0 },
+      { name: 'Native Content Stream',        count: record.Native_Content_Stream || 0 },
+      { name: 'Banner Slots',                 count: record.Banner_Slots          || 0 },
+      { name: 'Video Slots',                  count: record.Video_Slots           || 0 },
+      { name: 'Roadblock / Takeover Slots',   count: record.Roadblock_Takeover    || 0 },
+    ];
+
+    const total = slotCounts.reduce((sum, s) => sum + s.count, 0);
+    const ac    = availClass(total);
+    const lbl   = availLabel(total);
+
+    const rowsHTML = slotCounts.map(s => `
+      <div class="card-row">
+        <span class="slot-name" title="${s.name}">${s.name}</span>
+        <span class="slot-count">${s.count}</span>
+      </div>`).join('');
+
+    const infoHTML = `
+      <div class="drawer-info-row">
+        <span class="drawer-info-label">Platform</span>
+        <span class="drawer-info-value">${platform}</span>
+      </div>
+      <div class="drawer-info-row">
+        <span class="drawer-info-label">Language</span>
+        <span class="drawer-info-value">${language}</span>
+      </div>
+      <div class="drawer-info-row">
+        <span class="drawer-info-label">Region</span>
+        <span class="drawer-info-value">${region}</span>
+      </div>
+      <div class="drawer-info-row">
+        <span class="drawer-info-label">Campaign Type</span>
+        <span class="drawer-info-value">${campType}</span>
+      </div>
+      <div class="drawer-info-row">
+        <span class="drawer-info-label">Billing</span>
+        <span class="drawer-info-value">${billing}</span>
+      </div>
+      <div class="drawer-info-row">
+        <span class="drawer-info-label">Approval Status</span>
+        <span class="drawer-info-value">${approval}</span>
+      </div>`;
+
+    const $card = $('<div>')
+      .addClass(`slot-card avail-${ac}`)
+      .attr('data-slot-date', slotDate)
+      .html(`
+        <div class="card-header">
+          <span class="card-day">${slotDate}</span>
+          <span class="card-open ${ac}">${lbl}</span>
+        </div>
+        <div class="card-info">${infoHTML}</div>
+        <div class="card-rows">${rowsHTML}</div>`);
+
+    $grid.append($card);
+  });
+}
+
+/**
+ * Execute the COQL query for the given date range and re-render slot cards.
+ */
+function fetchAndRenderSlotCards(startDate, endDate) {
+  if (!startDate || !endDate) return;
+  const config = {
+    select_query: `select Slot_Date, Platform, Language, Region, Campaign_Type, Billing, Approval_Status, Home_Feed, Article_Page, Storypage_Impact, Native_Content_Stream, Banner_Slots, Video_Slots, Roadblock_Takeover from Deals where Slot_Date between '${startDate}' and '${endDate}' limit 2`,
+  };
+  ZOHO.CRM.API.coql(config).then(function (data) {
+    console.log(data);
+    const records = (data && data.data) ? data.data : [];
+    renderCoqlSlotCards(records);
+  });
+}
+
+/* ─────────────────────────────────────────────
    BOOK SLOT BUTTON
    ───────────────────────────────────────────── */
 function bookSelectedSlot() {
-  const startVal = $('#startDate').val();
-  if (startVal) {
-    const parts = startVal.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[2], 10);
-      if (day >= 1 && day <= 30) { openDayDetail(day); return; }
-    }
-  }
-  /* Fallback: open first available day */
-  const firstAvail = INVENTORY.find(d => d.total > 0);
-  if (firstAvail) openDayDetail(firstAvail.day);
+  const startDate = $('#startDate').val();
+  const endDate   = $('#endDate').val();
+  fetchAndRenderSlotCards(startDate, endDate);
 }
 
 /* ─────────────────────────────────────────────
@@ -494,10 +588,12 @@ $(document).ready(function () {
           : null;
         if (record) {
           populateDealRecord(record);
+          // Fetch slot data using the dates now populated from the Deal record
+          fetchAndRenderSlotCards($('#startDate').val(), $('#endDate').val());
+        } else {
+          // Re-render with populated campaign data
+          renderSlotCards(INVENTORY);
         }
-
-        // Re-render with populated campaign data
-        renderSlotCards(INVENTORY);
       });
     }
   });
