@@ -213,6 +213,11 @@ $(function () {
     return state.events.find(function (e) { return e.id === id; }) || null;
   }
 
+  /** Returns true when the paste button should be shown for a given date */
+  function canPaste(ds) {
+    return !!(state.clipboard && isValid(ds));
+  }
+
   /* ──────────────────────────────────────────────────────────
      SVG ICON TEMPLATES
   ────────────────────────────────────────────────────────── */
@@ -307,7 +312,9 @@ $(function () {
     var acts = '<div class="cell-acts">';
     acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
     acts += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy events">' + SVG.copy + '</button>';
-    acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
+    if (canPaste(ds)) {
+      acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
+    }
     acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
     acts += '</div>';
 
@@ -369,7 +376,7 @@ $(function () {
       /* Paste icon shown in header only when clipboard has content */
       var wdhActs = '<div class="cell-acts">' +
                     '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
-      if (state.clipboard && valid) {
+      if (canPaste(ds)) {
         wdhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
       }
       wdhActs += '</div>';
@@ -437,7 +444,7 @@ $(function () {
     /* Day header – paste icon shown here only when clipboard has content */
     var dhActs = '<div class="cell-acts">' +
                  '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
-    if (state.clipboard && valid) {
+    if (canPaste(ds)) {
       dhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
     }
     dhActs += '</div>';
