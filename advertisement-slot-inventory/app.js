@@ -261,8 +261,126 @@ function applyFilters() {
 }
 
 /* ─────────────────────────────────────────────
+   MEETING FOR – MULTI-SELECT
+   ───────────────────────────────────────────── */
+function initMeetingFor() {
+  const wrap      = document.getElementById('meetingForWrap');
+  const display   = document.getElementById('meetingForDisplay');
+  const dropdown  = document.getElementById('meetingForDropdown');
+  const tagsEl    = document.getElementById('meetingForTags');
+  const selectAll = document.getElementById('meetingForSelectAll');
+  const clearAll  = document.getElementById('meetingForClearAll');
+  const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+
+  function getSelected() {
+    return Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  }
+
+  function refreshTags() {
+    const selected = getSelected();
+
+    /* Build tag chips with DOM methods to avoid XSS */
+    tagsEl.innerHTML = '';
+    selected.forEach(v => {
+      const tag = document.createElement('span');
+      tag.className = 'ms-tag';
+
+      const text = document.createTextNode(v + ' ');
+      tag.appendChild(text);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ms-tag-remove';
+      btn.dataset.value = v;
+      btn.setAttribute('aria-label', 'Remove ' + v);
+      btn.textContent = '\u00D7';
+      tag.appendChild(btn);
+
+      tagsEl.appendChild(tag);
+    });
+
+    /* floating label state */
+    wrap.classList.toggle('has-value', selected.length > 0);
+  }
+
+  /* Event delegation for tag remove buttons */
+  tagsEl.addEventListener('click', e => {
+    const btn = e.target.closest('.ms-tag-remove');
+    if (!btn) return;
+    e.stopPropagation();
+    const cb = Array.from(checkboxes).find(c => c.value === btn.dataset.value);
+    if (cb) { cb.checked = false; refreshTags(); }
+  });
+
+  function openDropdown() {
+    dropdown.classList.remove('hidden');
+    display.classList.add('open');
+    display.setAttribute('aria-expanded', 'true');
+    wrap.classList.add('has-focus');
+  }
+
+  function closeDropdown() {
+    dropdown.classList.add('hidden');
+    display.classList.remove('open');
+    display.setAttribute('aria-expanded', 'false');
+    wrap.classList.remove('has-focus');
+  }
+
+  function toggleDropdown() {
+    if (dropdown.classList.contains('hidden')) {
+      openDropdown();
+    } else {
+      closeDropdown();
+    }
+  }
+
+  /* Open/close on click */
+  display.addEventListener('click', e => {
+    if (e.target.closest('.ms-tag-remove')) return;
+    toggleDropdown();
+  });
+
+  /* Keep label floating while display is focused */
+  display.addEventListener('focus', () => wrap.classList.add('has-focus'));
+  display.addEventListener('blur', e => {
+    /* relatedTarget is the element receiving focus; keep open if it's inside the dropdown */
+    if (!wrap.contains(e.relatedTarget)) {
+      wrap.classList.remove('has-focus');
+      closeDropdown();
+    }
+  });
+
+  /* Keyboard: open/close with Enter or Space */
+  display.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDropdown(); }
+    if (e.key === 'Escape') { closeDropdown(); display.focus(); }
+  });
+
+  /* Checkbox changes */
+  checkboxes.forEach(cb => cb.addEventListener('change', refreshTags));
+
+  /* Select All */
+  selectAll.addEventListener('click', () => {
+    checkboxes.forEach(cb => { cb.checked = true; });
+    refreshTags();
+  });
+
+  /* Clear All */
+  clearAll.addEventListener('click', () => {
+    checkboxes.forEach(cb => { cb.checked = false; });
+    refreshTags();
+  });
+
+  /* Close when clicking outside */
+  document.addEventListener('click', e => {
+    if (!wrap.contains(e.target)) closeDropdown();
+  });
+}
+
+/* ─────────────────────────────────────────────
    INIT
    ───────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   renderSlotCards(INVENTORY);
+  initMeetingFor();
 });
