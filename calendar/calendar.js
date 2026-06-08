@@ -90,7 +90,7 @@
     cursor:          new Date(),     // currently displayed date/period
     events:          loadEvents(),
     clipboard:       null,           // array of copied events (or null)
-    clipboardSource: null,           // 'cell' (day-level copy) | 'chip' (single-event copy)
+    clipboardSource: null,           // 'cell' (day-level copy) | 'chip' (single-event copy: chip, te-copy-btn, or popup)
     theme:           'light',
     editId:          null,           // id of event being edited (null = create)
     activePopup:     null,           // event id shown in popup (or null)
