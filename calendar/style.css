@@ -1220,7 +1220,15 @@ input, select, textarea {
   padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   transition: color .12s, border-color .12s;
+}
+.clipboard-banner button svg {
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
 }
 .clipboard-banner button:hover {
   color: var(--text-primary);

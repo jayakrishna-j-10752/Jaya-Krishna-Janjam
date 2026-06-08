@@ -525,7 +525,7 @@
     return '<div class="clipboard-banner">' +
            '  ' + SVG.paste + ' Clipboard: <strong>' + escHtml(state.clipboard.title) + '</strong>' +
            '  &nbsp; Click a <strong>paste icon</strong> or time slot to paste.' +
-           '  <button id="clearClipboard">&#10005; Clear</button>' +
+           '  <button id="clearClipboard">' + SVG.close + ' Clear</button>' +
            '</div>';
   }
 
