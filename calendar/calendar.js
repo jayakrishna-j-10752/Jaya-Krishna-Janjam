@@ -1,10 +1,10 @@
 /* ============================================================
-   calendar.js – Calendar Component  (vanilla JS, no CDN deps)
+   calendar.js – Calendar Component (jQuery)
    Zoho CRM Design Language · Month / Week / Day views
    Features: event CRUD, copy/paste, Light/Dark/Night themes
    ============================================================ */
 
-(function () {
+$(function () {
   'use strict';
 
   /* ──────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@
     cursor:          new Date(),     // currently displayed date/period
     events:          loadEvents(),
     clipboard:       null,           // array of copied events (or null)
-    clipboardSource: null,           // 'cell' (day-level copy) | 'chip' (single-event copy: chip, te-copy-btn, or popup)
+    clipboardSource: null,           // 'cell' (day-level copy) | 'chip' (single-event copy)
     theme:           'light',
     editId:          null,           // id of event being edited (null = create)
     activePopup:     null,           // event id shown in popup (or null)
@@ -98,41 +98,41 @@
   };
 
   /* ──────────────────────────────────────────────────────────
-     DOM REFERENCES
+     DOM REFERENCES  (jQuery objects)
   ────────────────────────────────────────────────────────── */
   var dom = {
-    canvas:       document.getElementById('calCanvas'),
-    periodLabel:  document.getElementById('periodLabel'),
-    btnPrev:      document.getElementById('btnPrev'),
-    btnNext:      document.getElementById('btnNext'),
-    btnToday:     document.getElementById('btnToday'),
-    viewTabs:     document.querySelectorAll('.view-tab'),
-    themeToggle:  document.getElementById('themeToggle'),
+    canvas:       $('#calCanvas'),
+    periodLabel:  $('#periodLabel'),
+    btnPrev:      $('#btnPrev'),
+    btnNext:      $('#btnNext'),
+    btnToday:     $('#btnToday'),
+    viewTabs:     $('.view-tab'),
+    themeToggle:  $('#themeToggle'),
 
-    modal:        document.getElementById('eventModal'),
-    modalHeading: document.getElementById('modalHeading'),
-    modalClose:   document.getElementById('modalClose'),
-    modalCancel:  document.getElementById('modalCancel'),
-    modalSave:    document.getElementById('modalSave'),
-    fTitle:       document.getElementById('fTitle'),
-    fTitleErr:    document.getElementById('fTitleErr'),
-    fDate:        document.getElementById('fDate'),
-    fStart:       document.getElementById('fStart'),
-    fEnd:         document.getElementById('fEnd'),
-    fDesc:        document.getElementById('fDesc'),
-    colorRow:     document.getElementById('colorRow'),
+    modal:        $('#eventModal'),
+    modalHeading: $('#modalHeading'),
+    modalClose:   $('#modalClose'),
+    modalCancel:  $('#modalCancel'),
+    modalSave:    $('#modalSave'),
+    fTitle:       $('#fTitle'),
+    fTitleErr:    $('#fTitleErr'),
+    fDate:        $('#fDate'),
+    fStart:       $('#fStart'),
+    fEnd:         $('#fEnd'),
+    fDesc:        $('#fDesc'),
+    colorRow:     $('#colorRow'),
 
-    popup:        document.getElementById('evtPopup'),
-    popupDot:     document.getElementById('popupDot'),
-    popupTitle:   document.getElementById('popupTitle'),
-    popupWhen:    document.getElementById('popupWhen'),
-    popupDesc:    document.getElementById('popupDesc'),
-    paCopy:       document.getElementById('paCopy'),
-    paEdit:       document.getElementById('paEdit'),
-    paDelete:     document.getElementById('paDelete'),
-    paClose:      document.getElementById('paClose'),
+    popup:        $('#evtPopup'),
+    popupDot:     $('#popupDot'),
+    popupTitle:   $('#popupTitle'),
+    popupWhen:    $('#popupWhen'),
+    popupDesc:    $('#popupDesc'),
+    paCopy:       $('#paCopy'),
+    paEdit:       $('#paEdit'),
+    paDelete:     $('#paDelete'),
+    paClose:      $('#paClose'),
 
-    toast:        document.getElementById('toast')
+    toast:        $('#toast')
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -141,11 +141,10 @@
   var toastTimer = null;
   function showToast(msg, ms) {
     ms = ms || 2800;
-    dom.toast.textContent = msg;
-    dom.toast.classList.add('toast-show');
+    dom.toast.text(msg).addClass('toast-show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () {
-      dom.toast.classList.remove('toast-show');
+      dom.toast.removeClass('toast-show');
     }, ms);
   }
 
@@ -180,11 +179,11 @@
       isCurrent = isToday(dateToStr(c));
     }
 
-    dom.btnToday.textContent = label;
-    dom.btnToday.style.display = isCurrent ? 'none' : '';
+    dom.btnToday.text(label).css('display', isCurrent ? 'none' : '');
   }
 
-  function updatePeriodLabel() {    var c = state.cursor;
+  function updatePeriodLabel() {
+    var c = state.cursor;
     var lbl = '';
     if (state.view === 'month') {
       lbl = MONTHS[c.getMonth()] + ' ' + c.getFullYear();
@@ -199,7 +198,7 @@
       lbl = WDAYS_LONG[c.getDay()] + ', ' +
             MONTHS[c.getMonth()] + ' ' + c.getDate() + ', ' + c.getFullYear();
     }
-    dom.periodLabel.textContent = lbl;
+    dom.periodLabel.text(lbl);
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -218,11 +217,11 @@
      SVG ICON TEMPLATES
   ────────────────────────────────────────────────────────── */
   var SVG = {
-    add: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>',
-    copy: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="7" height="8" rx="1.25"/><path d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v6A1.5 1.5 0 0 0 3.5 12H5"/></svg>',
+    add:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>',
+    copy:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="7" height="8" rx="1.25"/><path d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v6A1.5 1.5 0 0 0 3.5 12H5"/></svg>',
     paste: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="13" rx="1.5"/><path d="M6 2v2h4V2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>',
     trash: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5"/><rect x="3.5" y="4.5" width="9" height="9" rx="1.25"/><line x1="6.5" y1="7" x2="6.5" y2="11"/><line x1="9.5" y1="7" x2="9.5" y2="11"/></svg>',
-    edit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg>',
+    edit:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg>',
     close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>'
   };
 
@@ -289,14 +288,13 @@
     }
 
     html += '</div></div></div>';
-    dom.canvas.innerHTML = html;
+    dom.canvas.html(html);
     attachMonthHandlers();
   }
 
   function renderMonthCell(day, ds, otherMonth, tdStr) {
     var past  = isPast(ds);
     var today = ds === tdStr;
-    var valid = isValid(ds);
 
     var cls = 'm-cell';
     if (otherMonth) cls += ' cell-other';
@@ -305,7 +303,7 @@
 
     var numCls = 'day-num' + (today ? ' day-num-today' : '');
 
-    /* Action buttons – rendered for all cells (including other-month days) */
+    /* Action buttons */
     var acts = '<div class="cell-acts">';
     acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
     acts += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy events">' + SVG.copy + '</button>';
@@ -334,7 +332,7 @@
   }
 
   function renderChip(ev, past) {
-    var bg     = ev.color + '22';   /* 13% opacity tint */
+    var bg     = ev.color + '22';
     var border = ev.color;
     var fg     = ev.color;
     var pastCls = past ? ' evt-past' : '';
@@ -368,6 +366,7 @@
       var valid   = isValid(ds);
       var numCls  = 'wdh-num' + (isT ? ' wdh-num-today' : '');
       var headCls = 'week-day-head' + (isT ? ' wdh-today' : '');
+      /* Paste icon shown in header only when clipboard has content */
       var wdhActs = '<div class="cell-acts">' +
                     '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
       if (state.clipboard && valid) {
@@ -401,15 +400,12 @@
 
       html += '<div class="' + colCls + '" data-date="' + ds + '">';
 
-      /* Hour slots */
+      /* Hour slots – no paste button inside slots */
       for (var h = 0; h < 24; h++) {
         var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
           html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-          if (state.clipboard) {
-            html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
-          }
         }
         html += '</div>';
       }
@@ -423,7 +419,7 @@
     });
 
     html += '</div></div></div>'; /* week-time-body / week-grid / week-view */
-    dom.canvas.innerHTML = html;
+    dom.canvas.html(html);
     fixWeekHeadAlignment();
     attachWeekHandlers();
   }
@@ -438,7 +434,7 @@
     var headCls = 'day-head' + (isT ? ' dh-today' : '');
     var html = '<div class="day-view"><div class="day-grid">';
 
-    /* Day header */
+    /* Day header – paste icon shown here only when clipboard has content */
     var dhActs = '<div class="cell-acts">' +
                  '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
     if (state.clipboard && valid) {
@@ -472,16 +468,13 @@
     }
     html += '</div>';
 
-    /* Single day column */
+    /* Single day column – no paste button inside hour slots */
     html += '<div class="day-col" data-date="' + ds + '">';
     for (var h = 0; h < 24; h++) {
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (valid) {
         html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-        if (state.clipboard) {
-          html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
-        }
       }
       html += '</div>';
     }
@@ -492,7 +485,7 @@
     });
 
     html += '</div></div></div></div>'; /* day-col / day-body / day-grid / day-view */
-    dom.canvas.innerHTML = html;
+    dom.canvas.html(html);
     attachDayHandlers();
   }
 
@@ -501,7 +494,7 @@
     var past      = isPast(ds);
     var startMins = timeToMins(ev.startTime);
     var endMins   = timeToMins(ev.endTime);
-    var dur       = Math.max(endMins - startMins, 30); /* min 30-min visual height */
+    var dur       = Math.max(endMins - startMins, 30);
     var SLOT_PX   = 60;
     var top       = (startMins / 60) * SLOT_PX;
     var height    = (dur / 60) * SLOT_PX;
@@ -527,40 +520,45 @@
    * .week-head-row columns stay perfectly aligned with .week-day-col borders.
    */
   function fixWeekHeadAlignment() {
-    var headRow  = dom.canvas.querySelector('.week-head-row');
-    var timeBody = dom.canvas.querySelector('.week-time-body');
-    if (headRow && timeBody) {
-      var gutter = timeBody.offsetWidth - timeBody.clientWidth;
-      headRow.style.paddingRight = gutter + 'px';
+    var headRow  = dom.canvas.find('.week-head-row');
+    var timeBody = dom.canvas.find('.week-time-body');
+    if (headRow.length && timeBody.length) {
+      var gutter = timeBody[0].offsetWidth - timeBody[0].clientWidth;
+      headRow.css('padding-right', gutter + 'px');
     }
   }
 
   /* ──────────────────────────────────────────────────────────
-     EVENT DELEGATION HELPERS
+     EVENT DELEGATION HANDLERS
+     Use namespace '.calview' so handlers can be cleanly
+     replaced on each render without accumulation.
   ────────────────────────────────────────────────────────── */
 
   /** Attach all handlers for the month view */
   function attachMonthHandlers() {
-    delegate(dom.canvas, '.cell-add-btn',   'click', function (el, e) {
+    dom.canvas.off('.calview');
+    dom.canvas.on('click.calview', '.cell-add-btn', function (e) {
       e.stopPropagation();
-      if (isPast(el.dataset.date)) return;
-      openModal(el.dataset.date);
+      var date = $(this).data('date');
+      if (isPast(date)) return;
+      openModal(date);
     });
-    delegate(dom.canvas, '.cell-paste-btn', 'click', function (el, e) {
+    dom.canvas.on('click.calview', '.cell-paste-btn', function (e) {
       e.stopPropagation();
-      if (!isValid(el.dataset.date)) { showToast('Cannot paste on a past date.'); return; }
+      var date = $(this).data('date');
+      if (!isValid(date)) { showToast('Cannot paste on a past date.'); return; }
       if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
-      doPaste(el.dataset.date);
+      doPaste(date);
     });
-    delegate(dom.canvas, '.cell-copy-btn', 'click', function (el, e) {
+    dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
       e.stopPropagation();
-      var evts = eventsOn(el.dataset.date);
+      var evts = eventsOn($(this).data('date'));
       if (evts.length === 0) { showToast('No events to copy on this day.'); return; }
       doCopyAll(evts);
     });
-    delegate(dom.canvas, '.cell-del-day-btn', 'click', function (el, e) {
+    dom.canvas.on('click.calview', '.cell-del-day-btn', function (e) {
       e.stopPropagation();
-      var ds = el.dataset.date;
+      var ds   = $(this).data('date');
       var evts = eventsOn(ds);
       if (evts.length === 0) { showToast('No events to delete on this day.'); return; }
       if (window.confirm('Delete all ' + evts.length + ' event(s) on ' + ds + '?')) {
@@ -578,32 +576,43 @@
         showToast('All events deleted for ' + ds + '.');
       }
     });
-    delegate(dom.canvas, '.chip-copy-btn',  'click', function (el, e) {
+    dom.canvas.on('click.calview', '.chip-copy-btn', function (e) {
       e.stopPropagation();
-      doCopy(el.dataset.evid);
+      doCopy($(this).data('evid'));
     });
-    delegate(dom.canvas, '.evt-chip',       'click', function (el, e) {
-      if (!e.target.classList.contains('chip-copy-btn')) {
-        showPopup(el.dataset.evid, e);
+    dom.canvas.on('click.calview', '.evt-chip', function (e) {
+      if (!$(e.target).closest('.chip-copy-btn').length) {
+        showPopup($(this).data('evid'), e);
       }
     });
   }
 
   /** Attach all handlers for the week view */
   function attachWeekHandlers() {
+    dom.canvas.off('.calview');
     attachTimeGridHandlers();
+    dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
+      e.stopPropagation();
+      var evts = eventsOn($(this).data('date'));
+      if (evts.length === 0) { showToast('No events to copy on this day.'); return; }
+      doCopyAll(evts);
+    });
+    dom.canvas.on('click.calview', '.cell-paste-btn', function (e) {
+      e.stopPropagation();
+      var date = $(this).data('date');
+      if (!isValid(date)) { showToast('Cannot paste on a past date.'); return; }
+      if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
+      doPaste(date);
+    });
     /* Clicking a day header in week view switches to day view;
        ignore clicks that land on a button inside the header */
-    delegate(dom.canvas, '.week-day-head', 'click', function (el, e) {
-      if (e.target.closest('button')) return;
-      var ds = el.dataset.date;
+    dom.canvas.on('click.calview', '.week-day-head', function (e) {
+      if ($(e.target).closest('button').length) return;
+      var ds = $(this).data('date');
       if (ds) {
         state.cursor = new Date(ds + 'T12:00:00');
         state.view   = 'day';
-        dom.viewTabs.forEach(function (t) {
-          t.classList.toggle('active', t.dataset.view === 'day');
-          t.setAttribute('aria-selected', t.dataset.view === 'day' ? 'true' : 'false');
-        });
+        updateViewTab('day');
         render();
       }
     });
@@ -611,39 +620,40 @@
 
   /** Attach all handlers for the day view */
   function attachDayHandlers() {
+    dom.canvas.off('.calview');
     attachTimeGridHandlers();
-    delegate(dom.canvas, '.dh-add-btn',   'click', function (el) { openModal(el.dataset.date); });
-    delegate(dom.canvas, '.dh-paste-btn', 'click', function (el) { doPaste(el.dataset.date); });
+    dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
+      e.stopPropagation();
+      var evts = eventsOn($(this).data('date'));
+      if (evts.length === 0) { showToast('No events to copy on this day.'); return; }
+      doCopyAll(evts);
+    });
+    dom.canvas.on('click.calview', '.cell-paste-btn', function (e) {
+      e.stopPropagation();
+      var date = $(this).data('date');
+      if (!isValid(date)) { showToast('Cannot paste on a past date.'); return; }
+      if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
+      doPaste(date);
+    });
+    dom.canvas.on('click.calview', '.dh-add-btn', function () {
+      openModal($(this).data('date'));
+    });
   }
 
   /** Shared handler setup for week/day time grids */
   function attachTimeGridHandlers() {
-    delegate(dom.canvas, '.slot-add-btn',   'click', function (el, e) {
+    dom.canvas.on('click.calview', '.slot-add-btn', function (e) {
       e.stopPropagation();
-      var h = parseInt(el.dataset.hour, 10);
-      openModal(el.dataset.date, hourToTime(h), hourToTime(h + 1));
+      var h = parseInt($(this).data('hour'), 10);
+      openModal($(this).data('date'), hourToTime(h), hourToTime(h + 1));
     });
-    delegate(dom.canvas, '.slot-paste-btn', 'click', function (el, e) {
+    dom.canvas.on('click.calview', '.te-copy-btn', function (e) {
       e.stopPropagation();
-      doPaste(el.dataset.date, parseInt(el.dataset.hour, 10));
+      doCopy($(this).data('evid'));
     });
-    delegate(dom.canvas, '.te-copy-btn',    'click', function (el, e) {
-      e.stopPropagation();
-      doCopy(el.dataset.evid);
-    });
-    delegate(dom.canvas, '.time-event',     'click', function (el, e) {
-      if (!e.target.classList.contains('te-copy-btn')) {
-        showPopup(el.dataset.evid, e);
-      }
-    });
-  }
-
-  /** Simple event delegation utility */
-  function delegate(root, selector, event, handler) {
-    root.addEventListener(event, function (e) {
-      var target = e.target.closest(selector);
-      if (target && root.contains(target)) {
-        handler(target, e);
+    dom.canvas.on('click.calview', '.time-event', function (e) {
+      if (!$(e.target).closest('.te-copy-btn').length) {
+        showPopup($(this).data('evid'), e);
       }
     });
   }
@@ -709,11 +719,10 @@
     if (!ev) return;
 
     state.activePopup = evid;
-    dom.popupDot.style.background   = ev.color;
-    dom.popupTitle.textContent       = ev.title;
-    dom.popupWhen.textContent        = ev.date + '  ·  ' +
-                                       fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime);
-    dom.popupDesc.textContent        = ev.description || '';
+    dom.popupDot.css('background', ev.color);
+    dom.popupTitle.text(ev.title);
+    dom.popupWhen.text(ev.date + '  ·  ' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime));
+    dom.popupDesc.text(ev.description || '');
 
     /* Position near mouse, keeping inside viewport */
     var x = mouseEvt.clientX + 12;
@@ -721,15 +730,13 @@
     var pw = 310, ph = 140;
     if (x + pw > window.innerWidth  - 8) x = mouseEvt.clientX - pw - 8;
     if (y + ph > window.innerHeight - 8) y = mouseEvt.clientY - ph - 8;
-    dom.popup.style.left = Math.max(4, x) + 'px';
-    dom.popup.style.top  = Math.max(4, y) + 'px';
-
-    dom.popup.classList.add('popup-open');
+    dom.popup.css({ left: Math.max(4, x) + 'px', top: Math.max(4, y) + 'px' })
+             .addClass('popup-open');
   }
 
   function closePopup() {
     state.activePopup = null;
-    dom.popup.classList.remove('popup-open');
+    dom.popup.removeClass('popup-open');
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -744,53 +751,53 @@
    * @param {object?} existing   – event object to edit (null = create)
    */
   function openModal(date, startTime, endTime, existing) {
-    state.editId       = existing ? existing.id : null;
+    state.editId        = existing ? existing.id : null;
     state.selectedColor = existing ? existing.color : '#1565C0';
 
-    dom.modalHeading.textContent = existing ? 'Edit Event' : 'Create Event';
-    dom.fTitle.value             = existing ? existing.title       : '';
-    dom.fDate.value              = existing ? existing.date        : (date || todayStr());
-    dom.fStart.value             = existing ? existing.startTime   : (startTime || '09:00');
-    dom.fEnd.value               = existing ? existing.endTime     : (endTime   || '10:00');
-    dom.fDesc.value              = existing ? (existing.description || '') : '';
+    dom.modalHeading.text(existing ? 'Edit Event' : 'Create Event');
+    dom.fTitle.val(existing ? existing.title       : '');
+    dom.fDate.val(existing  ? existing.date        : (date || todayStr()));
+    dom.fStart.val(existing ? existing.startTime   : (startTime || '09:00'));
+    dom.fEnd.val(existing   ? existing.endTime     : (endTime   || '10:00'));
+    dom.fDesc.val(existing  ? (existing.description || '') : '');
 
-    dom.fTitle.classList.remove('input-err');
-    dom.fTitleErr.classList.remove('show');
+    dom.fTitle.removeClass('input-err');
+    dom.fTitleErr.removeClass('show');
 
     /* Update color picker */
-    dom.colorRow.querySelectorAll('.color-dot').forEach(function (dot) {
-      dot.classList.toggle('active', dot.dataset.color === state.selectedColor);
+    dom.colorRow.find('.color-dot').each(function () {
+      $(this).toggleClass('active', $(this).data('color') === state.selectedColor);
     });
 
-    dom.modal.classList.add('modal-open');
+    dom.modal.addClass('modal-open');
     setTimeout(function () { dom.fTitle.focus(); }, 60);
   }
 
   function closeModal() {
-    dom.modal.classList.remove('modal-open');
+    dom.modal.removeClass('modal-open');
     state.editId = null;
   }
 
   function saveModal() {
-    var title = dom.fTitle.value.trim();
+    var title = dom.fTitle.val().trim();
     if (!title) {
-      dom.fTitle.classList.add('input-err');
-      dom.fTitleErr.classList.add('show');
+      dom.fTitle.addClass('input-err');
+      dom.fTitleErr.addClass('show');
       dom.fTitle.focus();
       return;
     }
-    dom.fTitle.classList.remove('input-err');
-    dom.fTitleErr.classList.remove('show');
+    dom.fTitle.removeClass('input-err');
+    dom.fTitleErr.removeClass('show');
 
-    var date = dom.fDate.value;
+    var date = dom.fDate.val();
     if (!isValid(date)) {
       showToast('Cannot create or edit events on past dates.');
       return;
     }
 
     /* Validate times */
-    var start = dom.fStart.value || '09:00';
-    var end   = dom.fEnd.value   || '10:00';
+    var start = dom.fStart.val() || '09:00';
+    var end   = dom.fEnd.val()   || '10:00';
     if (timeToMins(end) <= timeToMins(start)) {
       end = hourToTime(Math.min(timeToMins(start) / 60 + 1, 23));
     }
@@ -801,7 +808,7 @@
       date:        date,
       startTime:   start,
       endTime:     end,
-      description: dom.fDesc.value.trim(),
+      description: dom.fDesc.val().trim(),
       color:       state.selectedColor
     };
 
@@ -863,7 +870,7 @@
 
   function setTheme(theme) {
     state.theme = theme;
-    document.body.className = 'theme-' + theme;
+    $('body').attr('class', 'theme-' + theme);
     try { localStorage.setItem('zcrm_cal_theme', theme); } catch (e) { /* ignore */ }
   }
 
@@ -872,12 +879,11 @@
   ────────────────────────────────────────────────────────── */
 
   function attachColorPicker() {
-    dom.colorRow.addEventListener('click', function (e) {
-      var dot = e.target.closest('.color-dot');
-      if (!dot) return;
-      state.selectedColor = dot.dataset.color;
-      dom.colorRow.querySelectorAll('.color-dot').forEach(function (d) {
-        d.classList.toggle('active', d === dot);
+    dom.colorRow.on('click', '.color-dot', function () {
+      var clickedDot = this;
+      state.selectedColor = $(this).data('color');
+      dom.colorRow.find('.color-dot').each(function () {
+        $(this).toggleClass('active', this === clickedDot);
       });
     });
   }
@@ -887,8 +893,7 @@
   ────────────────────────────────────────────────────────── */
 
   function seedSampleEvents() {
-    if (state.events.length > 0) return;          /* already has events */
-    var td = todayStr();
+    if (state.events.length > 0) return;
     var dateWithOffset = function (offsetDays) {
       var d = new Date();
       d.setDate(d.getDate() + offsetDays);
@@ -909,6 +914,13 @@
      BOOTSTRAP
   ────────────────────────────────────────────────────────── */
 
+  function updateViewTab(view) {
+    dom.viewTabs.each(function () {
+      var isView = $(this).data('view') === view;
+      $(this).toggleClass('active', isView).attr('aria-selected', isView ? 'true' : 'false');
+    });
+  }
+
   function init() {
     /* Restore theme */
     var savedTheme = 'light';
@@ -919,39 +931,34 @@
     seedSampleEvents();
 
     /* Navigation */
-    dom.btnPrev.addEventListener('click',  function () { navigate(-1); });
-    dom.btnNext.addEventListener('click',  function () { navigate(1); });
-    dom.btnToday.addEventListener('click', goToday);
+    dom.btnPrev.on('click',  function () { navigate(-1); });
+    dom.btnNext.on('click',  function () { navigate(1); });
+    dom.btnToday.on('click', goToday);
 
     /* View tabs */
-    dom.viewTabs.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        state.view = btn.dataset.view;
-        dom.viewTabs.forEach(function (t) {
-          t.classList.toggle('active', t === btn);
-          t.setAttribute('aria-selected', t === btn ? 'true' : 'false');
-        });
-        render();
-      });
+    dom.viewTabs.on('click', function () {
+      state.view = $(this).data('view');
+      updateViewTab(state.view);
+      render();
     });
 
     /* Theme toggle – cycles light → dark → night → light */
-    dom.themeToggle.addEventListener('click', function () {
+    dom.themeToggle.on('click', function () {
       var themes = ['light', 'dark', 'night'];
       var idx = themes.indexOf(state.theme);
       setTheme(themes[(idx + 1) % themes.length]);
     });
 
     /* Modal controls */
-    dom.modalClose.addEventListener('click',  closeModal);
-    dom.modalCancel.addEventListener('click', closeModal);
-    dom.modalSave.addEventListener('click',   saveModal);
-    dom.modal.addEventListener('click', function (e) {
-      if (e.target === dom.modal) closeModal();
+    dom.modalClose.on('click',  closeModal);
+    dom.modalCancel.on('click', closeModal);
+    dom.modalSave.on('click',   saveModal);
+    dom.modal.on('click', function (e) {
+      if (e.target === this) closeModal();
     });
 
     /* Enter key in title field → save */
-    dom.fTitle.addEventListener('keydown', function (e) {
+    dom.fTitle.on('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); saveModal(); }
     });
 
@@ -959,29 +966,31 @@
     attachColorPicker();
 
     /* Popup controls */
-    dom.paClose.addEventListener('click',  closePopup);
-    dom.paCopy.addEventListener('click',   function () {
+    dom.paClose.on('click',  closePopup);
+    dom.paCopy.on('click',   function () {
       if (state.activePopup) { doCopy(state.activePopup); closePopup(); }
     });
-    dom.paEdit.addEventListener('click',   function () {
+    dom.paEdit.on('click',   function () {
       var ev = findEvent(state.activePopup);
       if (ev) { closePopup(); openModal(ev.date, ev.startTime, ev.endTime, ev); }
     });
-    dom.paDelete.addEventListener('click', function () {
+    dom.paDelete.on('click', function () {
       var evid = state.activePopup;
       if (evid && window.confirm('Delete this event?')) { deleteEvent(evid); }
     });
 
     /* Close popup when clicking outside */
-    document.addEventListener('click', function (e) {
-      if (!dom.popup.contains(e.target) && !e.target.closest('.evt-chip') && !e.target.closest('.time-event')) {
+    $(document).on('click', function (e) {
+      if (!$(e.target).closest('#evtPopup').length &&
+          !$(e.target).closest('.evt-chip').length &&
+          !$(e.target).closest('.time-event').length) {
         closePopup();
       }
     });
 
     /* Keyboard shortcuts */
-    document.addEventListener('keydown', function (e) {
-      if (dom.modal.classList.contains('modal-open')) return; /* modal captures input */
+    $(document).on('keydown', function (e) {
+      if (dom.modal.hasClass('modal-open')) return; /* modal captures input */
       switch (e.key) {
         case 'Escape':     closePopup(); break;
         case 'ArrowLeft':  navigate(-1); break;
@@ -1000,18 +1009,6 @@
     render();
   }
 
-  function updateViewTab(view) {
-    dom.viewTabs.forEach(function (t) {
-      t.classList.toggle('active', t.dataset.view === view);
-      t.setAttribute('aria-selected', t.dataset.view === view ? 'true' : 'false');
-    });
-  }
+  init();
 
-  /* ── Boot ── */
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-})();
+});
