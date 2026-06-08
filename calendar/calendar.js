@@ -213,8 +213,8 @@ $(function () {
     return state.events.find(function (e) { return e.id === id; }) || null;
   }
 
-  /** Returns true when the paste button should be shown for a given date */
-  function canPaste(ds) {
+  /** Returns true when the paste button should be visible for a given date */
+  function shouldShowPasteButton(ds) {
     return !!(state.clipboard && isValid(ds));
   }
 
@@ -312,7 +312,7 @@ $(function () {
     var acts = '<div class="cell-acts">';
     acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
     acts += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy events">' + SVG.copy + '</button>';
-    if (canPaste(ds)) {
+    if (shouldShowPasteButton(ds)) {
       acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
     }
     acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
@@ -376,7 +376,7 @@ $(function () {
       /* Paste icon shown in header only when clipboard has content */
       var wdhActs = '<div class="cell-acts">' +
                     '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
-      if (canPaste(ds)) {
+      if (shouldShowPasteButton(ds)) {
         wdhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
       }
       wdhActs += '</div>';
@@ -444,7 +444,7 @@ $(function () {
     /* Day header – paste icon shown here only when clipboard has content */
     var dhActs = '<div class="cell-acts">' +
                  '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
-    if (canPaste(ds)) {
+    if (shouldShowPasteButton(ds)) {
       dhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
     }
     dhActs += '</div>';
@@ -773,7 +773,8 @@ $(function () {
 
     /* Update color picker */
     dom.colorRow.find('.color-dot').each(function () {
-      $(this).toggleClass('active', $(this).data('color') === state.selectedColor);
+      var $dot = $(this);
+      $dot.toggleClass('active', $dot.data('color') === state.selectedColor);
     });
 
     dom.modal.addClass('modal-open');
