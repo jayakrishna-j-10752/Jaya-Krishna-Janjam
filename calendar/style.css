@@ -495,20 +495,19 @@ input, select, textarea {
   box-shadow: 0 2px 6px rgba(21,101,192,.30);
 }
 
-/* + add button & paste button & delete-day button – always visible */
+/* action buttons (add / copy / paste / delete-day) – always visible */
 .cell-acts {
   display: flex;
   gap: 3px;
 }
 
 .cell-add-btn,
+.cell-copy-btn,
 .cell-paste-btn,
 .cell-del-day-btn {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -516,9 +515,16 @@ input, select, textarea {
   color: var(--z-blue);
   transition: background .12s, transform .12s, color .12s;
 }
-.cell-paste-btn { font-size: 11px; font-weight: 400; }
-.cell-del-day-btn { font-size: 13px; font-weight: 400; }
+.cell-add-btn svg,
+.cell-copy-btn svg,
+.cell-paste-btn svg,
+.cell-del-day-btn svg {
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+}
 .cell-add-btn:hover,
+.cell-copy-btn:hover,
 .cell-paste-btn:hover,
 .cell-del-day-btn:hover {
   background: var(--z-blue);
@@ -527,6 +533,7 @@ input, select, textarea {
 }
 /* Past-date action buttons – muted, non-interactive */
 .cell-past .cell-add-btn,
+.cell-past .cell-copy-btn,
 .cell-past .cell-paste-btn,
 .cell-past .cell-del-day-btn {
   background: color-mix(in srgb, var(--border) 50%, transparent);
@@ -576,7 +583,6 @@ input, select, textarea {
   width: 16px;
   height: 16px;
   border-radius: 3px;
-  font-size: 10px;
   background: rgba(255,255,255,.85);
   color: #333;
   display: flex;
@@ -585,6 +591,11 @@ input, select, textarea {
   opacity: 0;
   transition: opacity .12s;
   flex-shrink: 0;
+}
+.chip-copy-btn svg {
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
 }
 .evt-chip:hover .chip-copy-btn { opacity: 1; }
 
@@ -732,8 +743,6 @@ input, select, textarea {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  font-size: 13px;
-  font-weight: 700;
   background: var(--z-blue-pale);
   color: var(--z-blue);
   display: flex;
@@ -743,7 +752,13 @@ input, select, textarea {
   z-index: 3;
   transition: opacity .12s, background .12s, transform .12s;
 }
-.slot-paste-btn { right: 28px; font-size: 10px; font-weight: 400; }
+.slot-add-btn svg,
+.slot-paste-btn svg {
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
+}
+.slot-paste-btn { right: 28px; }
 .hour-slot:hover .slot-add-btn,
 .hour-slot:hover .slot-paste-btn  { opacity: 1; }
 .slot-add-btn:hover,
@@ -787,7 +802,6 @@ input, select, textarea {
   width: 18px;
   height: 18px;
   border-radius: 3px;
-  font-size: 10px;
   background: rgba(255,255,255,.25);
   color: #fff;
   display: flex;
@@ -795,6 +809,11 @@ input, select, textarea {
   justify-content: center;
   opacity: 0;
   transition: opacity .12s;
+}
+.te-copy-btn svg {
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
 }
 .time-event:hover .te-copy-btn { opacity: 1; }
 .te-copy-btn:hover { background: rgba(255,255,255,.45); }
@@ -868,7 +887,15 @@ input, select, textarea {
   border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   transition: background .15s;
+}
+.dh-paste-btn svg {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
 }
 .dh-paste-btn:hover { background: var(--z-blue-pale); }
 
@@ -1112,12 +1139,16 @@ input, select, textarea {
   width: 26px;
   height: 26px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background .12s, color .12s;
+}
+.popup-act svg {
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
 }
 .popup-act:hover { background: var(--surface-2); color: var(--text-primary); }
 
@@ -1168,6 +1199,7 @@ input, select, textarea {
 .clipboard-banner {
   display: flex;
   align-items: center;
+  gap: 6px;
   justify-content: space-between;
   padding: 6px 16px;
   background: color-mix(in srgb, var(--z-blue) 12%, var(--surface));
@@ -1175,6 +1207,11 @@ input, select, textarea {
   font-size: 12px;
   color: var(--z-blue);
   font-weight: 500;
+  flex-shrink: 0;
+}
+.clipboard-banner svg {
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 .clipboard-banner button {

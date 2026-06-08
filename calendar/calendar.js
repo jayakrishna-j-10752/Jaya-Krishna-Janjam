@@ -214,6 +214,18 @@
   }
 
   /* ──────────────────────────────────────────────────────────
+     SVG ICON TEMPLATES
+  ────────────────────────────────────────────────────────── */
+  var SVG = {
+    add: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>',
+    copy: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="7" height="8" rx="1.25"/><path d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v6A1.5 1.5 0 0 0 3.5 12H5"/></svg>',
+    paste: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="13" rx="1.5"/><path d="M6 2v2h4V2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>',
+    trash: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5"/><rect x="3.5" y="4.5" width="9" height="9" rx="1.25"/><line x1="6.5" y1="7" x2="6.5" y2="11"/><line x1="9.5" y1="7" x2="9.5" y2="11"/></svg>',
+    edit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg>',
+    close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>'
+  };
+
+  /* ──────────────────────────────────────────────────────────
      RENDERING
   ────────────────────────────────────────────────────────── */
 
@@ -296,9 +308,10 @@
     var acts = '';
     if (!otherMonth) {
       acts += '<div class="cell-acts">';
-      acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">+</button>';
-      acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste event">&#128203;</button>';
-      acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">&#128465;</button>';
+      acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
+      acts += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy event">' + SVG.copy + '</button>';
+      acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste event">' + SVG.paste + '</button>';
+      acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
       acts += '</div>';
     }
 
@@ -332,7 +345,7 @@
            '     style="background:' + bg + ';border-left-color:' + border + ';color:' + fg + '">' +
            '  <span class="chip-name">' + escHtml(ev.title) + '</span>' +
            '  <span class="chip-time">' + fmtTime(ev.startTime) + '</span>' +
-           '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">&#11078;</button>' +
+           '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
            '</div>';
   }
 
@@ -392,9 +405,9 @@
         var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
-          html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">+</button>';
+          html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
           if (state.clipboard) {
-            html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">&#11078;</button>';
+            html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
           }
         }
         html += '</div>';
@@ -440,7 +453,7 @@
     if (valid) {
       html += '<button class="dh-add-btn" data-date="' + ds + '">+ Add Event</button>';
       if (state.clipboard) {
-        html += '<button class="dh-paste-btn" data-date="' + ds + '">&#11078; Paste Event</button>';
+        html += '<button class="dh-paste-btn" data-date="' + ds + '">' + SVG.paste + ' Paste Event</button>';
       }
     } else {
       html += '<span class="dh-past-note">Past date – event creation not allowed</span>';
@@ -463,9 +476,9 @@
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (valid) {
-        html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">+</button>';
+        html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
         if (state.clipboard) {
-          html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">&#11078;</button>';
+          html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
         }
       }
       html += '</div>';
@@ -497,7 +510,7 @@
            '     style="top:' + top + 'px;height:' + height + 'px;background:' + ev.color + '">' +
            '  <div class="te-title">' + escHtml(ev.title) + '</div>' +
            '  <div class="te-time">' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime) + '</div>' +
-           '  <button class="te-copy-btn" data-evid="' + ev.id + '" title="Copy event">&#11078;</button>' +
+           '  <button class="te-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
            '</div>';
   }
 
@@ -510,8 +523,8 @@
   /* Clipboard banner HTML */
   function renderClipboardBanner() {
     return '<div class="clipboard-banner">' +
-           '  &#128203; Clipboard: <strong>' + escHtml(state.clipboard.title) + '</strong>' +
-           '  &nbsp; Click a <strong>paste icon (&#11078;)</strong> or time slot to paste.' +
+           '  ' + SVG.paste + ' Clipboard: <strong>' + escHtml(state.clipboard.title) + '</strong>' +
+           '  &nbsp; Click a <strong>paste icon</strong> or time slot to paste.' +
            '  <button id="clearClipboard">&#10005; Clear</button>' +
            '</div>';
   }
@@ -532,6 +545,13 @@
       if (!isValid(el.dataset.date)) { showToast('Cannot paste on a past date.'); return; }
       if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
       doPaste(el.dataset.date);
+    });
+    delegate(dom.canvas, '.cell-copy-btn', 'click', function (el, e) {
+      e.stopPropagation();
+      var evts = eventsOn(el.dataset.date);
+      if (evts.length === 0) { showToast('No events to copy on this day.'); return; }
+      if (evts.length === 1) { doCopy(evts[0].id); return; }
+      showToast('Multiple events – use the per-event copy button on each chip.');
     });
     delegate(dom.canvas, '.cell-del-day-btn', 'click', function (el, e) {
       e.stopPropagation();
@@ -639,7 +659,7 @@
     if (!ev) return;
     state.clipboard = Object.assign({}, ev);
     render();
-    showToast('&#11078; "' + ev.title + '" copied – paste on any future date.');
+    showToast('"' + ev.title + '" copied – paste on any future date.');
   }
 
   /**
