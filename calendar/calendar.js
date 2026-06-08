@@ -292,18 +292,14 @@
 
     var numCls = 'day-num' + (today ? ' day-num-today' : '');
 
-    /* Action buttons (+ and paste) – only rendered for valid dates */
+    /* Action buttons – rendered for all non-other-month cells */
     var acts = '';
-    if (valid && !otherMonth) {
+    if (!otherMonth) {
       acts += '<div class="cell-acts">';
       acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">+</button>';
-      if (state.clipboard) {
-        acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste event">&#11078;</button>';
-      }
+      acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste event">&#128203;</button>';
+      acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">&#128465;</button>';
       acts += '</div>';
-    } else if (!otherMonth) {
-      /* past date: render disabled placeholder so layout is consistent */
-      acts += '<div class="cell-acts"></div>';
     }
 
     /* Events */
@@ -528,11 +524,28 @@
   function attachMonthHandlers() {
     delegate(dom.canvas, '.cell-add-btn',   'click', function (el, e) {
       e.stopPropagation();
+      if (isPast(el.dataset.date)) return;
       openModal(el.dataset.date);
     });
     delegate(dom.canvas, '.cell-paste-btn', 'click', function (el, e) {
       e.stopPropagation();
+      if (!isValid(el.dataset.date)) { showToast('Cannot paste on a past date.'); return; }
+      if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
       doPaste(el.dataset.date);
+    });
+    delegate(dom.canvas, '.cell-del-day-btn', 'click', function (el, e) {
+      e.stopPropagation();
+      var ds = el.dataset.date;
+      var evts = eventsOn(ds);
+      if (evts.length === 0) { showToast('No events to delete on this day.'); return; }
+      if (window.confirm('Delete all ' + evts.length + ' event(s) on ' + ds + '?')) {
+        var ids = evts.map(function (ev) { return ev.id; });
+        state.events = state.events.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+        if (state.clipboard && ids.indexOf(state.clipboard.id) !== -1) state.clipboard = null;
+        saveEvents();
+        render();
+        showToast('All events deleted for ' + ds + '.');
+      }
     });
     delegate(dom.canvas, '.chip-copy-btn',  'click', function (el, e) {
       e.stopPropagation();
@@ -809,9 +822,6 @@
   function setTheme(theme) {
     state.theme = theme;
     document.body.className = 'theme-' + theme;
-    if (dom.themeToggle) {
-      dom.themeToggle.checked = (theme === 'dark' || theme === 'night');
-    }
     try { localStorage.setItem('zcrm_cal_theme', theme); } catch (e) { /* ignore */ }
   }
 
@@ -883,9 +893,11 @@
       });
     });
 
-    /* Theme toggle */
-    dom.themeToggle.addEventListener('change', function () {
-      setTheme(dom.themeToggle.checked ? 'dark' : 'light');
+    /* Theme toggle – cycles light → dark → night → light */
+    dom.themeToggle.addEventListener('click', function () {
+      var themes = ['light', 'dark', 'night'];
+      var idx = themes.indexOf(state.theme);
+      setTheme(themes[(idx + 1) % themes.length]);
     });
 
     /* Modal controls */

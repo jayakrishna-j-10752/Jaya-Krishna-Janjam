@@ -251,111 +251,92 @@ input, select, textarea {
   box-shadow: 0 2px 6px rgba(21,101,192,.32);
 }
 
-/* ── Theme Toggle Switch ── */
-.theme-toggle {
+/* ── User Profile ── */
+.user-profile {
   display: flex;
   align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-primary);
+  transition: background .15s, border-color .15s;
+  flex-shrink: 0;
   cursor: pointer;
-  user-select: none;
+}
+.user-profile:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
   flex-shrink: 0;
 }
-.theme-toggle-input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
+.user-avatar svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.user-chevron {
+  width: 10px;
+  height: 10px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
-/* Track – pill shape, light mode default */
-.theme-toggle-track {
-  position: relative;
-  width: 58px;
-  height: 30px;
-  border-radius: 15px;
-  background: #EEF1F8;
-  border: 1.5px solid #C8D0E2;
+/* ── Period Group (calendar icon + label) ── */
+.period-group {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 7px;
-  overflow: hidden;
-  transition: background .32s cubic-bezier(.4,0,.2,1),
-              border-color .32s cubic-bezier(.4,0,.2,1),
-              box-shadow .32s;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,.06);
+  gap: 6px;
 }
-
-/* Track – dark mode */
-.theme-toggle-input:checked ~ .theme-toggle-track {
-  background: #111624;
-  border-color: #2C3458;
-  box-shadow: inset 0 1px 4px rgba(0,0,0,.35);
-}
-
-/* Icons – render as inline SVG via background-image */
-.theme-toggle-icon {
-  display: inline-block;
-  width: 15px;
-  height: 15px;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  font-size: 0;   /* hide Unicode text content */
-  line-height: 0;
-  z-index: 1;
+.cal-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--z-blue);
   flex-shrink: 0;
-  transition: opacity .28s, filter .28s;
-  pointer-events: none;
 }
 
-/* Sun icon – outlined circle + 8 rays (matches reference) */
-.theme-icon-sun {
-  opacity: 1;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cline x1='12' y1='2' x2='12' y2='6'/%3E%3Cline x1='12' y1='18' x2='12' y2='22'/%3E%3Cline x1='2' y1='12' x2='6' y2='12'/%3E%3Cline x1='18' y1='12' x2='22' y2='12'/%3E%3Cline x1='4.93' y1='4.93' x2='7.76' y2='7.76'/%3E%3Cline x1='16.24' y1='16.24' x2='19.07' y2='19.07'/%3E%3Cline x1='4.93' y1='19.07' x2='7.76' y2='16.24'/%3E%3Cline x1='16.24' y1='7.76' x2='19.07' y2='4.93'/%3E%3C/svg%3E");
+/* ── Theme Toggle Button ── */
+.theme-toggle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  color: var(--text-secondary);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+  position: relative;
+}
+.theme-toggle-btn:hover {
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
+}
+.theme-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+  display: none;
 }
 
-/* Moon icon – crescent (matches reference), dimmed in light mode */
-.theme-icon-moon {
-  opacity: .32;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237080A0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'/%3E%3C/svg%3E");
-}
-
-/* Checked (dark mode): sun fades, moon brightens */
-.theme-toggle-input:checked ~ .theme-toggle-track .theme-icon-sun {
-  opacity: .28;
-  filter: brightness(.55) invert(.4);
-}
-.theme-toggle-input:checked ~ .theme-toggle-track .theme-icon-moon {
-  opacity: 1;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A8BFFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'/%3E%3C/svg%3E");
-}
-
-/* Thumb – white disc in light mode, tinted in dark mode */
-.theme-toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #FFFFFF;
-  box-shadow: 0 1px 5px rgba(0,0,0,.22), 0 0 0 0.5px rgba(0,0,0,.06);
-  transition: transform .32s cubic-bezier(.4,0,.2,1),
-              background .32s,
-              box-shadow .32s;
-  z-index: 0;
-}
-.theme-toggle-input:checked ~ .theme-toggle-track .theme-toggle-thumb {
-  transform: translateX(27px);
-  background: #2E3D78;
-  box-shadow: 0 1px 6px rgba(0,0,0,.50);
-}
-
-/* Hover ring */
-.theme-toggle:hover .theme-toggle-track {
-  border-color: var(--z-blue);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,.06), 0 0 0 3px color-mix(in srgb, var(--z-blue) 14%, transparent);
-}
+/* Light mode: show sun */
+.theme-light .theme-toggle-btn .theme-icon-sun  { display: block; }
+/* Dark mode: show moon */
+.theme-dark  .theme-toggle-btn .theme-icon-moon { display: block; }
+/* Night mode: show moon */
+.theme-night .theme-toggle-btn .theme-icon-moon { display: block; }
 
 /* New Event button */
 .btn-new-event {
@@ -480,7 +461,8 @@ input, select, textarea {
 
 /* Today highlight */
 .cell-today {
-  background: color-mix(in srgb, var(--z-blue) 8%, var(--surface)) !important;
+  background: var(--z-blue-pale) !important;
+  box-shadow: inset 0 0 0 2px var(--z-blue);
 }
 
 /* ── Cell header (day number + action buttons) ── */
@@ -513,17 +495,15 @@ input, select, textarea {
   box-shadow: 0 2px 6px rgba(21,101,192,.30);
 }
 
-/* + add button & paste button (hidden until hover) */
+/* + add button & paste button & delete-day button – always visible */
 .cell-acts {
   display: flex;
   gap: 3px;
-  opacity: 0;
-  transition: opacity .15s;
 }
-.m-cell:not(.cell-past):hover .cell-acts { opacity: 1; }
 
 .cell-add-btn,
-.cell-paste-btn {
+.cell-paste-btn,
+.cell-del-day-btn {
   width: 22px;
   height: 22px;
   border-radius: 6px;
@@ -537,11 +517,21 @@ input, select, textarea {
   transition: background .12s, transform .12s, color .12s;
 }
 .cell-paste-btn { font-size: 11px; font-weight: 400; }
+.cell-del-day-btn { font-size: 13px; font-weight: 400; }
 .cell-add-btn:hover,
-.cell-paste-btn:hover {
+.cell-paste-btn:hover,
+.cell-del-day-btn:hover {
   background: var(--z-blue);
   color: #fff;
   transform: scale(1.1);
+}
+/* Past-date action buttons – muted, non-interactive */
+.cell-past .cell-add-btn,
+.cell-past .cell-paste-btn,
+.cell-past .cell-del-day-btn {
+  background: color-mix(in srgb, var(--border) 50%, transparent);
+  color: var(--text-disabled);
+  pointer-events: none;
 }
 
 /* ── Event chips in month ── */
@@ -1261,12 +1251,8 @@ input, select, textarea {
   .nav-arrow { width: 28px; height: 28px; font-size: 17px; }
   .btn-today { padding: 5px 12px; font-size: 11px; }
 
-  .theme-toggle-track { width: 52px; height: 27px; padding: 0 5px; }
-  .theme-toggle-thumb { width: 20px; height: 20px; top: 3px; left: 3px; }
-  .theme-toggle-input:checked ~ .theme-toggle-track .theme-toggle-thumb {
-    transform: translateX(24px);
-  }
-  .theme-toggle-icon { width: 13px; height: 13px; }
+  .user-name { display: none; }
+  .user-chevron { display: none; }
 
   .modal-box { border-radius: 12px; }
   .modal-head { padding: 14px 16px; }
