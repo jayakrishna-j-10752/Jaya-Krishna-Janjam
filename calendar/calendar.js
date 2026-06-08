@@ -105,9 +105,8 @@
     btnPrev:      document.getElementById('btnPrev'),
     btnNext:      document.getElementById('btnNext'),
     btnToday:     document.getElementById('btnToday'),
-    btnNewEvent:  document.getElementById('btnNewEvent'),
     viewTabs:     document.querySelectorAll('.view-tab'),
-    themeBtns:    document.querySelectorAll('.theme-btn'),
+    themeToggle:  document.getElementById('themeToggle'),
 
     modal:        document.getElementById('eventModal'),
     modalHeading: document.getElementById('modalHeading'),
@@ -157,8 +156,34 @@
   var WDAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var WDAYS_LONG  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-  function updatePeriodLabel() {
-    var c = state.cursor;
+  /* ──────────────────────────────────────────────────────────
+     #btnToday – dynamic label + visibility
+  ────────────────────────────────────────────────────────── */
+  function updateTodayBtn() {
+    var today   = new Date();
+    var c       = state.cursor;
+    var label, isCurrent;
+
+    if (state.view === 'month') {
+      label     = 'This Month';
+      isCurrent = c.getFullYear() === today.getFullYear() &&
+                  c.getMonth()    === today.getMonth();
+    } else if (state.view === 'week') {
+      label       = 'This Week';
+      var ws      = weekStart(c);
+      var we      = new Date(ws); we.setDate(ws.getDate() + 6);
+      var td      = todayStr();
+      isCurrent   = dateToStr(ws) <= td && td <= dateToStr(we);
+    } else {
+      label     = 'Today';
+      isCurrent = isToday(dateToStr(c));
+    }
+
+    dom.btnToday.textContent = label;
+    dom.btnToday.style.display = isCurrent ? 'none' : '';
+  }
+
+  function updatePeriodLabel() {    var c = state.cursor;
     var lbl = '';
     if (state.view === 'month') {
       lbl = MONTHS[c.getMonth()] + ' ' + c.getFullYear();
@@ -194,6 +219,7 @@
 
   function render() {
     updatePeriodLabel();
+    updateTodayBtn();
     closePopup();
 
     if (state.view === 'month') {
@@ -783,9 +809,9 @@
   function setTheme(theme) {
     state.theme = theme;
     document.body.className = 'theme-' + theme;
-    dom.themeBtns.forEach(function (b) {
-      b.classList.toggle('active', b.dataset.theme === theme);
-    });
+    if (dom.themeToggle) {
+      dom.themeToggle.checked = (theme === 'dark' || theme === 'night');
+    }
     try { localStorage.setItem('zcrm_cal_theme', theme); } catch (e) { /* ignore */ }
   }
 
@@ -857,16 +883,9 @@
       });
     });
 
-    /* Theme buttons */
-    dom.themeBtns.forEach(function (btn) {
-      btn.addEventListener('click', function () { setTheme(btn.dataset.theme); });
-    });
-
-    /* New Event (opens modal for today or cursor date) */
-    dom.btnNewEvent.addEventListener('click', function () {
-      var ds = dateToStr(state.cursor);
-      if (isPast(ds)) ds = todayStr();   /* fallback to today if cursor is past */
-      openModal(ds);
+    /* Theme toggle */
+    dom.themeToggle.addEventListener('change', function () {
+      setTheme(dom.themeToggle.checked ? 'dark' : 'light');
     });
 
     /* Modal controls */

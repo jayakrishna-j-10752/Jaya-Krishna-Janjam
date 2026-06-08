@@ -14,11 +14,6 @@
     <!-- ── TOP HEADER ── -->
     <header class="cal-header">
       <div class="header-left">
-        <div class="app-brand">
-          <span class="brand-icon">&#128197;</span>
-          <span class="brand-name">Calendar</span>
-        </div>
-
         <div class="nav-group">
           <button class="nav-arrow" id="btnPrev" title="Previous">&#8249;</button>
           <button class="btn-today" id="btnToday">Today</button>
@@ -36,17 +31,15 @@
           <button class="view-tab" data-view="day"   role="tab" aria-selected="false">Day</button>
         </div>
 
-        <!-- Theme Switcher -->
-        <div class="theme-group" aria-label="Theme switcher">
-          <button class="theme-btn active" data-theme="light" title="Light Mode">&#9728;&#65039;</button>
-          <button class="theme-btn"        data-theme="dark"  title="Dark Mode">&#127769;</button>
-          <button class="theme-btn"        data-theme="night" title="Night Mode">&#127771;</button>
-        </div>
-
-        <!-- New Event -->
-        <button class="btn-new-event" id="btnNewEvent" title="Create new event">
-          <span class="btn-plus">+</span> New Event
-        </button>
+        <!-- Theme Toggle -->
+        <label class="theme-toggle" title="Toggle theme" aria-label="Toggle dark mode">
+          <input type="checkbox" id="themeToggle" class="theme-toggle-input" />
+          <span class="theme-toggle-track">
+            <span class="theme-toggle-icon theme-icon-sun">&#9728;</span>
+            <span class="theme-toggle-icon theme-icon-moon">&#9790;</span>
+            <span class="theme-toggle-thumb"></span>
+          </span>
+        </label>
       </div>
     </header>
 
