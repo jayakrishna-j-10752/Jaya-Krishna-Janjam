@@ -278,28 +278,39 @@ function initMeetingFor() {
 
   function refreshTags() {
     const selected = getSelected();
-    tagsEl.innerHTML = selected.map(v => `
-      <span class="ms-tag">
-        ${v}
-        <button type="button" class="ms-tag-remove" data-value="${v}" aria-label="Remove ${v}">&times;</button>
-      </span>`).join('');
+
+    /* Build tag chips with DOM methods to avoid XSS */
+    tagsEl.innerHTML = '';
+    selected.forEach(v => {
+      const tag = document.createElement('span');
+      tag.className = 'ms-tag';
+
+      const text = document.createTextNode(v + ' ');
+      tag.appendChild(text);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ms-tag-remove';
+      btn.dataset.value = v;
+      btn.setAttribute('aria-label', 'Remove ' + v);
+      btn.textContent = '\u00D7';
+      tag.appendChild(btn);
+
+      tagsEl.appendChild(tag);
+    });
 
     /* floating label state */
-    if (selected.length > 0) {
-      wrap.classList.add('has-value');
-    } else {
-      wrap.classList.remove('has-value');
-    }
-
-    /* tag remove buttons */
-    tagsEl.querySelectorAll('.ms-tag-remove').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const cb = Array.from(checkboxes).find(c => c.value === btn.dataset.value);
-        if (cb) { cb.checked = false; refreshTags(); }
-      });
-    });
+    wrap.classList.toggle('has-value', selected.length > 0);
   }
+
+  /* Event delegation for tag remove buttons */
+  tagsEl.addEventListener('click', e => {
+    const btn = e.target.closest('.ms-tag-remove');
+    if (!btn) return;
+    e.stopPropagation();
+    const cb = Array.from(checkboxes).find(c => c.value === btn.dataset.value);
+    if (cb) { cb.checked = false; refreshTags(); }
+  });
 
   function openDropdown() {
     dropdown.classList.remove('hidden');
@@ -331,13 +342,12 @@ function initMeetingFor() {
 
   /* Keep label floating while display is focused */
   display.addEventListener('focus', () => wrap.classList.add('has-focus'));
-  display.addEventListener('blur',  () => {
-    /* delay so click inside dropdown is processed first */
-    setTimeout(() => {
-      if (!dropdown.contains(document.activeElement)) {
-        wrap.classList.remove('has-focus');
-      }
-    }, 150);
+  display.addEventListener('blur', e => {
+    /* relatedTarget is the element receiving focus; keep open if it's inside the dropdown */
+    if (!wrap.contains(e.relatedTarget)) {
+      wrap.classList.remove('has-focus');
+      closeDropdown();
+    }
   });
 
   /* Keyboard: open/close with Enter or Space */
