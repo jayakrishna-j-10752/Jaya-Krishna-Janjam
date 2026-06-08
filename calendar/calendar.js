@@ -86,14 +86,15 @@
      APPLICATION STATE
   ────────────────────────────────────────────────────────── */
   var state = {
-    view:         'month',           // 'month' | 'week' | 'day'
-    cursor:       new Date(),        // currently displayed date/period
-    events:       loadEvents(),
-    clipboard:    null,              // array of copied events (or null)
-    theme:        'light',
-    editId:       null,              // id of event being edited (null = create)
-    activePopup:  null,              // event id shown in popup (or null)
-    selectedColor:'#1565C0'
+    view:            'month',        // 'month' | 'week' | 'day'
+    cursor:          new Date(),     // currently displayed date/period
+    events:          loadEvents(),
+    clipboard:       null,           // array of copied events (or null)
+    clipboardSource: null,           // 'cell' (day-level copy) | 'chip' (single-event copy)
+    theme:           'light',
+    editId:          null,           // id of event being edited (null = create)
+    activePopup:     null,           // event id shown in popup (or null)
+    selectedColor:   '#1565C0'
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -369,11 +370,19 @@
     days.forEach(function (d) {
       var ds      = dateToStr(d);
       var isT     = ds === tdStr;
+      var valid   = isValid(ds);
       var numCls  = 'wdh-num' + (isT ? ' wdh-num-today' : '');
       var headCls = 'week-day-head' + (isT ? ' wdh-today' : '');
+      var wdhActs = '<div class="cell-acts">' +
+                    '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
+      if (state.clipboard && state.clipboardSource === 'cell' && valid) {
+        wdhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
+      }
+      wdhActs += '</div>';
       html += '<div class="' + headCls + '" data-date="' + ds + '">' +
               '  <span class="wdh-name">' + WDAYS_SHORT[d.getDay()] + '</span>' +
               '  <span class="' + numCls + '">' + d.getDate() + '</span>' +
+              wdhActs +
               '</div>';
     });
     html += '</div>';
@@ -403,7 +412,7 @@
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
           html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-          if (state.clipboard) {
+          if (state.clipboard && state.clipboardSource === 'chip') {
             html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
           }
         }
@@ -420,6 +429,7 @@
 
     html += '</div></div></div>'; /* week-time-body / week-grid / week-view */
     dom.canvas.innerHTML = html;
+    fixWeekHeadAlignment();
     attachWeekHandlers();
   }
 
@@ -439,19 +449,24 @@
     }
 
     /* Day header */
+    var dhActs = '<div class="cell-acts">' +
+                 '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
+    if (state.clipboard && state.clipboardSource === 'cell' && valid) {
+      dhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
+    }
+    dhActs += '</div>';
+
     html += '<div class="' + headCls + '">' +
             '  <span class="dh-wday">' + WDAYS_LONG[state.cursor.getDay()] + '</span>' +
             '  <span class="dh-date">' +
                   MONTHS[state.cursor.getMonth()] + ' ' +
                   state.cursor.getDate() + ', ' + state.cursor.getFullYear() +
             '  </span>' +
+            dhActs +
             '  <div class="dh-actions">';
 
     if (valid) {
       html += '<button class="dh-add-btn" data-date="' + ds + '">+ Add Event</button>';
-      if (state.clipboard) {
-        html += '<button class="dh-paste-btn" data-date="' + ds + '">' + SVG.paste + ' Paste Event</button>';
-      }
     } else {
       html += '<span class="dh-past-note">Past date – event creation not allowed</span>';
     }
@@ -474,7 +489,7 @@
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (valid) {
         html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-        if (state.clipboard) {
+        if (state.clipboard && state.clipboardSource === 'chip') {
           html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
         }
       }
@@ -515,6 +530,19 @@
   function timeToMins(t) {
     var p = t.split(':');
     return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
+  }
+
+  /**
+   * Compensate for the vertical scrollbar in .week-time-body so that
+   * .week-head-row columns stay perfectly aligned with .week-day-col borders.
+   */
+  function fixWeekHeadAlignment() {
+    var headRow  = dom.canvas.querySelector('.week-head-row');
+    var timeBody = dom.canvas.querySelector('.week-time-body');
+    if (headRow && timeBody) {
+      var gutter = timeBody.offsetWidth - timeBody.clientWidth;
+      headRow.style.paddingRight = gutter + 'px';
+    }
   }
 
   /* Clipboard banner HTML */
@@ -562,7 +590,10 @@
         state.events = state.events.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
         if (state.clipboard) {
           state.clipboard = state.clipboard.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
-          if (state.clipboard.length === 0) state.clipboard = null;
+          if (state.clipboard.length === 0) {
+            state.clipboard       = null;
+            state.clipboardSource = null;
+          }
         }
         saveEvents();
         render();
@@ -583,8 +614,10 @@
   /** Attach all handlers for the week view */
   function attachWeekHandlers() {
     attachTimeGridHandlers();
-    /* Clicking a day header in week view switches to day view */
-    delegate(dom.canvas, '.week-day-head', 'click', function (el) {
+    /* Clicking a day header in week view switches to day view;
+       ignore clicks that land on a button inside the header */
+    delegate(dom.canvas, '.week-day-head', 'click', function (el, e) {
+      if (e.target.closest('button')) return;
       var ds = el.dataset.date;
       if (ds) {
         state.cursor = new Date(ds + 'T12:00:00');
@@ -630,7 +663,8 @@
     var cb = document.getElementById('clearClipboard');
     if (cb) {
       cb.addEventListener('click', function () {
-        state.clipboard = null;
+        state.clipboard       = null;
+        state.clipboardSource = null;
         render();
         showToast('Clipboard cleared.');
       });
@@ -659,13 +693,15 @@
   function doCopy(evid) {
     var ev = findEvent(evid);
     if (!ev) return;
-    state.clipboard = [Object.assign({}, ev)];
+    state.clipboard       = [Object.assign({}, ev)];
+    state.clipboardSource = 'chip';
     render();
     showToast('"' + ev.title + '" copied – paste on any future date.');
   }
 
   function doCopyAll(evts) {
-    state.clipboard = evts.map(function (ev) { return Object.assign({}, ev); });
+    state.clipboard       = evts.map(function (ev) { return Object.assign({}, ev); });
+    state.clipboardSource = 'cell';
     render();
     showToast(evts.length === 1
       ? '"' + evts[0].title + '" copied – paste on any future date.'
@@ -820,7 +856,10 @@
     /* Also remove from clipboard if that event was the source */
     if (state.clipboard) {
       state.clipboard = state.clipboard.filter(function (ev) { return ev.id !== evid; });
-      if (state.clipboard.length === 0) state.clipboard = null;
+      if (state.clipboard.length === 0) {
+        state.clipboard       = null;
+        state.clipboardSource = null;
+      }
     }
     saveEvents();
     closePopup();

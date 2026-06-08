@@ -650,6 +650,9 @@ input, select, textarea {
   border-right: 1px solid var(--border);
   cursor: pointer;
   transition: background .12s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .week-day-head:last-child { border-right: none; }
 .week-day-head:hover { background: var(--z-blue-pale); }
@@ -680,6 +683,17 @@ input, select, textarea {
 .wdh-num-today {
   background: var(--today-bg);
   color: var(--today-fg) !important;
+}
+
+/* cell-acts inside week-day-head */
+.week-day-head .cell-acts {
+  margin-top: 6px;
+  justify-content: center;
+}
+
+/* cell-acts inside day-head – inherits flex-row from day-head */
+.day-head .cell-acts {
+  flex-shrink: 0;
 }
 
 /* Scrollable time body */
