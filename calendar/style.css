@@ -18,7 +18,7 @@
   --border-strong: #BDC1C6;
 
   --text-primary:  #1A1A2E;
-  --text-secondary:#5F6368;
+  --text-secondary: #5F6368;
   --text-muted:    #9AA0A6;
   --text-disabled: #C4C7CA;
 
@@ -1092,13 +1092,13 @@ input, select, textarea {
    RESPONSIVE TWEAKS
 ══════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  :root, .theme-light, .theme-dark, .theme-night { --time-col-w: 40px; }
   .cal-header { height: auto; padding: 8px 12px; }
   .header-left, .header-right { flex-wrap: wrap; gap: 8px; }
   .period-label { font-size: 14px; min-width: 0; }
   .brand-name { font-size: 15px; }
   .btn-new-event { padding: 6px 12px; font-size: 12px; }
-  .week-head-row { grid-template-columns: 40px repeat(7, 1fr); }
-  .week-time-body { grid-template-columns: 40px repeat(7, 1fr); }
-  --time-col-w: 40px;
+  .week-head-row { grid-template-columns: var(--time-col-w) repeat(7, 1fr); }
+  .week-time-body { grid-template-columns: var(--time-col-w) repeat(7, 1fr); }
   .wdh-num { font-size: 14px; width: 26px; height: 26px; }
 }

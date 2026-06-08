@@ -18,7 +18,7 @@
   }
 
   function pad2(n) { return n < 10 ? '0' + n : '' + n; }
-  function pad4(n) { return n < 1000 ? '0' + n : '' + n; }
+  function pad4(n) { var s = '' + n; while (s.length < 4) s = '0' + s; return s; }
 
   /** Convert a Date object → YYYY-MM-DD string (local time) */
   function dateToStr(d) {
@@ -811,17 +811,17 @@
   function seedSampleEvents() {
     if (state.events.length > 0) return;          /* already has events */
     var td = todayStr();
-    var nt = function (offsetDays, h) {
+    var dateWithOffset = function (offsetDays) {
       var d = new Date();
       d.setDate(d.getDate() + offsetDays);
       return dateToStr(d);
     };
     var samples = [
-      { id: uid(), title: 'Team Stand-up',   date: nt(0),  startTime: '09:00', endTime: '09:30', description: 'Daily sync with the team', color: '#1565C0' },
-      { id: uid(), title: 'Product Review',  date: nt(0),  startTime: '11:00', endTime: '12:00', description: 'Q3 product roadmap review', color: '#2E7D32' },
-      { id: uid(), title: 'Client Call',     date: nt(1),  startTime: '14:00', endTime: '15:00', description: 'Zoho CRM demo for Acme Corp', color: '#E65100' },
-      { id: uid(), title: 'Sprint Planning', date: nt(2),  startTime: '10:00', endTime: '11:30', description: 'Sprint 22 planning session',  color: '#6A1B9A' },
-      { id: uid(), title: 'Design Review',   date: nt(3),  startTime: '15:00', endTime: '16:00', description: 'UI/UX feedback round',        color: '#00838F' }
+      { id: uid(), title: 'Team Stand-up',   date: dateWithOffset(0),  startTime: '09:00', endTime: '09:30', description: 'Daily sync with the team', color: '#1565C0' },
+      { id: uid(), title: 'Product Review',  date: dateWithOffset(0),  startTime: '11:00', endTime: '12:00', description: 'Q3 product roadmap review', color: '#2E7D32' },
+      { id: uid(), title: 'Client Call',     date: dateWithOffset(1),  startTime: '14:00', endTime: '15:00', description: 'Zoho CRM demo for Acme Corp', color: '#E65100' },
+      { id: uid(), title: 'Sprint Planning', date: dateWithOffset(2),  startTime: '10:00', endTime: '11:30', description: 'Sprint 22 planning session',  color: '#6A1B9A' },
+      { id: uid(), title: 'Design Review',   date: dateWithOffset(3),  startTime: '15:00', endTime: '16:00', description: 'UI/UX feedback round',        color: '#00838F' }
     ];
     state.events = samples;
     saveEvents();
