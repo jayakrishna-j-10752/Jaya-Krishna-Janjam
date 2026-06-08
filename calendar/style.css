@@ -300,7 +300,7 @@ input, select, textarea {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  font-size: 0;   /* hide Unicode fallback */
+  font-size: 0;   /* hide Unicode text content */
   line-height: 0;
   z-index: 1;
   flex-shrink: 0;
@@ -1209,7 +1209,7 @@ input, select, textarea {
 }
 
 @media (max-width: 768px) {
-  :root, .theme-light, .theme-dark, .theme-night {
+  :root {
     --time-col-w: 40px;
     --header-h: auto;
   }
@@ -1256,7 +1256,7 @@ input, select, textarea {
 }
 
 @media (max-width: 540px) {
-  :root, .theme-light, .theme-dark, .theme-night { --time-col-w: 32px; }
+  :root { --time-col-w: 32px; }
 
   .nav-arrow { width: 28px; height: 28px; font-size: 17px; }
   .btn-today { padding: 5px 12px; font-size: 11px; }

@@ -37,7 +37,7 @@
   --c-roadblock:  #212121;
 }
 
-html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body {
   font-family: var(--font);
   background: var(--zoho-bg);
