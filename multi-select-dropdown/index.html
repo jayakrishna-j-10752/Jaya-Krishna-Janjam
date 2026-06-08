@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Select Dropdown</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="demo-wrapper">
+
+    <!-- ── Multi-Select Dropdown Component ── -->
+    <div class="ms-wrap" id="msWrap">
+
+      <!-- Floating label (acts as placeholder when field is empty/unfocused) -->
+      <label class="ms-label" id="msLabel" for="msDisplay">Meeting For</label>
+
+      <!-- Trigger box -->
+      <div class="ms-field" id="msDisplay" tabindex="0"
+           role="combobox" aria-haspopup="listbox"
+           aria-expanded="false" aria-label="Meeting For">
+        <span class="ms-chips" id="msChips"></span>
+        <span class="ms-chevron" aria-hidden="true">
+          <svg width="12" height="8" viewBox="0 0 12 8" fill="none"
+               xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L6 7L11 1" stroke="#5F6368"
+                  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
+
+      <!-- Dropdown panel -->
+      <div class="ms-dropdown" id="msDropdown" role="listbox"
+           aria-multiselectable="true" tabindex="-1" hidden>
+
+        <!-- Select All / Clear All actions -->
+        <div class="ms-actions">
+          <button type="button" class="ms-btn-action" id="msSelectAll">Select All</button>
+          <button type="button" class="ms-btn-action" id="msClearAll">Clear All</button>
+        </div>
+
+        <div class="ms-options" id="msOptions">
+          <!-- Options will be injected by script.js -->
+        </div>
+      </div>
+
+    </div><!-- /.ms-wrap -->
+
+  </div><!-- /.demo-wrapper -->
+
+  <script src="script.js"></script>
+</body>
+</html>
