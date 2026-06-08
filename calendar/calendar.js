@@ -89,7 +89,7 @@
     view:         'month',           // 'month' | 'week' | 'day'
     cursor:       new Date(),        // currently displayed date/period
     events:       loadEvents(),
-    clipboard:    null,              // copied event (or null)
+    clipboard:    null,              // array of copied events (or null)
     theme:        'light',
     editId:       null,              // id of event being edited (null = create)
     activePopup:  null,              // event id shown in popup (or null)
@@ -304,19 +304,16 @@
 
     var numCls = 'day-num' + (today ? ' day-num-today' : '');
 
-    /* Action buttons – rendered for all non-other-month cells */
-    var acts = '';
-    if (!otherMonth) {
-      acts += '<div class="cell-acts">';
-      acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
-      acts += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy event">' + SVG.copy + '</button>';
-      acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste event">' + SVG.paste + '</button>';
-      acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
-      acts += '</div>';
-    }
+    /* Action buttons – rendered for all cells (including other-month days) */
+    var acts = '<div class="cell-acts">';
+    acts += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
+    acts += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy events">' + SVG.copy + '</button>';
+    acts += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
+    acts += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
+    acts += '</div>';
 
     /* Events */
-    var evts    = otherMonth ? [] : eventsOn(ds);
+    var evts    = eventsOn(ds);
     var maxShow = 3;
     var chips   = '';
     evts.slice(0, maxShow).forEach(function (ev) {
@@ -522,8 +519,11 @@
 
   /* Clipboard banner HTML */
   function renderClipboardBanner() {
+    var label = state.clipboard.length === 1
+      ? escHtml(state.clipboard[0].title)
+      : state.clipboard.length + ' events';
     return '<div class="clipboard-banner">' +
-           '  ' + SVG.paste + ' Clipboard: <strong>' + escHtml(state.clipboard.title) + '</strong>' +
+           '  ' + SVG.paste + ' Clipboard: <strong>' + label + '</strong>' +
            '  &nbsp; Click a <strong>paste icon</strong> or time slot to paste.' +
            '  <button id="clearClipboard">' + SVG.close + ' Clear</button>' +
            '</div>';
@@ -550,8 +550,7 @@
       e.stopPropagation();
       var evts = eventsOn(el.dataset.date);
       if (evts.length === 0) { showToast('No events to copy on this day.'); return; }
-      if (evts.length === 1) { doCopy(evts[0].id); return; }
-      showToast('Multiple events – use the per-event copy button on each chip.');
+      doCopyAll(evts);
     });
     delegate(dom.canvas, '.cell-del-day-btn', 'click', function (el, e) {
       e.stopPropagation();
@@ -561,7 +560,10 @@
       if (window.confirm('Delete all ' + evts.length + ' event(s) on ' + ds + '?')) {
         var ids = evts.map(function (ev) { return ev.id; });
         state.events = state.events.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
-        if (state.clipboard && ids.indexOf(state.clipboard.id) !== -1) state.clipboard = null;
+        if (state.clipboard) {
+          state.clipboard = state.clipboard.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+          if (state.clipboard.length === 0) state.clipboard = null;
+        }
         saveEvents();
         render();
         showToast('All events deleted for ' + ds + '.');
@@ -657,31 +659,42 @@
   function doCopy(evid) {
     var ev = findEvent(evid);
     if (!ev) return;
-    state.clipboard = Object.assign({}, ev);
+    state.clipboard = [Object.assign({}, ev)];
     render();
     showToast('"' + ev.title + '" copied – paste on any future date.');
   }
 
+  function doCopyAll(evts) {
+    state.clipboard = evts.map(function (ev) { return Object.assign({}, ev); });
+    render();
+    showToast(evts.length === 1
+      ? '"' + evts[0].title + '" copied – paste on any future date.'
+      : evts.length + ' events copied – paste on any future date.');
+  }
+
   /**
-   * Paste clipboard event onto a date (and optionally a specific hour).
+   * Paste all clipboard events onto a date (and optionally a specific hour).
    * @param {string}  ds    – target date string YYYY-MM-DD
-   * @param {number?} hour  – optional hour (0-23); if omitted keeps original time
+   * @param {number?} hour  – optional hour (0-23); if omitted keeps original times
    */
   function doPaste(ds, hour) {
     if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
     if (!isValid(ds))     { showToast('Cannot paste on a past date.'); return; }
 
-    var ev = Object.assign({}, state.clipboard, { id: uid(), date: ds });
-
-    if (hour !== undefined) {
-      ev.startTime = hourToTime(hour);
-      ev.endTime   = hourToTime(Math.min(hour + 1, 23));
-    }
-
-    state.events.push(ev);
+    var count = state.clipboard.length;
+    state.clipboard.forEach(function (clipEv) {
+      var ev = Object.assign({}, clipEv, { id: uid(), date: ds });
+      if (hour !== undefined) {
+        ev.startTime = hourToTime(hour);
+        ev.endTime   = hourToTime(Math.min(hour + 1, 23));
+      }
+      state.events.push(ev);
+    });
     saveEvents();
     render();
-    showToast('Event pasted on ' + ds + '.');
+    showToast(count === 1
+      ? 'Event pasted on ' + ds + '.'
+      : count + ' events pasted on ' + ds + '.');
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -804,8 +817,11 @@
 
   function deleteEvent(evid) {
     state.events = state.events.filter(function (e) { return e.id !== evid; });
-    /* Also clear clipboard if that event was the source */
-    if (state.clipboard && state.clipboard.id === evid) state.clipboard = null;
+    /* Also remove from clipboard if that event was the source */
+    if (state.clipboard) {
+      state.clipboard = state.clipboard.filter(function (ev) { return ev.id !== evid; });
+      if (state.clipboard.length === 0) state.clipboard = null;
+    }
     saveEvents();
     closePopup();
     render();
