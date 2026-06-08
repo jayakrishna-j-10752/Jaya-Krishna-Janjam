@@ -816,7 +816,7 @@
   }
 
   /* ──────────────────────────────────────────────────────────
-     COLOUR PICKER (inside modal)
+     COLOR PICKER (inside modal)
   ────────────────────────────────────────────────────────── */
 
   function attachColorPicker() {
