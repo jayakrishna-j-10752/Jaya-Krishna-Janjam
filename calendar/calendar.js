@@ -360,11 +360,6 @@
 
     var html = '<div class="week-view"><div class="week-grid">';
 
-    /* Clipboard banner */
-    if (state.clipboard) {
-      html += renderClipboardBanner();
-    }
-
     /* Header row */
     html += '<div class="week-head-row"><div class="week-head-spacer"></div>';
     days.forEach(function (d) {
@@ -375,7 +370,7 @@
       var headCls = 'week-day-head' + (isT ? ' wdh-today' : '');
       var wdhActs = '<div class="cell-acts">' +
                     '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
-      if (state.clipboard && state.clipboardSource === 'cell' && valid) {
+      if (state.clipboard && valid) {
         wdhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
       }
       wdhActs += '</div>';
@@ -412,7 +407,7 @@
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
           html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-          if (state.clipboard && state.clipboardSource === 'chip') {
+          if (state.clipboard) {
             html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
           }
         }
@@ -443,15 +438,10 @@
     var headCls = 'day-head' + (isT ? ' dh-today' : '');
     var html = '<div class="day-view"><div class="day-grid">';
 
-    /* Clipboard banner */
-    if (state.clipboard) {
-      html += renderClipboardBanner();
-    }
-
     /* Day header */
     var dhActs = '<div class="cell-acts">' +
                  '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
-    if (state.clipboard && state.clipboardSource === 'cell' && valid) {
+    if (state.clipboard && valid) {
       dhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
     }
     dhActs += '</div>';
@@ -489,7 +479,7 @@
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (valid) {
         html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-        if (state.clipboard && state.clipboardSource === 'chip') {
+        if (state.clipboard) {
           html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
         }
       }
@@ -543,18 +533,6 @@
       var gutter = timeBody.offsetWidth - timeBody.clientWidth;
       headRow.style.paddingRight = gutter + 'px';
     }
-  }
-
-  /* Clipboard banner HTML */
-  function renderClipboardBanner() {
-    var label = state.clipboard.length === 1
-      ? escHtml(state.clipboard[0].title)
-      : state.clipboard.length + ' events';
-    return '<div class="clipboard-banner">' +
-           '  ' + SVG.paste + ' Clipboard: <strong>' + label + '</strong>' +
-           '  &nbsp; Click a <strong>paste icon</strong> or time slot to paste.' +
-           '  <button id="clearClipboard">' + SVG.close + ' Clear</button>' +
-           '</div>';
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -658,17 +636,6 @@
         showPopup(el.dataset.evid, e);
       }
     });
-
-    /* Clear clipboard banner */
-    var cb = document.getElementById('clearClipboard');
-    if (cb) {
-      cb.addEventListener('click', function () {
-        state.clipboard       = null;
-        state.clipboardSource = null;
-        render();
-        showToast('Clipboard cleared.');
-      });
-    }
   }
 
   /** Simple event delegation utility */
