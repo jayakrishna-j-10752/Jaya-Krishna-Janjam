@@ -961,10 +961,13 @@ $(function () {
     /* Position near mouse, keeping inside viewport */
     var x = mouseEvt.clientX + 12;
     var y = mouseEvt.clientY + 8;
-    var pw = 310, ph = 140;
+    var pw = dom.popup[0].offsetWidth || 300;
+    var ph = dom.popup[0].offsetHeight || 140;
     if (x + pw > window.innerWidth  - 8) x = mouseEvt.clientX - pw - 8;
     if (y + ph > window.innerHeight - 8) y = mouseEvt.clientY - ph - 8;
-    dom.popup.css({ left: Math.max(4, x) + 'px', top: Math.max(4, y) + 'px' })
+    x = Math.max(4, Math.min(x, window.innerWidth  - pw - 4));
+    y = Math.max(4, Math.min(y, window.innerHeight - ph - 4));
+    dom.popup.css({ left: x + 'px', top: y + 'px' })
              .addClass('popup-open');
   }
 

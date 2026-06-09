@@ -1125,6 +1125,7 @@ input, select, textarea {
 .evt-popup {
   position: fixed;
   width: 300px;
+  max-width: calc(100vw - 16px);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1163,7 +1164,7 @@ input, select, textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.popup-acts { display: flex; gap: 1px; margin-left: auto; }
+.popup-acts { display: flex; gap: 1px; margin-left: auto; flex-shrink: 0; }
 .popup-act {
   width: 26px;
   height: 26px;
@@ -1254,10 +1255,17 @@ input, select, textarea {
     gap: 8px;
   }
 
+  .period-group {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .period-label {
     font-size: 15px;
     min-width: 0;
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Hide view tabs – on mobile only Week View is shown */
