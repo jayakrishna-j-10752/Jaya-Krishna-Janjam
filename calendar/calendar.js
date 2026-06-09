@@ -1044,52 +1044,179 @@ $(function () {
 
   var picker = {
     open:       false,
-    mode:       'month',   // 'month' | 'decade'
-    viewYear:   new Date().getFullYear()
+    mode:       'month',   // 'day' | 'month' | 'decade'
+    viewYear:   new Date().getFullYear(),
+    viewMonth:  new Date().getMonth()
   };
 
   function decadeStart(year) { return Math.floor(year / 10) * 10; }
 
+  /* ── Determine footer button text (null = hide footer) ── */
+  function getPickerFooterText() {
+    var today = new Date();
+    var c = state.cursor;
+    if (state.view === 'month') {
+      var same = c.getFullYear() === today.getFullYear() && c.getMonth() === today.getMonth();
+      return same ? null : 'This Month';
+    } else if (state.view === 'week') {
+      var ws  = weekStart(c);
+      var we  = new Date(ws); we.setDate(ws.getDate() + 6);
+      var td  = todayStr();
+      var cur = dateToStr(ws) <= td && td <= dateToStr(we);
+      return cur ? null : 'This Week';
+    }
+    return null;
+  }
+
+  /* ── Render the day grid (used in 'day' picker mode) ── */
+  function renderPickerDayGrid($grid) {
+    var y       = picker.viewYear;
+    var m       = picker.viewMonth;
+    var dim     = daysInMonth(y, m);
+    var fdow    = firstDOW(y, m);
+    var prevDim = daysInMonth(y, m - 1);
+    var tdStr   = todayStr();
+
+    /* Week boundaries (for week-view highlight) */
+    var wsStr = null, weStr = null;
+    if (state.view === 'week') {
+      var ws = weekStart(state.cursor);
+      var we = new Date(ws); we.setDate(ws.getDate() + 6);
+      wsStr  = dateToStr(ws);
+      weStr  = dateToStr(we);
+    }
+
+    /* Always render 6 rows (42 cells) for a stable picker height */
+    var ROWS = 6, COLS = 7;
+    for (var row = 0; row < ROWS; row++) {
+      /* Determine if this row is the highlighted week */
+      var rowHl = false;
+      if (wsStr && weStr) {
+        for (var ci = 0; ci < COLS; ci++) {
+          var idx = row * COLS + ci;
+          var d0  = cellDate(y, m, fdow, dim, prevDim, idx);
+          var ds0 = dateToStr(d0);
+          if (ds0 >= wsStr && ds0 <= weStr) { rowHl = true; break; }
+        }
+      }
+
+      var rowHtml = '<div class="cp-week-row' + (rowHl ? ' cp-row-hl' : '') + '">';
+      for (var col = 0; col < COLS; col++) {
+        var idx = row * COLS + col;
+        var d   = cellDate(y, m, fdow, dim, prevDim, idx);
+        var ds  = dateToStr(d);
+        var dn  = d.getDate();
+        var isOther = (d.getFullYear() !== y || d.getMonth() !== m);
+        var isToday = (ds === tdStr);
+        var isStart = (wsStr && ds === wsStr);
+        var isEnd   = (weStr && ds === weStr);
+        var isCircle = isStart || isEnd;
+
+        var cls = 'cp-day';
+        if (isOther)  cls += ' cp-day-other';
+        if (isToday)  cls += ' cp-day-today';
+        else if (isCircle) cls += ' cp-day-circle';
+
+        rowHtml += '<button class="' + cls + '" data-date="' + ds + '">' + dn + '</button>';
+      }
+      rowHtml += '</div>';
+      $grid.append($(rowHtml));
+    }
+  }
+
+  /** Return the Date object for a given cell index in the picker day grid */
+  function cellDate(y, m, fdow, dim, prevDim, idx) {
+    if (idx < fdow) {
+      return new Date(y, m - 1, prevDim - fdow + 1 + idx);
+    }
+    var dayNum = idx - fdow + 1;
+    if (dayNum <= dim) {
+      return new Date(y, m, dayNum);
+    }
+    return new Date(y, m + 1, dayNum - dim);
+  }
+
+  /* ── Render the complete picker based on picker.mode ── */
   function renderPicker() {
-    var grid = $('#cpGrid');
-    var rangeBtn = $('#cpRangeBtn');
-    grid.empty();
+    var $grid      = $('#cpGrid');
+    var $rangeBtn  = $('#cpRangeBtn');
+    var $monthBtn  = $('#cpMonthBtn');
+    var $dayNames  = $('#cpDayNames');
+    var $footer    = $('#cpFooter');
+    var $footerBtn = $('#cpFooterBtn');
+    $grid.empty();
 
-    if (picker.mode === 'month') {
-      var selYear  = state.cursor.getFullYear();
-      var selMonth = state.cursor.getMonth();
-      rangeBtn.text(picker.viewYear).attr('aria-label', 'Switch to decade view');
+    if (picker.mode === 'day') {
+      /* ── Day mode: show month+year buttons, day-names, date grid ── */
+      $monthBtn.text(MONTHS[picker.viewMonth]).show();
+      $rangeBtn.text(picker.viewYear).attr('aria-label', 'Switch to decade view');
 
+      /* Day-of-week names */
+      $dayNames.html(
+        WDAYS_SHORT.map(function (d) {
+          return '<div class="cp-dname">' + d[0] + '</div>';
+        }).join('')
+      ).addClass('cp-visible');
+
+      $grid.addClass('cp-day-mode');
+      renderPickerDayGrid($grid);
+
+    } else if (picker.mode === 'month') {
+      /* ── Month mode: show year button, 12-month grid ── */
+      $monthBtn.hide();
+      $dayNames.removeClass('cp-visible');
+      $grid.removeClass('cp-day-mode');
+      $rangeBtn.text(picker.viewYear).attr('aria-label', 'Switch to decade view');
+
+      var today     = new Date();
+      var selYear   = state.cursor.getFullYear();
+      var selMonth  = state.cursor.getMonth();
       for (var m = 0; m < 12; m++) {
         var isSelected = (picker.viewYear === selYear && m === selMonth);
+        var isCurMo    = (picker.viewYear === today.getFullYear() && m === today.getMonth());
         var cell = $('<button class="cp-cell"></button>')
           .text(MONTHS_SHORT[m])
           .attr('data-m', m)
-          .toggleClass('cp-selected', isSelected);
-        grid.append(cell);
+          .toggleClass('cp-selected', isSelected)
+          .toggleClass('cp-current-period', !isSelected && isCurMo);
+        $grid.append(cell);
       }
-    } else {
-      /* decade view */
-      var ds = decadeStart(picker.viewYear);
-      rangeBtn.text(ds + ' \u2013 ' + (ds + 9)).attr('aria-label', 'Switch to month view');
-      var selYear2 = state.cursor.getFullYear();
 
+    } else {
+      /* ── Decade mode: show decade range, year grid ── */
+      $monthBtn.hide();
+      $dayNames.removeClass('cp-visible');
+      $grid.removeClass('cp-day-mode');
+      var ds       = decadeStart(picker.viewYear);
+      $rangeBtn.text(ds + ' \u2013 ' + (ds + 9)).attr('aria-label', 'Switch to month view');
+      var selYear2 = state.cursor.getFullYear();
       for (var offset = -1; offset <= 10; offset++) {
-        var y = ds + offset;
+        var y       = ds + offset;
         var outside = (offset === -1 || offset === 10);
         var cell = $('<button class="cp-cell"></button>')
           .text(y)
           .attr('data-y', y)
           .toggleClass('cp-selected', y === selYear2)
           .toggleClass('cp-outside', outside);
-        grid.append(cell);
+        $grid.append(cell);
       }
+    }
+
+    /* ── Footer: This Week / This Month ── */
+    var footerText = getPickerFooterText();
+    if (footerText) {
+      $footerBtn.text(footerText);
+      $footer.addClass('cp-visible');
+    } else {
+      $footer.removeClass('cp-visible');
     }
   }
 
   function openPicker() {
-    picker.viewYear = state.cursor.getFullYear();
-    picker.mode = 'month';
+    picker.viewYear  = state.cursor.getFullYear();
+    picker.viewMonth = state.cursor.getMonth();
+    /* Day mode for week / day calendar views; month mode for month view */
+    picker.mode = (state.view === 'month') ? 'month' : 'day';
     renderPicker();
     positionPicker();
     $('#calPicker').addClass('cp-open');
@@ -1102,12 +1229,12 @@ $(function () {
   }
 
   function positionPicker() {
-    var icon = $('.cal-icon');
-    var off  = icon.offset();
-    var iconH = icon.outerHeight();
-    var pickerW = 300;
-    var winW = $(window).width();
-    var left = off.left;
+    var icon    = $('.cal-icon');
+    var off     = icon.offset();
+    var iconH   = icon.outerHeight();
+    var pickerW = 296;
+    var winW    = $(window).width();
+    var left    = off.left;
     if (left + pickerW > winW - 8) {
       left = winW - pickerW - 8;
     }
@@ -1121,12 +1248,25 @@ $(function () {
       if (picker.open) { closePicker(); } else { openPicker(); }
     });
 
-    /* Toggle between month and decade mode */
+    /* Month button (day mode) → switch to month mode */
+    $('#cpMonthBtn').on('click', function (e) {
+      e.stopPropagation();
+      picker.mode = 'month';
+      renderPicker();
+    });
+
+    /* Range button (year/decade) → toggle decade ↔ month; in day mode year → decade */
     $('#cpRangeBtn').on('click', function (e) {
       e.stopPropagation();
-      picker.mode = (picker.mode === 'month') ? 'decade' : 'month';
-      if (picker.mode === 'decade') {
+      if (picker.mode === 'day') {
+        picker.mode = 'decade';
         picker.viewYear = decadeStart(picker.viewYear);
+      } else if (picker.mode === 'month') {
+        picker.mode = 'decade';
+        picker.viewYear = decadeStart(picker.viewYear);
+      } else {
+        /* decade → back to month (or day if calendar view is week/day) */
+        picker.mode = (state.view === 'month') ? 'month' : 'day';
       }
       renderPicker();
     });
@@ -1134,7 +1274,10 @@ $(function () {
     /* Prev / Next navigation */
     $('#cpPrev').on('click', function (e) {
       e.stopPropagation();
-      if (picker.mode === 'month') {
+      if (picker.mode === 'day') {
+        picker.viewMonth -= 1;
+        if (picker.viewMonth < 0) { picker.viewMonth = 11; picker.viewYear -= 1; }
+      } else if (picker.mode === 'month') {
         picker.viewYear -= 1;
       } else {
         picker.viewYear = decadeStart(picker.viewYear) - 10;
@@ -1144,7 +1287,10 @@ $(function () {
 
     $('#cpNext').on('click', function (e) {
       e.stopPropagation();
-      if (picker.mode === 'month') {
+      if (picker.mode === 'day') {
+        picker.viewMonth += 1;
+        if (picker.viewMonth > 11) { picker.viewMonth = 0; picker.viewYear += 1; }
+      } else if (picker.mode === 'month') {
         picker.viewYear += 1;
       } else {
         picker.viewYear = decadeStart(picker.viewYear) + 10;
@@ -1156,20 +1302,52 @@ $(function () {
     $('#cpGrid').on('click', '.cp-cell', function (e) {
       e.stopPropagation();
       if (picker.mode === 'decade') {
+        /* Picked a year → go to month mode */
         picker.viewYear = parseInt($(this).data('y'), 10);
         picker.mode = 'month';
         renderPicker();
-      } else {
+      } else if (picker.mode === 'month') {
         var m = parseInt($(this).data('m'), 10);
         var y = picker.viewYear;
-        state.cursor = new Date(y, m, 1);
-        if (state.view !== 'month') {
-          state.view = 'month';
-          updateViewTab('month');
+        if (state.view === 'month') {
+          /* Navigate the calendar to the chosen month */
+          state.cursor = new Date(y, m, 1);
+          closePicker();
+          render();
+        } else {
+          /* In week/day view: switch picker to day grid for chosen month */
+          picker.viewYear  = y;
+          picker.viewMonth = m;
+          picker.mode = 'day';
+          renderPicker();
         }
-        closePicker();
-        render();
       }
+    });
+
+    /* Day cell selection (day mode) */
+    $('#cpGrid').on('click', '.cp-day', function (e) {
+      e.stopPropagation();
+      var ds = $(this).data('date');
+      if (!ds) return;
+      var parts = ds.split('-');
+      var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      if (state.view === 'week') {
+        /* Navigate to the week that contains the clicked date */
+        state.cursor = d;
+      } else {
+        /* Day view: navigate to exact day */
+        state.cursor = d;
+      }
+      closePicker();
+      render();
+    });
+
+    /* Footer button – jump to current period */
+    $('#cpFooterBtn').on('click', function (e) {
+      e.stopPropagation();
+      state.cursor = new Date();
+      closePicker();
+      render();
     });
 
     /* Close picker when clicking outside */

@@ -1406,7 +1406,7 @@ input, select, textarea {
 ══════════════════════════════════════════════════════════ */
 .cal-picker {
   position: fixed;
-  width: 300px;
+  width: 296px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1430,6 +1430,18 @@ input, select, textarea {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+}
+
+/* Wrapper for the month + year/decade range buttons */
+.cp-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Month-name button – only shown in day mode (JS toggles visibility) */
+#cpMonthBtn {
+  display: none;
 }
 
 .cp-range-btn {
@@ -1506,4 +1518,128 @@ input, select, textarea {
 }
 .cp-cell.cp-outside {
   color: var(--text-muted);
+}
+
+/* Current-month indicator inside the month grid (not the selected month) */
+.cp-cell.cp-current-period {
+  color: var(--z-blue);
+}
+
+/* ── Day-picker mode ── */
+
+/* Day-of-week names row above the grid */
+.cp-day-names {
+  display: none;      /* shown via JS in day mode */
+  margin-bottom: 4px;
+}
+.cp-day-names.cp-visible {
+  display: flex;
+}
+.cp-dname {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 2px 0 4px;
+}
+
+/* Grid overrides for day mode */
+.cp-grid.cp-day-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* One calendar week row */
+.cp-week-row {
+  display: flex;
+}
+/* Highlight band for the currently viewed week (week view only) */
+.cp-week-row.cp-row-hl {
+  background: var(--z-blue-pale);
+  border-radius: var(--radius-md);
+}
+
+/* Individual day cell inside the day-mode grid */
+.cp-day {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  padding: 5px 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-primary);
+  transition: background .13s, color .13s;
+  min-width: 0;
+}
+.cp-day:hover {
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
+  border-radius: 50%;
+}
+/* Other-month dates in the leading/trailing cells */
+.cp-day.cp-day-other {
+  color: var(--text-muted);
+}
+/* Today's date – solid circle */
+.cp-day.cp-day-today {
+  background: var(--z-blue);
+  color: #fff;
+  border-radius: 50%;
+  font-weight: 700;
+}
+.cp-day.cp-day-today:hover {
+  background: var(--z-blue-hover);
+}
+/* Week-start / week-end dates – solid circle */
+.cp-day.cp-day-circle {
+  background: var(--z-blue);
+  color: #fff;
+  border-radius: 50%;
+  font-weight: 700;
+}
+.cp-day.cp-day-circle:hover {
+  background: var(--z-blue-hover);
+}
+/* In-week days that are not today / start / end – inherit band colour */
+.cp-week-row.cp-row-hl .cp-day:not(.cp-day-today):not(.cp-day-circle) {
+  background: transparent;
+  border-radius: 0;
+  color: var(--text-primary);
+}
+.cp-week-row.cp-row-hl .cp-day:not(.cp-day-today):not(.cp-day-circle):hover {
+  background: rgba(0,0,0,.07);
+  border-radius: 0;
+}
+
+/* ── Footer (This Week / This Month) ── */
+.cp-footer {
+  display: none;      /* shown via JS when needed */
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.cp-footer.cp-visible {
+  display: block;
+}
+.cp-footer-btn {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 5px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background .13s, border-color .13s;
+}
+.cp-footer-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--z-blue);
+  color: var(--z-blue);
 }
