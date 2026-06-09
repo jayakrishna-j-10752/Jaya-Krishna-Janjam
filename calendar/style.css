@@ -549,7 +549,7 @@ input, select, textarea {
 }
 
 /* ── Event chips in month ── */
-.cell-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.cell-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; flex: 1; min-height: 0; }
 
 .evt-chip {
   display: flex;
@@ -565,6 +565,7 @@ input, select, textarea {
   border-left: 3px solid transparent;
   transition: filter .12s;
   min-width: 0;
+  flex: 1;
 }
 .evt-chip:hover { filter: brightness(.92); }
 .evt-chip.evt-past { opacity: .5; }
@@ -1611,6 +1612,21 @@ input, select, textarea {
 }
 .cp-week-row.cp-row-hl .cp-day:not(.cp-day-today):not(.cp-day-circle):hover {
   background: rgba(0,0,0,.07);
+  border-radius: 0;
+}
+
+/* Week-mode: hovering any day highlights the full row seamlessly */
+.cal-picker.cp-week-mode .cp-week-row:hover {
+  background: var(--z-blue-pale);
+  border-radius: var(--radius-md);
+}
+.cal-picker.cp-week-mode .cp-week-row:hover .cp-day:not(.cp-day-today):not(.cp-day-circle) {
+  background: transparent;
+  border-radius: 0;
+  color: var(--text-primary);
+}
+.cal-picker.cp-week-mode .cp-week-row:hover .cp-day:not(.cp-day-today):not(.cp-day-circle):hover {
+  background: rgba(0,0,0,.06);
   border-radius: 0;
 }
 

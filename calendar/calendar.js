@@ -387,11 +387,15 @@ $(function () {
       var numCls  = 'wdh-num' + (isT ? ' wdh-num-today' : '');
       var headCls = 'week-day-head' + (isT ? ' wdh-today' : '');
       /* Paste icon shown in header only when clipboard has content */
-      var wdhActs = '<div class="cell-acts">' +
-                    '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
+      var wdhActs = '<div class="cell-acts">';
+      if (valid) {
+        wdhActs += '<button class="cell-add-btn" data-date="' + ds + '" title="Add event">' + SVG.add + '</button>';
+      }
+      wdhActs += '<button class="cell-copy-btn" data-date="' + ds + '" title="Copy all events">' + SVG.copy + '</button>';
       if (shouldShowPasteButton(ds)) {
         wdhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
       }
+      wdhActs += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
       wdhActs += '</div>';
       html += '<div class="' + headCls + '" data-date="' + ds + '">' +
               '  <span class="wdh-name">' + WDAYS_SHORT[d.getDay()] + '</span>' +
@@ -463,6 +467,7 @@ $(function () {
     if (shouldShowPasteButton(ds)) {
       dhActs += '<button class="cell-paste-btn" data-date="' + ds + '" title="Paste events">' + SVG.paste + '</button>';
     }
+    dhActs += '<button class="cell-del-day-btn" data-date="' + ds + '" title="Delete all events">' + SVG.trash + '</button>';
     dhActs += '</div>';
 
     html += '<div class="' + headCls + '">' +
@@ -616,10 +621,11 @@ $(function () {
       e.stopPropagation();
       showDayEventsPopup($(this).data('date'), e);
     });
-    /* Clicking a month cell (not on a button or chip) opens the day events popup */
+    /* Clicking a month cell (not on a button or chip) opens the event creation modal */
     dom.canvas.on('click.calview', '.m-cell', function (e) {
       if ($(e.target).closest('button, .evt-chip, .more-chip').length) return;
-      showDayEventsPopup($(this).data('date'), e);
+      var ds = $(this).data('date');
+      if (isValid(ds)) { openModal(ds); }
     });
   }
 
@@ -627,6 +633,12 @@ $(function () {
   function attachWeekHandlers() {
     dom.canvas.off('.calview');
     attachTimeGridHandlers();
+    dom.canvas.on('click.calview', '.cell-add-btn', function (e) {
+      e.stopPropagation();
+      var date = $(this).data('date');
+      if (isPast(date)) return;
+      openModal(date);
+    });
     dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
       e.stopPropagation();
       var evts = eventsOn($(this).data('date'));
@@ -639,6 +651,26 @@ $(function () {
       if (!isValid(date)) { showToast('Cannot paste on a past date.'); return; }
       if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
       doPaste(date);
+    });
+    dom.canvas.on('click.calview', '.cell-del-day-btn', function (e) {
+      e.stopPropagation();
+      var ds   = $(this).data('date');
+      var evts = eventsOn(ds);
+      if (evts.length === 0) { showToast('No events to delete on this day.'); return; }
+      if (window.confirm('Delete all ' + evts.length + ' event(s) on ' + ds + '?')) {
+        var ids = evts.map(function (ev) { return ev.id; });
+        state.events = state.events.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+        if (state.clipboard) {
+          state.clipboard = state.clipboard.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+          if (state.clipboard.length === 0) {
+            state.clipboard       = null;
+            state.clipboardSource = null;
+          }
+        }
+        saveEvents();
+        render();
+        showToast('All events deleted for ' + ds + '.');
+      }
     });
     /* Clicking a day header in week view switches to day view;
        ignore clicks that land on a button inside the header */
@@ -670,6 +702,26 @@ $(function () {
       if (!isValid(date)) { showToast('Cannot paste on a past date.'); return; }
       if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
       doPaste(date);
+    });
+    dom.canvas.on('click.calview', '.cell-del-day-btn', function (e) {
+      e.stopPropagation();
+      var ds   = $(this).data('date');
+      var evts = eventsOn(ds);
+      if (evts.length === 0) { showToast('No events to delete on this day.'); return; }
+      if (window.confirm('Delete all ' + evts.length + ' event(s) on ' + ds + '?')) {
+        var ids = evts.map(function (ev) { return ev.id; });
+        state.events = state.events.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+        if (state.clipboard) {
+          state.clipboard = state.clipboard.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+          if (state.clipboard.length === 0) {
+            state.clipboard       = null;
+            state.clipboardSource = null;
+          }
+        }
+        saveEvents();
+        render();
+        showToast('All events deleted for ' + ds + '.');
+      }
     });
     dom.canvas.on('click.calview', '.dh-add-btn', function () {
       openModal($(this).data('date'));
@@ -1145,6 +1197,9 @@ $(function () {
     var $footer    = $('#cpFooter');
     var $footerBtn = $('#cpFooterBtn');
     $grid.empty();
+
+    /* Toggle week-mode class so CSS can apply seamless row hover */
+    $('#calPicker').toggleClass('cp-week-mode', state.view === 'week');
 
     if (picker.mode === 'day') {
       /* ── Day mode: show month+year buttons, day-names, date grid ── */
