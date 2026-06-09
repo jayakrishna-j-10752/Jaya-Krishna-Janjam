@@ -32,7 +32,15 @@ $(function () {
   function isToday(ds) { return ds === todayStr(); }
 
   /** True when the viewport is in the mobile range (≤ 768 px) */
-  function isMobile() { return window.innerWidth <= 768; }
+  function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+
+  /** Enforce week view on mobile; call before any view-dependent work */
+  function enforceMobileView() {
+    if (isMobile() && state.view !== 'week') {
+      state.view = 'week';
+      updateViewTab('week');
+    }
+  }
 
   /** Is date valid for creating / pasting events? (today or future) */
   function isValid(ds) { return !isPast(ds); }
@@ -250,10 +258,7 @@ $(function () {
 
   function render() {
     /* On mobile always enforce the week view */
-    if (isMobile() && state.view !== 'week') {
-      state.view = 'week';
-      updateViewTab('week');
-    }
+    enforceMobileView();
     updatePeriodLabel();
     updateTodayBtn();
     closePopup();
@@ -1538,10 +1543,7 @@ $(function () {
     seedSampleEvents();
 
     /* On mobile, start in week view */
-    if (isMobile()) {
-      state.view = 'week';
-      updateViewTab('week');
-    }
+    enforceMobileView();
 
     /* Calendar month/year picker */
     initPicker();
