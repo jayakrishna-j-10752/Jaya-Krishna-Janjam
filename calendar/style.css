@@ -1245,7 +1245,9 @@ input, select, textarea {
 
   .header-left {
     flex: 1 1 100%;
+    flex-wrap: wrap;
     justify-content: space-between;
+    align-items: center;
   }
 
   .header-right {
@@ -1255,17 +1257,44 @@ input, select, textarea {
     gap: 8px;
   }
 
+  /* Period group wraps to its own row so the full date range is always visible */
   .period-group {
+    flex: 1 1 100%;
     min-width: 0;
-    overflow: hidden;
   }
 
   .period-label {
     font-size: 15px;
     min-width: 0;
     flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Slot buttons: always visible on touch (hover never fires) */
+  .slot-add-btn,
+  .slot-paste-btn { opacity: 1; }
+
+  /* Week-day-head action buttons: wrap into 2×2 grid so paste/delete are reachable */
+  .week-day-head .cell-acts {
+    gap: 2px;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .week-day-head .cell-add-btn,
+  .week-day-head .cell-copy-btn,
+  .week-day-head .cell-paste-btn,
+  .week-day-head .cell-del-day-btn {
+    width: 18px;
+    height: 18px;
+  }
+  .week-day-head .cell-add-btn svg,
+  .week-day-head .cell-copy-btn svg,
+  .week-day-head .cell-paste-btn svg,
+  .week-day-head .cell-del-day-btn svg {
+    width: 11px;
+    height: 11px;
   }
 
   /* Hide view tabs – on mobile only Week View is shown */
