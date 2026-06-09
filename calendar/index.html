@@ -163,6 +163,18 @@
   <!-- ══════════════════════ TOAST NOTIFICATION ══════════════════════ -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <!-- ══════════════════════ MONTH/YEAR PICKER ══════════════════════ -->
+  <div class="cal-picker" id="calPicker" role="dialog" aria-label="Month picker" aria-modal="true">
+    <div class="cp-header">
+      <button class="cp-range-btn" id="cpRangeBtn"></button>
+      <div class="cp-nav">
+        <button class="cp-nav-btn" id="cpPrev" aria-label="Previous">&#8249;</button>
+        <button class="cp-nav-btn" id="cpNext" aria-label="Next">&#8250;</button>
+      </div>
+    </div>
+    <div class="cp-grid" id="cpGrid"></div>
+  </div>
+
   <!-- ══════════════════════ DAY EVENTS POPUP ══════════════════════ -->
   <div class="day-events-popup" id="dayEventsPopup" role="dialog" aria-modal="true" aria-labelledby="depDate">
     <div class="dep-head">

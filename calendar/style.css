@@ -305,6 +305,14 @@ input, select, textarea {
   height: 18px;
   color: var(--z-blue);
   flex-shrink: 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  transition: background .15s, color .15s;
+}
+.cal-icon:hover {
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
 }
 
 /* ── Theme Toggle Button ── */
@@ -1391,4 +1399,111 @@ input, select, textarea {
 .dep-item-time {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CALENDAR MONTH/YEAR PICKER
+══════════════════════════════════════════════════════════ */
+.cal-picker {
+  position: fixed;
+  width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1100;
+  padding: 16px 16px 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px) scale(.97);
+  transition: opacity .15s, transform .15s;
+}
+.cal-picker.cp-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+
+/* Header row: range label + prev/next buttons */
+.cp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.cp-range-btn {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--z-blue);
+  background: none;
+  border: 2px solid var(--z-blue);
+  border-radius: var(--radius-md);
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: background .13s, color .13s;
+  line-height: 1.4;
+}
+.cp-range-btn:hover {
+  background: var(--z-blue-pale);
+}
+
+.cp-nav {
+  display: flex;
+  gap: 6px;
+}
+.cp-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .13s, border-color .13s;
+  line-height: 1;
+}
+.cp-nav-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+/* Grid: 4 columns for months (3 rows × 4) or years (3 rows × 4) */
+.cp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.cp-cell {
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  padding: 10px 4px;
+  cursor: pointer;
+  background: none;
+  color: var(--text-primary);
+  transition: background .13s, color .13s;
+  border: none;
+  width: 100%;
+}
+.cp-cell:hover {
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
+}
+.cp-cell.cp-selected {
+  background: var(--z-blue);
+  color: #fff;
+}
+.cp-cell.cp-selected:hover {
+  background: var(--z-blue-hover);
+  color: #fff;
+}
+.cp-cell.cp-outside {
+  color: var(--text-muted);
 }

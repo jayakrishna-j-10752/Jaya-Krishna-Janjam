@@ -1036,6 +1036,156 @@ $(function () {
     });
   }
 
+  /* ──────────────────────────────────────────────────────────
+     CALENDAR MONTH/YEAR PICKER
+  ────────────────────────────────────────────────────────── */
+  var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  var picker = {
+    open:       false,
+    mode:       'month',   // 'month' | 'decade'
+    viewYear:   new Date().getFullYear()
+  };
+
+  function decadeStart(year) { return Math.floor(year / 10) * 10; }
+
+  function renderPicker() {
+    var grid = $('#cpGrid');
+    var rangeBtn = $('#cpRangeBtn');
+    grid.empty();
+
+    if (picker.mode === 'month') {
+      var selYear  = state.cursor.getFullYear();
+      var selMonth = state.cursor.getMonth();
+      rangeBtn.text(picker.viewYear).attr('aria-label', 'Switch to decade view');
+
+      for (var m = 0; m < 12; m++) {
+        var isSelected = (picker.viewYear === selYear && m === selMonth);
+        var cell = $('<button class="cp-cell"></button>')
+          .text(MONTHS_SHORT[m])
+          .attr('data-m', m)
+          .toggleClass('cp-selected', isSelected);
+        grid.append(cell);
+      }
+    } else {
+      /* decade view */
+      var ds = decadeStart(picker.viewYear);
+      rangeBtn.text(ds + ' \u2013 ' + (ds + 9)).attr('aria-label', 'Switch to month view');
+      var selYear2 = state.cursor.getFullYear();
+
+      for (var offset = -1; offset <= 10; offset++) {
+        var y = ds + offset;
+        var outside = (offset === -1 || offset === 10);
+        var cell = $('<button class="cp-cell"></button>')
+          .text(y)
+          .attr('data-y', y)
+          .toggleClass('cp-selected', y === selYear2)
+          .toggleClass('cp-outside', outside);
+        grid.append(cell);
+      }
+    }
+  }
+
+  function openPicker() {
+    picker.viewYear = state.cursor.getFullYear();
+    picker.mode = 'month';
+    renderPicker();
+    positionPicker();
+    $('#calPicker').addClass('cp-open');
+    picker.open = true;
+  }
+
+  function closePicker() {
+    $('#calPicker').removeClass('cp-open');
+    picker.open = false;
+  }
+
+  function positionPicker() {
+    var icon = $('.cal-icon');
+    var off  = icon.offset();
+    var iconH = icon.outerHeight();
+    var pickerW = 300;
+    var winW = $(window).width();
+    var left = off.left;
+    if (left + pickerW > winW - 8) {
+      left = winW - pickerW - 8;
+    }
+    $('#calPicker').css({ top: off.top + iconH + 6, left: left });
+  }
+
+  function initPicker() {
+    /* Open/close on cal-icon click */
+    $('.cal-icon').on('click', function (e) {
+      e.stopPropagation();
+      if (picker.open) { closePicker(); } else { openPicker(); }
+    });
+
+    /* Toggle between month and decade mode */
+    $('#cpRangeBtn').on('click', function (e) {
+      e.stopPropagation();
+      picker.mode = (picker.mode === 'month') ? 'decade' : 'month';
+      if (picker.mode === 'decade') {
+        picker.viewYear = decadeStart(picker.viewYear);
+      }
+      renderPicker();
+    });
+
+    /* Prev / Next navigation */
+    $('#cpPrev').on('click', function (e) {
+      e.stopPropagation();
+      if (picker.mode === 'month') {
+        picker.viewYear -= 1;
+      } else {
+        picker.viewYear = decadeStart(picker.viewYear) - 10;
+      }
+      renderPicker();
+    });
+
+    $('#cpNext').on('click', function (e) {
+      e.stopPropagation();
+      if (picker.mode === 'month') {
+        picker.viewYear += 1;
+      } else {
+        picker.viewYear = decadeStart(picker.viewYear) + 10;
+      }
+      renderPicker();
+    });
+
+    /* Cell selection */
+    $('#cpGrid').on('click', '.cp-cell', function (e) {
+      e.stopPropagation();
+      if (picker.mode === 'decade') {
+        picker.viewYear = parseInt($(this).data('y'), 10);
+        picker.mode = 'month';
+        renderPicker();
+      } else {
+        var m = parseInt($(this).data('m'), 10);
+        var y = picker.viewYear;
+        state.cursor = new Date(y, m, 1);
+        if (state.view !== 'month') {
+          state.view = 'month';
+          updateViewTab('month');
+        }
+        closePicker();
+        render();
+      }
+    });
+
+    /* Close picker when clicking outside */
+    $(document).on('click.picker', function (e) {
+      if (!$(e.target).closest('#calPicker').length &&
+          !$(e.target).closest('.cal-icon').length) {
+        if (picker.open) { closePicker(); }
+      }
+    });
+
+    /* Reposition picker on window resize */
+    $(window).on('resize.picker', function () {
+      if (picker.open) { positionPicker(); }
+    });
+  }
+
   function init() {
     /* Restore theme */
     var savedTheme = 'light';
@@ -1044,6 +1194,9 @@ $(function () {
 
     /* Seed sample events for first-time visitors */
     seedSampleEvents();
+
+    /* Calendar month/year picker */
+    initPicker();
 
     /* Navigation */
     dom.btnPrev.on('click',  function () { navigate(-1); });
