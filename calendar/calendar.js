@@ -461,6 +461,8 @@ $(function () {
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
           var evAtSlot = eventAtHour(ds, h);
+          /* When a time-event occupies this slot, show a copy button instead of
+             the add button to prevent the + icon from overlapping the event block. */
           if (evAtSlot) {
             html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
           } else {
