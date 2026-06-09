@@ -240,6 +240,22 @@ $(function () {
     return !!(state.clipboard && state.clipboardSource !== 'cell' && isValid(ds));
   }
 
+  /**
+   * Returns the first event that covers the given hour slot on a date, or null.
+   * An event covers slot h when its start < (h+1)*60 and its end > h*60 minutes.
+   */
+  function eventAtHour(ds, h) {
+    var slotStart = h * 60;
+    var slotEnd   = (h + 1) * 60;
+    var found = null;
+    eventsOn(ds).forEach(function (ev) {
+      if (!found && timeToMins(ev.startTime) < slotEnd && timeToMins(ev.endTime) > slotStart) {
+        found = ev;
+      }
+    });
+    return found;
+  }
+
   /* ──────────────────────────────────────────────────────────
      SVG ICON TEMPLATES
   ────────────────────────────────────────────────────────── */
@@ -444,9 +460,14 @@ $(function () {
         var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
-          html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-          if (shouldShowPasteInSlot(ds)) {
-            html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+          var evAtSlot = eventAtHour(ds, h);
+          if (evAtSlot) {
+            html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
+          } else {
+            html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+            if (shouldShowPasteInSlot(ds)) {
+              html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+            }
           }
         }
         html += '</div>';
@@ -509,11 +530,16 @@ $(function () {
 
     html += '<div class="mobile-day-detail">';
 
+    html += '<div class="mobile-day-toolbar">';
     if (valid) {
-      html += '<div class="mobile-day-toolbar">' +
-              '<button class="dh-add-btn" data-date="' + selDs + '">+ Add Event</button>' +
-              '</div>';
+      html += '<button class="dh-add-btn" data-date="' + selDs + '">+ Add Event</button>';
     }
+    html += '<button class="mdt-copy-btn" data-date="' + selDs + '" title="Copy events">' + SVG.copy + '</button>';
+    if (shouldShowPasteButton(selDs)) {
+      html += '<button class="mdt-paste-btn" data-date="' + selDs + '" title="Paste events">' + SVG.paste + '</button>';
+    }
+    html += '<button class="mdt-delete-btn" data-date="' + selDs + '" title="Delete events">' + SVG.trash + '</button>';
+    html += '</div>';
 
     html += '<div class="mobile-day-body">';
 
@@ -530,7 +556,15 @@ $(function () {
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + selDs + '" data-hour="' + h + '">';
       if (valid) {
-        html += '<button class="slot-add-btn" data-date="' + selDs + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+        var evAtSlot = eventAtHour(selDs, h);
+        if (evAtSlot) {
+          html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
+        } else {
+          html += '<button class="slot-add-btn" data-date="' + selDs + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+          if (shouldShowPasteInSlot(selDs)) {
+            html += '<button class="slot-paste-btn" data-date="' + selDs + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+          }
+        }
       }
       html += '</div>';
     }
@@ -598,9 +632,14 @@ $(function () {
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (valid) {
-        html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
-        if (shouldShowPasteInSlot(ds)) {
-          html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+        var evAtSlot = eventAtHour(ds, h);
+        if (evAtSlot) {
+          html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
+        } else {
+          html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+          if (shouldShowPasteInSlot(ds)) {
+            html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+          }
         }
       }
       html += '</div>';
@@ -796,6 +835,45 @@ $(function () {
       openModal($(this).data('date'));
     });
 
+    /* Mobile toolbar – Copy all events */
+    dom.canvas.on('click.calview', '.mdt-copy-btn', function (e) {
+      e.stopPropagation();
+      var evts = eventsOn($(this).data('date'));
+      if (evts.length === 0) { showToast('No events to copy on this day.'); return; }
+      doCopyAll(evts);
+    });
+
+    /* Mobile toolbar – Paste events */
+    dom.canvas.on('click.calview', '.mdt-paste-btn', function (e) {
+      e.stopPropagation();
+      var date = $(this).data('date');
+      if (!isValid(date)) { showToast('Cannot paste on a past date.'); return; }
+      if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
+      doPaste(date);
+    });
+
+    /* Mobile toolbar – Delete all events */
+    dom.canvas.on('click.calview', '.mdt-delete-btn', function (e) {
+      e.stopPropagation();
+      var ds   = $(this).data('date');
+      var evts = eventsOn(ds);
+      if (evts.length === 0) { showToast('No events to delete on this day.'); return; }
+      if (window.confirm('Delete all ' + evts.length + ' event(s) on ' + ds + '?')) {
+        var ids = evts.map(function (ev) { return ev.id; });
+        state.events = state.events.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+        if (state.clipboard) {
+          state.clipboard = state.clipboard.filter(function (ev) { return ids.indexOf(ev.id) === -1; });
+          if (state.clipboard.length === 0) {
+            state.clipboard       = null;
+            state.clipboardSource = null;
+          }
+        }
+        saveEvents();
+        render();
+        showToast('All events deleted for ' + ds + '.');
+      }
+    });
+
     /* Shared time-grid handlers (slot add / paste, time-event popup, copy) */
     attachTimeGridHandlers();
   }
@@ -858,6 +936,10 @@ $(function () {
       doPaste(ds, hour);
     });
     dom.canvas.on('click.calview', '.te-copy-btn', function (e) {
+      e.stopPropagation();
+      doCopy($(this).data('evid'));
+    });
+    dom.canvas.on('click.calview', '.slot-copy-btn', function (e) {
       e.stopPropagation();
       doCopy($(this).data('evid'));
     });
