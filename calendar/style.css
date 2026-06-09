@@ -1592,7 +1592,8 @@ input, select, textarea {
   border-radius: 50%;
   font-weight: 700;
 }
-.cp-day.cp-day-today:hover {
+.cp-day.cp-day-today:hover,
+.cp-day.cp-day-circle:hover {
   background: var(--z-blue-hover);
 }
 /* Week-start / week-end dates – solid circle */
@@ -1601,9 +1602,6 @@ input, select, textarea {
   color: #fff;
   border-radius: 50%;
   font-weight: 700;
-}
-.cp-day.cp-day-circle:hover {
-  background: var(--z-blue-hover);
 }
 /* In-week days that are not today / start / end – inherit band colour */
 .cp-week-row.cp-row-hl .cp-day:not(.cp-day-today):not(.cp-day-circle) {
