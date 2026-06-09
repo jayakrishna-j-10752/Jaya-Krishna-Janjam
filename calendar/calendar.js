@@ -755,7 +755,10 @@ $(function () {
       return hasConflict(ds, clipEv, hour);
     });
     if (conflicting) {
-      showToast('An event already exists in the selected time slot on ' + ds + '.', 3500);
+      var parts = ds.split('-');
+      var dObj  = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      var label = MONTHS[dObj.getMonth()] + ' ' + dObj.getDate() + ', ' + dObj.getFullYear();
+      showToast('An event already exists in the selected time slot on ' + label + '.', 3500);
       return;
     }
 
