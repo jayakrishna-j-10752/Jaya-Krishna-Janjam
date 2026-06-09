@@ -1260,8 +1260,8 @@ input, select, textarea {
     flex: 1;
   }
 
-  .view-tabs { gap: 1px; }
-  .view-tab { padding: 5px 11px; font-size: 11px; }
+  /* Hide view tabs – on mobile only Week View is shown */
+  .view-tabs { display: none; }
 
   .month-view { padding: 8px; }
   .week-view  { padding: 0 8px 8px; }
@@ -1656,4 +1656,102 @@ input, select, textarea {
   background: var(--surface-2);
   border-color: var(--z-blue);
   color: var(--z-blue);
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE WEEK VIEW
+   Horizontal scrollable day strip + single-day time grid.
+   Only rendered when isMobile() is true (≤ 768 px).
+══════════════════════════════════════════════════════════ */
+
+.mobile-week-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Day strip ── */
+.mobile-week-strip {
+  display: flex;
+  overflow-x: auto;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  padding: 6px 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.mobile-week-strip::-webkit-scrollbar { display: none; }
+
+.mobile-week-day {
+  flex: 1;
+  min-width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-week-day:hover,
+.mobile-week-day.mwd-selected { background: var(--z-blue-pale); }
+
+.mwd-name {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-secondary);
+}
+.mobile-week-day.mwd-selected .mwd-name { color: var(--z-blue); }
+
+.mwd-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.mobile-week-day.mwd-today .mwd-num {
+  background: var(--today-bg);
+  color: var(--today-fg);
+  font-weight: 700;
+}
+.mobile-week-day.mwd-selected:not(.mwd-today) .mwd-num {
+  background: color-mix(in srgb, var(--z-blue) 18%, transparent);
+  color: var(--z-blue);
+}
+
+/* ── Day detail ── */
+.mobile-day-detail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.mobile-day-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.mobile-day-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--time-col-w) 1fr;
+  overflow-y: auto;
 }

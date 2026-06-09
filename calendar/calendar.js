@@ -31,6 +31,9 @@ $(function () {
   /** Is the date string today? */
   function isToday(ds) { return ds === todayStr(); }
 
+  /** True when the viewport is in the mobile range (≤ 768 px) */
+  function isMobile() { return window.innerWidth <= 768; }
+
   /** Is date valid for creating / pasting events? (today or future) */
   function isValid(ds) { return !isPast(ds); }
 
@@ -86,15 +89,16 @@ $(function () {
      APPLICATION STATE
   ────────────────────────────────────────────────────────── */
   var state = {
-    view:            'month',        // 'month' | 'week' | 'day'
-    cursor:          new Date(),     // currently displayed date/period
-    events:          loadEvents(),
-    clipboard:       null,           // array of copied events (or null)
-    clipboardSource: null,           // 'cell' (day-level copy) | 'chip' (single-event copy)
-    theme:           'light',
-    editId:          null,           // id of event being edited (null = create)
-    activePopup:     null,           // event id shown in popup (or null)
-    selectedColor:   '#1565C0'
+    view:              'month',        // 'month' | 'week' | 'day'
+    cursor:            new Date(),     // currently displayed date/period
+    events:            loadEvents(),
+    clipboard:         null,           // array of copied events (or null)
+    clipboardSource:   null,           // 'cell' (day-level copy) | 'chip' (single-event copy)
+    theme:             'light',
+    editId:            null,           // id of event being edited (null = create)
+    activePopup:       null,           // event id shown in popup (or null)
+    selectedColor:     '#1565C0',
+    mobileDaySelected: null            // selected day string (YYYY-MM-DD) in mobile week view
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -245,6 +249,11 @@ $(function () {
   ────────────────────────────────────────────────────────── */
 
   function render() {
+    /* On mobile always enforce the week view */
+    if (isMobile() && state.view !== 'week') {
+      state.view = 'week';
+      updateViewTab('week');
+    }
     updatePeriodLabel();
     updateTodayBtn();
     closePopup();
@@ -367,6 +376,7 @@ $(function () {
 
   /* ════════════ WEEK VIEW ════════════ */
   function renderWeek() {
+    if (isMobile()) { renderMobileWeek(); return; }
     var ws    = weekStart(state.cursor);
     var days  = [];
     for (var i = 0; i < 7; i++) {
@@ -449,6 +459,87 @@ $(function () {
     dom.canvas.html(html);
     fixWeekHeadAlignment();
     attachWeekHandlers();
+  }
+
+  /* ════════════ MOBILE WEEK VIEW ════════════
+     Horizontal scrollable day strip + single-day time grid below.
+  ══════════════════════════════════════════ */
+  function renderMobileWeek() {
+    var ws   = weekStart(state.cursor);
+    var days = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(ws);
+      d.setDate(ws.getDate() + i);
+      days.push(d);
+    }
+    var tdStr = todayStr();
+
+    /* Ensure mobileDaySelected falls in the current week */
+    var selectedInWeek = days.some(function (d) { return dateToStr(d) === state.mobileDaySelected; });
+    if (!selectedInWeek) {
+      var todayDay = days.find(function (d) { return dateToStr(d) === tdStr; });
+      state.mobileDaySelected = todayDay ? tdStr : dateToStr(days[0]);
+    }
+
+    /* ── Week strip ── */
+    var html = '<div class="mobile-week-view">';
+    html += '<div class="mobile-week-strip">';
+    days.forEach(function (d) {
+      var ds    = dateToStr(d);
+      var isT   = ds === tdStr;
+      var isSel = ds === state.mobileDaySelected;
+      var cls   = 'mobile-week-day' +
+                  (isT   ? ' mwd-today'    : '') +
+                  (isSel ? ' mwd-selected' : '');
+      html += '<div class="' + cls + '" data-date="' + ds + '">' +
+              '  <span class="mwd-name">' + WDAYS_SHORT[d.getDay()] + '</span>' +
+              '  <span class="mwd-num">' + d.getDate() + '</span>' +
+              '</div>';
+    });
+    html += '</div>'; /* /.mobile-week-strip */
+
+    /* ── Day detail for the selected day ── */
+    var selDs = state.mobileDaySelected;
+    var valid = isValid(selDs);
+
+    html += '<div class="mobile-day-detail">';
+
+    if (valid) {
+      html += '<div class="mobile-day-toolbar">' +
+              '<button class="dh-add-btn" data-date="' + selDs + '">+ Add Event</button>' +
+              '</div>';
+    }
+
+    html += '<div class="mobile-day-body">';
+
+    /* Time labels */
+    html += '<div class="time-col">';
+    for (var h = 0; h < 24; h++) {
+      html += '<div class="time-lbl">' + (h === 0 ? '' : pad2(h) + ':00') + '</div>';
+    }
+    html += '</div>';
+
+    /* Day column with hour slots and events */
+    html += '<div class="day-col" data-date="' + selDs + '">';
+    for (var h = 0; h < 24; h++) {
+      var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
+      html += '<div class="' + slotCls + '" data-date="' + selDs + '" data-hour="' + h + '">';
+      if (valid) {
+        html += '<button class="slot-add-btn" data-date="' + selDs + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+      }
+      html += '</div>';
+    }
+    eventsOn(selDs).forEach(function (ev) {
+      html += renderTimeEvent(ev, selDs);
+    });
+    html += '</div>'; /* /.day-col */
+
+    html += '</div>'; /* /.mobile-day-body */
+    html += '</div>'; /* /.mobile-day-detail */
+    html += '</div>'; /* /.mobile-week-view */
+
+    dom.canvas.html(html);
+    attachMobileWeekHandlers();
   }
 
   /* ════════════ DAY VIEW ════════════ */
@@ -621,12 +712,6 @@ $(function () {
       e.stopPropagation();
       showDayEventsPopup($(this).data('date'), e);
     });
-    /* Clicking a month cell (not on a button or chip) opens the event creation modal */
-    dom.canvas.on('click.calview', '.m-cell', function (e) {
-      if ($(e.target).closest('button, .evt-chip, .more-chip').length) return;
-      var ds = $(this).data('date');
-      if (isValid(ds)) { openModal(ds); }
-    });
   }
 
   /** Attach all handlers for the week view */
@@ -684,6 +769,30 @@ $(function () {
         render();
       }
     });
+  }
+
+  /** Attach handlers for the mobile week view */
+  function attachMobileWeekHandlers() {
+    dom.canvas.off('.calview');
+
+    /* Tap a day in the strip to select it and show its events */
+    dom.canvas.on('click.calview', '.mobile-week-day', function (e) {
+      e.stopPropagation();
+      var ds = $(this).data('date');
+      if (ds && ds !== state.mobileDaySelected) {
+        state.mobileDaySelected = ds;
+        renderMobileWeek();
+      }
+    });
+
+    /* "+ Add Event" toolbar button */
+    dom.canvas.on('click.calview', '.dh-add-btn', function (e) {
+      e.stopPropagation();
+      openModal($(this).data('date'));
+    });
+
+    /* Shared time-grid handlers (slot add / paste, time-event popup, copy) */
+    attachTimeGridHandlers();
   }
 
   /** Attach all handlers for the day view */
@@ -1428,6 +1537,12 @@ $(function () {
     /* Seed sample events for first-time visitors */
     seedSampleEvents();
 
+    /* On mobile, start in week view */
+    if (isMobile()) {
+      state.view = 'week';
+      updateViewTab('week');
+    }
+
     /* Calendar month/year picker */
     initPicker();
 
@@ -1436,8 +1551,9 @@ $(function () {
     dom.btnNext.on('click',  function () { navigate(1); });
     dom.btnToday.on('click', goToday);
 
-    /* View tabs */
+    /* View tabs – on mobile week view is always enforced */
     dom.viewTabs.on('click', function () {
+      if (isMobile()) return;
       state.view = $(this).data('view');
       updateViewTab(state.view);
       render();
