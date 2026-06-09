@@ -132,7 +132,12 @@ $(function () {
     paDelete:     $('#paDelete'),
     paClose:      $('#paClose'),
 
-    toast:        $('#toast')
+    toast:        $('#toast'),
+
+    dayEventsPopup: $('#dayEventsPopup'),
+    depDate:        $('#depDate'),
+    depList:        $('#depList'),
+    depClose:       $('#depClose')
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -213,9 +218,14 @@ $(function () {
     return state.events.find(function (e) { return e.id === id; }) || null;
   }
 
-  /** Returns true when the paste button should be visible for a given date */
+  /** Returns true when the paste button should be visible for a given date (heads only) */
   function shouldShowPasteButton(ds) {
     return !!(state.clipboard && isValid(ds));
+  }
+
+  /** Returns true when the paste button should appear inside hour slots (chip/te copy only) */
+  function shouldShowPasteInSlot(ds) {
+    return !!(state.clipboard && state.clipboardSource !== 'cell' && isValid(ds));
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -238,6 +248,7 @@ $(function () {
     updatePeriodLabel();
     updateTodayBtn();
     closePopup();
+    closeDayEventsPopup();
 
     if (state.view === 'month') {
       renderMonth();
@@ -325,8 +336,9 @@ $(function () {
     evts.slice(0, maxShow).forEach(function (ev) {
       chips += renderChip(ev, past);
     });
+    var moreChip = '';
     if (evts.length > maxShow) {
-      chips += '<div class="more-chip">+' + (evts.length - maxShow) + ' more</div>';
+      moreChip = '<div class="more-chip" data-date="' + ds + '">+' + (evts.length - maxShow) + ' more</div>';
     }
 
     return '<div class="' + cls + '" data-date="' + ds + '">' +
@@ -335,6 +347,7 @@ $(function () {
            acts +
            '  </div>' +
            '  <div class="cell-events">' + chips + '</div>' +
+           moreChip +
            '</div>';
   }
 
@@ -407,12 +420,15 @@ $(function () {
 
       html += '<div class="' + colCls + '" data-date="' + ds + '">';
 
-      /* Hour slots – no paste button inside slots */
+      /* Hour slots – paste button inside slots only for chip/te copy */
       for (var h = 0; h < 24; h++) {
         var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (valid) {
           html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+          if (shouldShowPasteInSlot(ds)) {
+            html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+          }
         }
         html += '</div>';
       }
@@ -475,13 +491,16 @@ $(function () {
     }
     html += '</div>';
 
-    /* Single day column – no paste button inside hour slots */
+    /* Single day column – paste button inside hour slots only for chip/te copy */
     html += '<div class="day-col" data-date="' + ds + '">';
     for (var h = 0; h < 24; h++) {
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (valid) {
         html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
+        if (shouldShowPasteInSlot(ds)) {
+          html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
+        }
       }
       html += '</div>';
     }
@@ -592,6 +611,16 @@ $(function () {
         showPopup($(this).data('evid'), e);
       }
     });
+    /* Clicking the "+N more" chip opens the day events popup */
+    dom.canvas.on('click.calview', '.more-chip', function (e) {
+      e.stopPropagation();
+      showDayEventsPopup($(this).data('date'), e);
+    });
+    /* Clicking a month cell (not on a button or chip) opens the day events popup */
+    dom.canvas.on('click.calview', '.m-cell', function (e) {
+      if ($(e.target).closest('button, .evt-chip, .more-chip').length) return;
+      showDayEventsPopup($(this).data('date'), e);
+    });
   }
 
   /** Attach all handlers for the week view */
@@ -654,6 +683,14 @@ $(function () {
       var h = parseInt($(this).data('hour'), 10);
       openModal($(this).data('date'), hourToTime(h), hourToTime(h + 1));
     });
+    dom.canvas.on('click.calview', '.slot-paste-btn', function (e) {
+      e.stopPropagation();
+      var ds   = $(this).data('date');
+      var hour = parseInt($(this).data('hour'), 10);
+      if (!isValid(ds))        { showToast('Cannot paste on a past date.'); return; }
+      if (!state.clipboard)    { showToast('Nothing in clipboard.'); return; }
+      doPaste(ds, hour);
+    });
     dom.canvas.on('click.calview', '.te-copy-btn', function (e) {
       e.stopPropagation();
       doCopy($(this).data('evid'));
@@ -693,6 +730,18 @@ $(function () {
   }
 
   /**
+   * Returns true when a clipboard event would conflict with an existing event
+   * on the target date (same startTime and endTime after applying optional hour offset).
+   */
+  function hasConflict(ds, clipEv, hour) {
+    var targetStart = (hour !== undefined) ? hourToTime(hour)                        : clipEv.startTime;
+    var targetEnd   = (hour !== undefined) ? hourToTime(Math.min(hour + 1, 23))      : clipEv.endTime;
+    return state.events.some(function (ev) {
+      return ev.date === ds && ev.startTime === targetStart && ev.endTime === targetEnd;
+    });
+  }
+
+  /**
    * Paste all clipboard events onto a date (and optionally a specific hour).
    * @param {string}  ds    – target date string YYYY-MM-DD
    * @param {number?} hour  – optional hour (0-23); if omitted keeps original times
@@ -700,6 +749,15 @@ $(function () {
   function doPaste(ds, hour) {
     if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
     if (!isValid(ds))     { showToast('Cannot paste on a past date.'); return; }
+
+    /* Conflict check – prevent paste if any event already occupies the same slot */
+    var conflicting = state.clipboard.some(function (clipEv) {
+      return hasConflict(ds, clipEv, hour);
+    });
+    if (conflicting) {
+      showToast('An event already exists in the selected time slot on ' + ds + '.', 3500);
+      return;
+    }
 
     var count = state.clipboard.length;
     state.clipboard.forEach(function (clipEv) {
@@ -744,6 +802,52 @@ $(function () {
   function closePopup() {
     state.activePopup = null;
     dom.popup.removeClass('popup-open');
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     DAY EVENTS POPUP (all events for a month cell)
+  ────────────────────────────────────────────────────────── */
+
+  function showDayEventsPopup(ds, mouseEvt) {
+    var evts = eventsOn(ds);
+
+    /* Build date label */
+    var parts = ds.split('-');
+    var d     = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    dom.depDate.text(WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
+
+    /* Build event list */
+    var listHtml = '';
+    if (evts.length === 0) {
+      listHtml = '';
+    } else {
+      evts.forEach(function (ev) {
+        listHtml +=
+          '<div class="dep-item" data-evid="' + ev.id + '"' +
+          '     style="border-left-color:' + ev.color + ';background:' + ev.color + '18">' +
+          '  <span class="dep-item-dot" style="background:' + ev.color + '"></span>' +
+          '  <div class="dep-item-info">' +
+          '    <div class="dep-item-title">' + escHtml(ev.title) + '</div>' +
+          '    <div class="dep-item-time">' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime) + '</div>' +
+          '  </div>' +
+          '</div>';
+      });
+    }
+    dom.depList.html(listHtml);
+
+    /* Position near mouse, keeping inside viewport */
+    var pw = 280, ph = Math.min(evts.length * 56 + 48, 340);
+    var x  = mouseEvt.clientX + 12;
+    var y  = mouseEvt.clientY + 8;
+    if (x + pw > window.innerWidth  - 8) x = mouseEvt.clientX - pw - 8;
+    if (y + ph > window.innerHeight - 8) y = mouseEvt.clientY - ph - 8;
+    dom.dayEventsPopup
+      .css({ left: Math.max(4, x) + 'px', top: Math.max(4, y) + 'px' })
+      .addClass('dep-open');
+  }
+
+  function closeDayEventsPopup() {
+    dom.dayEventsPopup.removeClass('dep-open');
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -975,6 +1079,15 @@ $(function () {
 
     /* Popup controls */
     dom.paClose.on('click',  closePopup);
+
+    /* Day events popup controls */
+    dom.depClose.on('click', closeDayEventsPopup);
+    dom.dayEventsPopup.on('click', '.dep-item', function (e) {
+      var evid = $(this).data('evid');
+      closeDayEventsPopup();
+      showPopup(evid, e);
+    });
+
     dom.paCopy.on('click',   function () {
       if (state.activePopup) { doCopy(state.activePopup); closePopup(); }
     });
@@ -993,6 +1106,11 @@ $(function () {
           !$(e.target).closest('.evt-chip').length &&
           !$(e.target).closest('.time-event').length) {
         closePopup();
+      }
+      if (!$(e.target).closest('#dayEventsPopup').length &&
+          !$(e.target).closest('.m-cell').length &&
+          !$(e.target).closest('.more-chip').length) {
+        closeDayEventsPopup();
       }
     });
 
