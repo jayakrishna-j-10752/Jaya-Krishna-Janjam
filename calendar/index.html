@@ -15,19 +15,31 @@
     <header class="cal-header">
       <div class="header-left">
         <!-- User Profile -->
-        <button class="user-profile" id="userProfile" aria-label="User menu">
+        <button class="user-profile" id="userProfile" aria-label="User menu" aria-haspopup="true" aria-expanded="false">
           <span class="user-avatar">
             <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <circle cx="16" cy="16" r="16" fill="#5A7EFF"/>
-              <circle cx="16" cy="13" r="5" fill="white" fill-opacity="0.9"/>
-              <path d="M4 30c0-6.627 5.373-11 12-11s12 4.373 12 11" fill="white" fill-opacity="0.9"/>
+              <circle cx="16" cy="16" r="16" fill="#6B9FD4"/>
+              <circle cx="16" cy="12" r="5.5" fill="#D0E8FF" fill-opacity="0.95"/>
+              <path d="M3 30c0-7.18 5.82-12 13-12s13 4.82 13 12" fill="#D0E8FF" fill-opacity="0.95"/>
             </svg>
           </span>
-          <span class="user-name">presalessolutions</span>
+          <span class="user-name">Jaya Krishna Janjam</span>
           <svg class="user-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true">
             <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
+
+        <!-- User Profile Dropdown -->
+        <div class="user-dropdown" id="userDropdown" role="listbox" aria-label="Select user">
+          <div class="ud-search-wrap">
+            <svg class="ud-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+              <circle cx="6.5" cy="6.5" r="4.5"/>
+              <line x1="10" y1="10" x2="14" y2="14"/>
+            </svg>
+            <input type="text" class="ud-search-input" id="udSearch" placeholder="Search users..." autocomplete="off" aria-label="Search users" />
+          </div>
+          <div class="ud-list" id="udList"></div>
+        </div>
 
         <div class="nav-group">
           <button class="nav-arrow" id="btnPrev" title="Previous">&#8249;</button>

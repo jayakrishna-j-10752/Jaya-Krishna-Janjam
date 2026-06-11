@@ -725,6 +725,7 @@ input, select, textarea {
 .time-col {
   flex-shrink: 0;
   border-right: 1px solid var(--border);
+  position: relative;
 }
 .time-lbl {
   height: var(--slot-h);
@@ -969,6 +970,7 @@ input, select, textarea {
   display: grid;
   grid-template-columns: var(--time-col-w) 1fr;
   overflow-y: auto;
+  position: relative;
 }
 
 .day-col {
@@ -1851,4 +1853,223 @@ input, select, textarea {
   display: grid;
   grid-template-columns: var(--time-col-w) 1fr;
   overflow-y: auto;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CURRENT TIME INDICATOR
+   Red badge in the time column + horizontal red line across
+   the day columns, rendered at the exact current time.
+══════════════════════════════════════════════════════════ */
+
+/* Badge in the time column showing the current time e.g. "3:45 PM" */
+.current-time-badge {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  transform: translateY(-50%);
+  background: #E53935;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 10px;
+  z-index: 7;
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Horizontal line spanning from the time column edge to the right */
+.current-time-line {
+  position: absolute;
+  left: var(--time-col-w);
+  right: 0;
+  height: 2px;
+  background: #E53935;
+  transform: translateY(-50%);
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* Small right-pointing triangle at the start of the line */
+.current-time-line::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -4px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid #E53935;
+}
+
+/* ══════════════════════════════════════════════════════════
+   USER PROFILE DROPDOWN
+   Opens beneath the .user-profile button in the header.
+══════════════════════════════════════════════════════════ */
+
+/* Anchor the nav-group so the dropdown can be positioned relative to it */
+.header-left { position: relative; }
+
+.user-dropdown {
+  position: fixed;
+  width: 420px;
+  max-width: calc(100vw - 16px);
+  max-height: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px) scale(.97);
+  transition: opacity .16s, transform .16s;
+}
+.user-dropdown.ud-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+
+/* Search area */
+.ud-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+.ud-search-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.ud-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  padding: 0;
+}
+.ud-search-input::placeholder { color: var(--text-muted); }
+
+/* User list */
+.ud-list {
+  overflow-y: auto;
+  padding: 6px 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.ud-empty {
+  padding: 14px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Individual user row */
+.ud-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.ud-item:hover { background: var(--surface-2); }
+.ud-item.ud-item-active {
+  background: color-mix(in srgb, var(--z-blue) 10%, var(--surface));
+}
+.ud-item.ud-item-active:hover {
+  background: color-mix(in srgb, var(--z-blue) 14%, var(--surface));
+}
+
+/* Avatar circle with initial */
+.ud-item-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--z-blue) 18%, var(--surface-2));
+  color: var(--z-blue);
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ud-item-active .ud-item-avatar {
+  background: var(--z-blue);
+  color: #fff;
+}
+
+/* Text block */
+.ud-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.ud-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ud-item-active .ud-item-name { color: var(--z-blue); }
+
+.ud-item-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.ud-item-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Expand (sub-calendar) button */
+.ud-expand-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.ud-expand-btn svg {
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.ud-expand-btn:hover {
+  border-color: var(--z-blue);
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
+}
+.ud-item-active .ud-expand-btn {
+  border-color: var(--z-blue);
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
 }

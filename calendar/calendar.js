@@ -68,6 +68,14 @@ $(function () {
     return h12 + ':' + m + ' ' + ampm;
   }
 
+  /** Format an hour integer (0-23) to a 12-hour AM/PM time label, e.g. 13 → "1:00 PM" */
+  function fmtHourLabel(h) {
+    if (h === 0) return '';
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12  = h % 12 || 12;
+    return h12 + ':00 ' + ampm;
+  }
+
   /** Number of days in a month */
   function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 
@@ -442,7 +450,7 @@ $(function () {
     /* Time labels */
     html += '<div class="time-col">';
     for (var h = 0; h < 24; h++) {
-      html += '<div class="time-lbl">' + (h === 0 ? '' : pad2(h) + ':00') + '</div>';
+      html += '<div class="time-lbl">' + fmtHourLabel(h) + '</div>';
     }
     html += '</div>';
 
@@ -487,6 +495,7 @@ $(function () {
     dom.canvas.html(html);
     fixWeekHeadAlignment();
     attachWeekHandlers();
+    renderCurrentTimeLine();
   }
 
   /* ════════════ MOBILE WEEK VIEW ════════════
@@ -548,7 +557,7 @@ $(function () {
     /* Time labels */
     html += '<div class="time-col">';
     for (var h = 0; h < 24; h++) {
-      html += '<div class="time-lbl">' + (h === 0 ? '' : pad2(h) + ':00') + '</div>';
+      html += '<div class="time-lbl">' + fmtHourLabel(h) + '</div>';
     }
     html += '</div>';
 
@@ -581,6 +590,7 @@ $(function () {
 
     dom.canvas.html(html);
     attachMobileWeekHandlers();
+    renderCurrentTimeLine();
   }
 
   /* ════════════ DAY VIEW ════════════ */
@@ -624,7 +634,7 @@ $(function () {
     /* Time labels */
     html += '<div class="time-col">';
     for (var h = 0; h < 24; h++) {
-      html += '<div class="time-lbl">' + (h === 0 ? '' : pad2(h) + ':00') + '</div>';
+      html += '<div class="time-lbl">' + fmtHourLabel(h) + '</div>';
     }
     html += '</div>';
 
@@ -655,6 +665,7 @@ $(function () {
     html += '</div></div></div></div>'; /* day-col / day-body / day-grid / day-view */
     dom.canvas.html(html);
     attachDayHandlers();
+    renderCurrentTimeLine();
   }
 
   /* ────── Time-event block (week + day views) ────── */
@@ -693,6 +704,60 @@ $(function () {
     if (headRow.length && timeBody.length) {
       var gutter = timeBody[0].offsetWidth - timeBody[0].clientWidth;
       headRow.css('padding-right', gutter + 'px');
+    }
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     CURRENT TIME INDICATOR
+     Renders a red horizontal line + time badge at the current
+     time position in the Week / Day time grid.  Auto-updates
+     every minute via a global interval started in init().
+  ─────────────────────────────────────────────────────────── */
+
+  /** Inject (or refresh) the current-time indicator elements */
+  function renderCurrentTimeLine() {
+    /* Remove any stale indicator from a previous render */
+    dom.canvas.find('.current-time-line, .current-time-badge').remove();
+
+    if (state.view !== 'week' && state.view !== 'day') return;
+
+    var now    = new Date();
+    var tdStr  = todayStr();
+
+    /* Week view: only render when today is inside the displayed week */
+    if (state.view === 'week') {
+      var ws = weekStart(state.cursor);
+      var we = new Date(ws); we.setDate(ws.getDate() + 6);
+      if (tdStr < dateToStr(ws) || tdStr > dateToStr(we)) return;
+    }
+
+    /* Day view: only render when the displayed day is today */
+    if (state.view === 'day' && dateToStr(state.cursor) !== tdStr) return;
+
+    var mins     = now.getHours() * 60 + now.getMinutes();
+    var SLOT_PX  = 60;
+    var top      = (mins / 60) * SLOT_PX;
+    var timeLabel = fmtTime(pad2(now.getHours()) + ':' + pad2(now.getMinutes()));
+
+    /* Badge inside the time-col */
+    var $timeCol = dom.canvas.find('.time-col');
+    $timeCol.append(
+      '<div class="current-time-badge" style="top:' + top + 'px">' +
+        escHtml(timeLabel) +
+      '</div>'
+    );
+
+    /* Line spanning the day-column area */
+    var $timeBody = dom.canvas.find('.week-time-body, .day-body');
+    $timeBody.append(
+      '<div class="current-time-line" style="top:' + top + 'px"></div>'
+    );
+
+    /* Scroll so the indicator is roughly centred in the viewport */
+    if ($timeBody.length) {
+      var viewH   = $timeBody[0].clientHeight;
+      var scroll  = Math.max(0, top - viewH / 3);
+      $timeBody[0].scrollTop = scroll;
     }
   }
 
@@ -1620,6 +1685,119 @@ $(function () {
     });
   }
 
+  /* ──────────────────────────────────────────────────────────
+     USER PROFILE DROPDOWN
+  ────────────────────────────────────────────────────────── */
+
+  var USERS = [
+    { id: 'u1', name: 'Jaya Krishna Janjam',  email: 'jayakrishna.j@zohotest.com',          role: 'Administrator',  expand: false },
+    { id: 'u2', name: 'Siva Pavan Duvvuru',   email: 'jayakrishnajanjam1997+1@gmail.com',   role: 'Managers Head',  expand: false },
+    { id: 'u3', name: 'Uday Kumar Janjam',    email: 'jayakrishnajanjam1997+2@gmail.com',   role: 'Director',       expand: true  },
+    { id: 'u4', name: 'Sindhu Priya SA',      email: 'jayakrishnajanjam1997+4@gmail.com',   role: 'Director',       expand: true  },
+    { id: 'u5', name: 'Athith Santosh',       email: 'jayakrishnajanjam1997+3@gmail.com',   role: 'Standard',       expand: false }
+  ];
+
+  var activeUserId = 'u1';
+
+  function renderUserList(filter) {
+    var $list  = $('#udList');
+    var q      = (filter || '').toLowerCase().trim();
+    var items  = USERS.filter(function (u) {
+      return !q ||
+        u.name.toLowerCase().indexOf(q)  !== -1 ||
+        u.email.toLowerCase().indexOf(q) !== -1 ||
+        u.role.toLowerCase().indexOf(q)  !== -1;
+    });
+    if (items.length === 0) {
+      $list.html('<div class="ud-empty">No users found.</div>');
+      return;
+    }
+    var html = '';
+    items.forEach(function (u) {
+      var isActive = u.id === activeUserId;
+      html += '<div class="ud-item' + (isActive ? ' ud-item-active' : '') + '" data-uid="' + u.id + '">' +
+              '  <div class="ud-item-avatar">' + escHtml(u.name.charAt(0).toUpperCase()) + '</div>' +
+              '  <div class="ud-item-info">' +
+              '    <div class="ud-item-name">' + escHtml(u.name) + '</div>' +
+              '    <div class="ud-item-email">' + escHtml(u.email) + '</div>' +
+              '    <div class="ud-item-role">' + escHtml(u.role) + '</div>' +
+              '  </div>';
+      if (u.expand) {
+        html += '  <button class="ud-expand-btn" title="View sub-calendars">' +
+                '    <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>' +
+                '  </button>';
+      }
+      html += '</div>';
+    });
+    $list.html(html);
+  }
+
+  function openUserDropdown() {
+    var $btn = $('#userProfile');
+    var $dd  = $('#userDropdown');
+    renderUserList('');
+    $('#udSearch').val('');
+
+    /* Position below the button */
+    var off  = $btn.offset();
+    var btnH = $btn.outerHeight();
+    $dd.css({ top: off.top + btnH + 6, left: off.left });
+
+    $dd.addClass('ud-open');
+    $btn.attr('aria-expanded', 'true');
+    setTimeout(function () { $('#udSearch').focus(); }, 60);
+  }
+
+  function closeUserDropdown() {
+    $('#userDropdown').removeClass('ud-open');
+    $('#userProfile').attr('aria-expanded', 'false');
+  }
+
+  function initUserDropdown() {
+    /* Toggle on button click */
+    $('#userProfile').on('click', function (e) {
+      e.stopPropagation();
+      if ($('#userDropdown').hasClass('ud-open')) {
+        closeUserDropdown();
+      } else {
+        openUserDropdown();
+      }
+    });
+
+    /* Live search */
+    $(document).on('input', '#udSearch', function () {
+      renderUserList($(this).val());
+    });
+
+    /* Select a user */
+    $(document).on('click', '.ud-item', function (e) {
+      if ($(e.target).closest('.ud-expand-btn').length) return;
+      var uid = $(this).data('uid');
+      var user = USERS.find(function (u) { return u.id === uid; });
+      if (!user) return;
+      activeUserId = uid;
+      $('.user-name').text(user.name);
+      closeUserDropdown();
+    });
+
+    /* Close when clicking outside */
+    $(document).on('click.udropdown', function (e) {
+      if (!$(e.target).closest('#userDropdown').length &&
+          !$(e.target).closest('#userProfile').length) {
+        closeUserDropdown();
+      }
+    });
+
+    /* Reposition on resize */
+    $(window).on('resize.udropdown', function () {
+      if ($('#userDropdown').hasClass('ud-open')) {
+        var off  = $('#userProfile').offset();
+        var btnH = $('#userProfile').outerHeight();
+        $('#userDropdown').css({ top: off.top + btnH + 6, left: off.left });
+      }
+    });
+  }
+
   function init() {
     /* Restore theme */
     var savedTheme = 'light';
@@ -1634,6 +1812,9 @@ $(function () {
 
     /* Calendar month/year picker */
     initPicker();
+
+    /* User profile dropdown */
+    initUserDropdown();
 
     /* Navigation */
     dom.btnPrev.on('click',  function () { navigate(-1); });
@@ -1724,6 +1905,13 @@ $(function () {
           state.view = 'day';   updateViewTab('day');   render(); break;
       }
     });
+
+    /* Auto-refresh current time indicator every minute */
+    setInterval(function () {
+      if (state.view === 'week' || state.view === 'day') {
+        renderCurrentTimeLine();
+      }
+    }, 60000);
 
     /* Initial render */
     render();
