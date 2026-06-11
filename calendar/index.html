@@ -11,6 +11,53 @@
   <!-- ══════════════════════ APP SHELL ══════════════════════ -->
   <div class="cal-app" id="calApp">
 
+    <!-- ── SETTINGS ICON (shown only when Beat Plan Reference data exists) ── -->
+    <button class="settings-icon-btn" id="settingsIconBtn" title="Settings" aria-label="Open settings" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+
+    <!-- ── SETTINGS PANEL ── -->
+    <div class="settings-panel" id="settingsPanel" role="dialog" aria-modal="true" aria-label="Settings" style="display:none;">
+      <div class="settings-panel-inner">
+        <div class="settings-panel-head">
+          <span class="settings-panel-title">Settings</span>
+          <button class="settings-panel-close" id="settingsPanelClose" aria-label="Close settings">&times;</button>
+        </div>
+        <div class="settings-panel-body">
+          <!-- Meetings For multi-select dropdown -->
+          <div class="mf-dropdown-wrap" id="mfDropdownWrap">
+            <div class="mf-field" id="mfField" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Meetings For">
+              <span class="mf-floating-label" id="mfFloatingLabel">Meetings For</span>
+              <span class="mf-selected-text" id="mfSelectedText"></span>
+              <svg class="mf-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+                <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="mf-dropdown" id="mfDropdown" role="listbox" aria-label="Meetings For options" aria-multiselectable="true">
+              <div class="mf-search-wrap">
+                <svg class="mf-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                  <circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/>
+                </svg>
+                <input type="text" class="mf-search-input" id="mfSearch" placeholder="Search…" autocomplete="off" aria-label="Search modules" />
+              </div>
+              <div class="mf-actions-row">
+                <button class="mf-action-btn" id="mfSelectAll">Select All</button>
+                <button class="mf-action-btn" id="mfClearAll">Clear All</button>
+              </div>
+              <div class="mf-list" id="mfList" role="group"></div>
+              <div class="mf-footer">
+                <button class="btn-ghost mf-cancel-btn" id="mfCancel">Cancel</button>
+                <button class="btn-primary mf-done-btn" id="mfDone">Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── TOP HEADER ── -->
     <header class="cal-header">
       <div class="header-left">
@@ -206,5 +253,8 @@
 
   <script src="jquery.min.js"></script>
   <script src="calendar.js"></script>
+  <!-- Zoho CRM Widget SDK -->
+  <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbeddedAppSDK.min.js"></script>
+  <script src="zoho-init.js"></script>
 </body>
 </html>
