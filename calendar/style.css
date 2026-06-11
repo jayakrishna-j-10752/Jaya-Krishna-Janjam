@@ -149,19 +149,97 @@ input, select, textarea {
    HEADER
 ────────────────────────────────────────────────────────── */
 .cal-header {
-  height: var(--header-h);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border), 0 2px 8px rgba(0,0,0,.06);
+  z-index: 10;
+  position: relative;
+}
+
+/* ── Toolbar row (top of header) ── */
+.header-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 24px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  transition: border-color .15s, color .15s, background .15s, box-shadow .15s, transform .12s;
+  white-space: nowrap;
+}
+.toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.toolbar-btn:hover {
+  border-color: var(--z-blue);
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--z-blue) 12%, transparent);
+}
+.toolbar-btn:active { transform: scale(.96); }
+
+.toolbar-settings-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  color: var(--text-secondary);
+  transition: background .15s, color .15s, transform .12s;
+  flex-shrink: 0;
+}
+.toolbar-settings-btn svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+.toolbar-settings-btn:hover {
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
+  transform: rotate(22deg) scale(1.08);
+}
+.toolbar-settings-btn:active { transform: rotate(0deg) scale(.94); }
+
+/* ── Main header row ── */
+.header-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 0 var(--border), 0 2px 8px rgba(0,0,0,.06);
+  height: var(--header-h);
   gap: 16px;
   flex-wrap: wrap;
-  z-index: 10;
-  position: relative;
+  flex-shrink: 0;
 }
 
 .header-left,
@@ -1265,12 +1343,16 @@ input, select, textarea {
 @media (max-width: 768px) {
   :root {
     --time-col-w: 40px;
-    --header-h: auto;
+    --header-h:   auto;
   }
 
-  .cal-header {
+  .header-toolbar {
+    padding: 6px 14px;
+  }
+
+  .header-main {
     height: auto;
-    padding: 10px 14px;
+    padding: 8px 14px;
     gap: 10px;
   }
 
@@ -1288,9 +1370,9 @@ input, select, textarea {
     gap: 8px;
   }
 
-  /* Period group wraps to its own row so the full date range is always visible */
+  /* Period group and theme toggle share a row on mobile */
   .period-group {
-    flex: 1 1 100%;
+    flex: 1;
     min-width: 0;
   }
 
