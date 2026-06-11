@@ -123,7 +123,10 @@
       .replace(/"/g, '&quot;');
   }
 
-  /** Populate options from a list of Zoho module objects */
+  /** Populate options from a list of Zoho module objects.
+   *  Field priority: api_name (most reliable, unique CRM name)
+   *  → module_name (legacy) → singular_label (fallback display string).
+   *  Labels use plural_label first, then singular_label, then api_name. */
   function populateMfOptions(modules) {
     mfState.allOptions = (modules || []).map(function (m) {
       return {
@@ -259,9 +262,9 @@
     console.log('[CalWidget] PageLoad data:', pageData);
 
     ZOHO.CRM.API.getAllRecords({
-      Entity:     'beatplanner__Beat_Plan_References',
+      Entity:     'beatplanner__Beat_Plan_References', // custom module (beatplanner namespace)
       sort_order: 'asc',
-      per_page:   2,
+      per_page:   2,  // per spec; 2 records are sufficient to confirm data exists
       page:       1
     }).then(function (data) {
       console.log('[CalWidget] Beat_Plan_References data:', data);
