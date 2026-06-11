@@ -1798,6 +1798,149 @@ $(function () {
     });
   }
 
+  /* ──────────────────────────────────────────────────────────
+     MEETINGS-FOR MULTI-SELECT DROPDOWN
+  ────────────────────────────────────────────────────────── */
+  var mfSelected = []; /* IDs of currently selected users */
+
+  function renderMfChips() {
+    var $wrap = $('#mfChipsWrap');
+    var $sel  = $('#mfSelect');
+    var html  = '';
+    mfSelected.forEach(function (id) {
+      var u = USERS.find(function (x) { return x.id === id; });
+      if (!u) return;
+      html += '<span class="mf-chip" data-uid="' + id + '">' +
+              '<span class="mf-chip-text">' + escHtml(u.name) + '</span>' +
+              '<span class="mf-chip-remove" data-uid="' + id + '" role="button" ' +
+                'aria-label="Remove ' + escHtml(u.name) + '" title="Remove">&#215;</span>' +
+              '</span>';
+    });
+    $wrap.html(html);
+    if (mfSelected.length > 0 || $sel.hasClass('mf-open')) {
+      $sel.addClass('mf-active');
+    } else {
+      $sel.removeClass('mf-active');
+    }
+  }
+
+  function renderMfList() {
+    var html = '';
+    USERS.forEach(function (u) {
+      var checked = mfSelected.indexOf(u.id) !== -1;
+      html += '<div class="mf-item' + (checked ? ' mf-item-checked' : '') + '" ' +
+              'data-uid="' + u.id + '" role="option" aria-selected="' + checked + '">' +
+              '<span class="mf-checkbox">' +
+              '<svg class="mf-checkbox-tick" viewBox="0 0 10 8" fill="none" stroke="#fff" ' +
+                   'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<polyline points="1,4 4,7 9,1"/>' +
+              '</svg></span>' +
+              '<span class="mf-item-avatar">' + escHtml(u.name.charAt(0).toUpperCase()) + '</span>' +
+              '<span class="mf-item-text">' +
+              '<span class="mf-item-name">' + escHtml(u.name) + '</span>' +
+              '<span class="mf-item-role">' + escHtml(u.role) + '</span>' +
+              '</span></div>';
+    });
+    $('#mfList').html(html);
+  }
+
+  function positionMfDropdown() {
+    var $sel  = $('#mfSelect');
+    var $dd   = $('#mfDropdown');
+    var off   = $sel.offset();
+    var selH  = $sel.outerHeight();
+    var ddW   = Math.max($sel.outerWidth(), 280);
+    var vpW   = $(window).width();
+    var left  = off.left;
+    if (left + ddW > vpW - 8) { left = vpW - ddW - 8; }
+    if (left < 8) { left = 8; }
+    $dd.css({ top: off.top + selH + 4, left: left, width: ddW });
+  }
+
+  function openMf() {
+    var $sel = $('#mfSelect');
+    renderMfList();
+    positionMfDropdown();
+    $('#mfDropdown').addClass('mf-dd-open');
+    $sel.addClass('mf-open mf-active');
+    $sel.attr('aria-expanded', 'true');
+  }
+
+  function closeMf() {
+    var $sel = $('#mfSelect');
+    $sel.removeClass('mf-open');
+    if (mfSelected.length === 0) { $sel.removeClass('mf-active'); }
+    $sel.attr('aria-expanded', 'false');
+    $('#mfDropdown').removeClass('mf-dd-open');
+  }
+
+  function initMf() {
+    /* Toggle on click of the trigger box (ignore clicks on chip ×) */
+    $(document).on('click', '#mfSelect', function (e) {
+      if ($(e.target).closest('.mf-chip-remove').length) return;
+      e.stopPropagation();
+      if ($(this).hasClass('mf-open')) { closeMf(); } else { openMf(); }
+    });
+
+    /* Keyboard: Enter / Space open|close; Escape closes */
+    $(document).on('keydown', '#mfSelect', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if ($(this).hasClass('mf-open')) { closeMf(); } else { openMf(); }
+      } else if (e.key === 'Escape') {
+        closeMf();
+      }
+    });
+
+    /* Remove individual chip via × button */
+    $(document).on('click', '.mf-chip-remove', function (e) {
+      e.stopPropagation();
+      var id = $(this).data('uid');
+      mfSelected = mfSelected.filter(function (x) { return x !== id; });
+      renderMfChips();
+      if ($('#mfSelect').hasClass('mf-open')) { renderMfList(); }
+    });
+
+    /* Toggle item in dropdown */
+    $(document).on('click', '.mf-item', function (e) {
+      e.stopPropagation();
+      var id  = $(this).data('uid');
+      var idx = mfSelected.indexOf(id);
+      if (idx === -1) { mfSelected.push(id); } else { mfSelected.splice(idx, 1); }
+      renderMfChips();
+      renderMfList();
+    });
+
+    /* Select All */
+    $(document).on('click', '#mfSelectAll', function (e) {
+      e.stopPropagation();
+      mfSelected = USERS.map(function (u) { return u.id; });
+      renderMfChips();
+      renderMfList();
+    });
+
+    /* Clear All */
+    $(document).on('click', '#mfClearAll', function (e) {
+      e.stopPropagation();
+      mfSelected = [];
+      renderMfChips();
+      renderMfList();
+    });
+
+    /* Close when clicking outside */
+    $(document).on('click.mf', function (e) {
+      if (!$(e.target).closest('#mfDropdown').length &&
+          !$(e.target).closest('#mfSelect').length) {
+        closeMf();
+      }
+    });
+
+    /* Reposition on resize */
+    $(window).on('resize.mf', function () {
+      if ($('#mfSelect').hasClass('mf-open')) { positionMfDropdown(); }
+    });
+  }
+
   function init() {
     /* Restore theme */
     var savedTheme = 'light';
@@ -1815,6 +1958,9 @@ $(function () {
 
     /* User profile dropdown */
     initUserDropdown();
+
+    /* Meetings-for multi-select */
+    initMf();
 
     /* Navigation */
     dom.btnPrev.on('click',  function () { navigate(-1); });

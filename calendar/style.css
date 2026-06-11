@@ -1333,6 +1333,252 @@ input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════════════════
+   MEETINGS-FOR MULTI-SELECT
+   Floating-label multi-select strip that sits above the
+   toolbar.  Chips show selected items; dropdown lists all
+   users with checkbox toggles plus Select All / Clear All.
+══════════════════════════════════════════════════════════ */
+
+/* ── Bar wrapper ── */
+.meetings-bar {
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ── Select trigger box ── */
+.mf-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 42px;
+  padding: 18px 36px 7px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+}
+.mf-select:focus,
+.mf-select.mf-open {
+  border-color: var(--z-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--z-blue) 12%, transparent);
+}
+
+/* ── Floating label ── */
+.mf-label {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: var(--text-muted);
+  pointer-events: none;
+  background: transparent;
+  padding: 0 2px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: top .15s, font-size .15s, color .15s, background .15s, padding .15s;
+}
+/* Floated state: triggered when the box is open or chips are present */
+.mf-select.mf-active .mf-label {
+  top: 0;
+  font-size: 11px;
+  color: var(--z-blue);
+  background: var(--surface);
+  padding: 0 4px;
+}
+
+/* ── Chips container ── */
+.mf-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Individual chip ── */
+.mf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 9px;
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 160px;
+}
+.mf-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mf-chip-remove {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--z-blue);
+  transition: background .12s, color .12s;
+}
+.mf-chip-remove:hover {
+  background: var(--z-blue);
+  color: #fff;
+}
+
+/* ── Chevron arrow ── */
+.mf-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: transform .15s, color .15s;
+  pointer-events: none;
+}
+.mf-arrow svg { width: 10px; height: 10px; }
+.mf-select.mf-open .mf-arrow {
+  transform: translateY(-50%) rotate(180deg);
+  color: var(--z-blue);
+}
+
+/* ── Dropdown panel ── */
+.mf-dropdown {
+  position: fixed;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px) scale(.97);
+  transition: opacity .15s, transform .15s;
+}
+.mf-dropdown.mf-dd-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+
+/* Actions row: Select All / Clear All */
+.mf-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+.mf-action-btn {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+  font-family: var(--font);
+}
+.mf-action-btn:hover {
+  border-color: var(--z-blue);
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
+}
+
+/* Options list */
+.mf-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.mf-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background .12s;
+  user-select: none;
+}
+.mf-item:hover { background: var(--surface-2); }
+.mf-item.mf-item-checked {
+  background: color-mix(in srgb, var(--z-blue) 7%, transparent);
+}
+
+/* Custom checkbox */
+.mf-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s, border-color .12s;
+}
+.mf-item.mf-item-checked .mf-checkbox {
+  background: var(--z-blue);
+  border-color: var(--z-blue);
+}
+.mf-checkbox-tick { display: none; width: 10px; height: 8px; }
+.mf-item.mf-item-checked .mf-checkbox-tick { display: block; }
+
+/* User avatar circle */
+.mf-item-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--z-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* User name + role */
+.mf-item-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mf-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mf-item-role {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════
    RESPONSIVE TWEAKS
 ══════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
@@ -1349,6 +1595,9 @@ input, select, textarea {
   .header-toolbar {
     padding: 6px 14px;
   }
+
+  .meetings-bar { padding: 6px 14px; }
+  .mf-chip { max-width: 120px; }
 
   .header-main {
     height: auto;
@@ -1466,6 +1715,9 @@ input, select, textarea {
 
   .evt-popup { width: 260px; }
   .toast { font-size: 12px; padding: 9px 18px; }
+
+  .meetings-bar { padding: 6px 10px; }
+  .mf-chip { max-width: 80px; font-size: 11px; }
 }
 
 /* ══════════════════════════════════════════════════════════

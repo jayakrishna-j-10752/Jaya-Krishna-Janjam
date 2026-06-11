@@ -14,6 +14,21 @@
     <!-- ── TOP HEADER ── -->
     <header class="cal-header">
 
+      <!-- ── MEETINGS FOR MULTI-SELECT ── -->
+      <div class="meetings-bar">
+        <div class="mf-select" id="mfSelect" tabindex="0" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false" aria-label="Meetings For">
+          <span class="mf-label" id="mfLabel">Meetings For</span>
+          <div class="mf-chips-wrap" id="mfChipsWrap"></div>
+          <span class="mf-arrow" aria-hidden="true">
+            <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
       <!-- ── TOOLBAR ROW ── -->
       <div class="header-toolbar">
         <div class="toolbar-left">
@@ -234,6 +249,16 @@
       <button class="dep-close" id="depClose" aria-label="Close">&times;</button>
     </div>
     <div class="dep-list" id="depList"></div>
+  </div>
+
+
+  <!-- ══════════════════════ MEETINGS-FOR DROPDOWN ══════════════════════ -->
+  <div class="mf-dropdown" id="mfDropdown" role="listbox" aria-multiselectable="true" aria-label="Select users for meetings">
+    <div class="mf-actions">
+      <button class="mf-action-btn" id="mfSelectAll">Select All</button>
+      <button class="mf-action-btn" id="mfClearAll">Clear All</button>
+    </div>
+    <div class="mf-list" id="mfList"></div>
   </div>
 
 
