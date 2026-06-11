@@ -1363,17 +1363,33 @@ input, select, textarea {
     align-items: center;
   }
 
+  /* Assign flex order so user-profile and nav-group sit on the first row,
+     while period-group and theme-toggle drop to a dedicated second row */
+  .user-profile     { order: 1; }
+  .nav-group        { order: 2; }
+
+  /* Invisible flex-break forces period-group and theme-toggle onto a new row */
+  .header-left::before {
+    content: '';
+    flex: 0 0 100%;
+    order: 3;
+    height: 0;
+  }
+
+  /* Period-group and theme-toggle share the second row */
+  .period-group {
+    order: 4;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .theme-toggle-btn { order: 5; }
+
   .header-right {
     flex: 1 1 100%;
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 8px;
-  }
-
-  /* Period group and theme toggle share a row on mobile */
-  .period-group {
-    flex: 1;
-    min-width: 0;
   }
 
   .period-label {
@@ -1434,7 +1450,13 @@ input, select, textarea {
   .nav-arrow { width: 28px; height: 28px; font-size: 17px; }
   .btn-today { padding: 5px 12px; font-size: 11px; }
 
-  .user-name { display: none; }
+  .user-name {
+    font-size: 11px;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .user-chevron { display: none; }
 
   .modal-box { border-radius: 12px; }
@@ -1936,6 +1958,7 @@ input, select, textarea {
   display: grid;
   grid-template-columns: var(--time-col-w) 1fr;
   overflow-y: auto;
+  position: relative;
 }
 
 /* ══════════════════════════════════════════════════════════

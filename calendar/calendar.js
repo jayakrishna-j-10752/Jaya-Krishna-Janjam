@@ -748,7 +748,7 @@ $(function () {
     );
 
     /* Line spanning the day-column area */
-    var $timeBody = dom.canvas.find('.week-time-body, .day-body');
+    var $timeBody = dom.canvas.find('.week-time-body, .day-body, .mobile-day-body');
     $timeBody.append(
       '<div class="current-time-line" style="top:' + top + 'px"></div>'
     );
