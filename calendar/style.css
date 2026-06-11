@@ -1346,6 +1346,16 @@ input, select, textarea {
   background: var(--surface);
 }
 
+/* ── Step label ── */
+.mf-step-label {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+
 /* ── Select trigger box ── */
 .mf-select {
   position: relative;
@@ -1462,7 +1472,7 @@ input, select, textarea {
   position: fixed;
   width: 320px;
   max-width: calc(100vw - 16px);
-  max-height: 300px;
+  max-height: 360px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1508,6 +1518,28 @@ input, select, textarea {
   border-color: var(--z-blue);
   color: var(--z-blue);
   background: var(--z-blue-pale);
+}
+
+/* Footer row: Done / Cancel */
+.mf-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+.mf-btn-done {
+  border-color: var(--z-blue);
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
+}
+.mf-btn-done:hover {
+  background: var(--z-blue);
+  color: #fff;
+  border-color: var(--z-blue);
 }
 
 /* Options list */

@@ -1801,19 +1801,42 @@ $(function () {
   /* ──────────────────────────────────────────────────────────
      MEETINGS-FOR MULTI-SELECT DROPDOWN
   ────────────────────────────────────────────────────────── */
-  var mfSelected = []; /* IDs of currently selected users */
+
+  /**
+   * MF_MODULES holds the CRM module list fetched via ZOHO.CRM.META.getModules().
+   * Each entry: { id: <api_name>, name: <display_label> }
+   */
+  var MF_MODULES  = [];
+  var mfSelected  = []; /* api_names of currently confirmed selections */
+  var mfSnapshot  = []; /* snapshot of mfSelected taken when dropdown opens (used by Cancel) */
+
+  /**
+   * Populate MF_MODULES from the raw ZOHO.CRM.META.getModules() response and
+   * re-render the chip strip to reflect any now-resolved names.
+   */
+  function populateMfModules(response) {
+    var modules = (response && response.modules) ? response.modules : [];
+    MF_MODULES = modules.map(function (m) {
+      return {
+        id:   m.api_name    || m.module_name || String(m.id),
+        name: m.display_label || m.module_name || m.api_name || String(m.id)
+      };
+    });
+    renderMfChips();
+    if ($('#mfSelect').hasClass('mf-open')) { renderMfList(); }
+  }
 
   function renderMfChips() {
     var $wrap = $('#mfChipsWrap');
     var $sel  = $('#mfSelect');
     var html  = '';
     mfSelected.forEach(function (id) {
-      var u = USERS.find(function (x) { return x.id === id; });
-      if (!u) return;
-      html += '<span class="mf-chip" data-uid="' + id + '">' +
-              '<span class="mf-chip-text">' + escHtml(u.name) + '</span>' +
-              '<span class="mf-chip-remove" data-uid="' + id + '" role="button" ' +
-                'aria-label="Remove ' + escHtml(u.name) + '" title="Remove">&#215;</span>' +
+      var m = MF_MODULES.find(function (x) { return x.id === id; });
+      var label = m ? m.name : id;
+      html += '<span class="mf-chip" data-uid="' + escHtml(id) + '">' +
+              '<span class="mf-chip-text">' + escHtml(label) + '</span>' +
+              '<span class="mf-chip-remove" data-uid="' + escHtml(id) + '" role="button" ' +
+                'aria-label="Remove ' + escHtml(label) + '" title="Remove">&#215;</span>' +
               '</span>';
     });
     $wrap.html(html);
@@ -1826,21 +1849,25 @@ $(function () {
 
   function renderMfList() {
     var html = '';
-    USERS.forEach(function (u) {
-      var checked = mfSelected.indexOf(u.id) !== -1;
-      html += '<div class="mf-item' + (checked ? ' mf-item-checked' : '') + '" ' +
-              'data-uid="' + u.id + '" role="option" aria-selected="' + checked + '">' +
-              '<span class="mf-checkbox">' +
-              '<svg class="mf-checkbox-tick" viewBox="0 0 10 8" fill="none" stroke="#fff" ' +
-                   'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                '<polyline points="1,4 4,7 9,1"/>' +
-              '</svg></span>' +
-              '<span class="mf-item-avatar">' + escHtml(u.name.charAt(0).toUpperCase()) + '</span>' +
-              '<span class="mf-item-text">' +
-              '<span class="mf-item-name">' + escHtml(u.name) + '</span>' +
-              '<span class="mf-item-role">' + escHtml(u.role) + '</span>' +
-              '</span></div>';
-    });
+    if (MF_MODULES.length === 0) {
+      html = '<div style="padding:12px 14px;font-size:12px;color:var(--text-muted)">Loading modules…</div>';
+    } else {
+      MF_MODULES.forEach(function (m) {
+        var checked = mfSelected.indexOf(m.id) !== -1;
+        html += '<div class="mf-item' + (checked ? ' mf-item-checked' : '') + '" ' +
+                'data-uid="' + escHtml(m.id) + '" role="option" aria-selected="' + checked + '">' +
+                '<span class="mf-checkbox">' +
+                '<svg class="mf-checkbox-tick" viewBox="0 0 10 8" fill="none" stroke="#fff" ' +
+                     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<polyline points="1,4 4,7 9,1"/>' +
+                '</svg></span>' +
+                '<span class="mf-item-avatar">' + escHtml(m.name.charAt(0).toUpperCase()) + '</span>' +
+                '<span class="mf-item-text">' +
+                '<span class="mf-item-name">' + escHtml(m.name) + '</span>' +
+                '<span class="mf-item-role">' + escHtml(m.id) + '</span>' +
+                '</span></div>';
+      });
+    }
     $('#mfList').html(html);
   }
 
@@ -1859,6 +1886,7 @@ $(function () {
 
   function openMf() {
     var $sel = $('#mfSelect');
+    mfSnapshot = mfSelected.slice(); /* save state for Cancel */
     renderMfList();
     positionMfDropdown();
     $('#mfDropdown').addClass('mf-dd-open');
@@ -1914,7 +1942,7 @@ $(function () {
     /* Select All */
     $(document).on('click', '#mfSelectAll', function (e) {
       e.stopPropagation();
-      mfSelected = USERS.map(function (u) { return u.id; });
+      mfSelected = MF_MODULES.map(function (m) { return m.id; });
       renderMfChips();
       renderMfList();
     });
@@ -1925,6 +1953,20 @@ $(function () {
       mfSelected = [];
       renderMfChips();
       renderMfList();
+    });
+
+    /* Done – confirm current selections and close */
+    $(document).on('click', '#mfDone', function (e) {
+      e.stopPropagation();
+      closeMf();
+    });
+
+    /* Cancel – discard pending changes and close */
+    $(document).on('click', '#mfCancel', function (e) {
+      e.stopPropagation();
+      mfSelected = mfSnapshot.slice();
+      renderMfChips();
+      closeMf();
     });
 
     /* Close when clicking outside */
@@ -2064,5 +2106,20 @@ $(function () {
   }
 
   init();
+
+  /* ──────────────────────────────────────────────────────────
+     ZOHO EMBEDDED APP INTEGRATION
+     Subscribe to PageLoad before calling embeddedApp.init().
+     On PageLoad, fetch CRM modules to populate the
+     "Meetings For" multi-select dropdown.
+  ────────────────────────────────────────────────────────── */
+  ZOHO.embeddedApp.on('PageLoad', function (data) {
+    console.log(data);
+    ZOHO.CRM.META.getModules().then(function (response) {
+      console.log(response);
+      populateMfModules(response);
+    });
+  });
+  ZOHO.embeddedApp.init();
 
 });

@@ -16,6 +16,7 @@
 
       <!-- ── MEETINGS FOR MULTI-SELECT ── -->
       <div class="meetings-bar">
+        <p class="mf-step-label">Step 1: Meetings For</p>
         <div class="mf-select" id="mfSelect" tabindex="0" role="combobox"
              aria-haspopup="listbox" aria-expanded="false" aria-label="Meetings For">
           <span class="mf-label" id="mfLabel">Meetings For</span>
@@ -253,15 +254,20 @@
 
 
   <!-- ══════════════════════ MEETINGS-FOR DROPDOWN ══════════════════════ -->
-  <div class="mf-dropdown" id="mfDropdown" role="listbox" aria-multiselectable="true" aria-label="Select users for meetings">
+  <div class="mf-dropdown" id="mfDropdown" role="listbox" aria-multiselectable="true" aria-label="Select modules for meetings">
     <div class="mf-actions">
       <button class="mf-action-btn" id="mfSelectAll">Select All</button>
       <button class="mf-action-btn" id="mfClearAll">Clear All</button>
     </div>
     <div class="mf-list" id="mfList"></div>
+    <div class="mf-footer">
+      <button class="mf-action-btn" id="mfCancel">Cancel</button>
+      <button class="mf-action-btn mf-btn-done" id="mfDone">Done</button>
+    </div>
   </div>
 
 
+  <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
   <script src="jquery.min.js"></script>
   <script src="calendar.js"></script>
 </body>
