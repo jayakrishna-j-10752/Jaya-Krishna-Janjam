@@ -1820,7 +1820,7 @@ $(function () {
    *  - Deduplicate by plural_label (removes duplicate integrated-module entries).
    */
   function populateMfModules(response) {
-    var modules = (response && response.modules) ? response.modules : [];
+    var modules = (response && response.data && response.data.modules) ? response.data.modules : [];
 
     /* Module names (lower-cased) to exclude from generated_type === "default" */
     var EXCLUDED_DEFAULT = [
