@@ -2236,7 +2236,8 @@ $(function () {
     console.log('dailyBeatPlanPreferences', dailyBeatPlanPreferences);
     var hasRecords = dailyBeatPlanPreferences &&
                      dailyBeatPlanPreferences.data &&
-                     dailyBeatPlanPreferences.data.length > 0;
+                     dailyBeatPlanPreferences.data.data &&
+                     dailyBeatPlanPreferences.data.data.length > 0;
 
     if (!hasRecords) {
       showMeetingsBarOnly();
