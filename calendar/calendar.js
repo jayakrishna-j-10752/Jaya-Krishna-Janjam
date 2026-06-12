@@ -1813,15 +1813,56 @@ $(function () {
   /**
    * Populate MF_MODULES from the raw ZOHO.CRM.META.getModules() response and
    * re-render the chip strip to reflect any now-resolved names.
+   * Rules:
+   *  - Only include modules whose generated_type is "custom" or "default".
+   *  - Exclude modules with status "user_hidden" (integrated / hidden modules).
+   *  - For "default" modules, exclude a fixed set of non-CRM / utility modules.
+   *  - Deduplicate by plural_label (removes duplicate integrated-module entries).
    */
   function populateMfModules(response) {
     var modules = (response && response.modules) ? response.modules : [];
-    MF_MODULES = modules.map(function (m) {
-      return {
-        id:   m.api_name    || m.module_name || String(m.id),
-        name: m.display_label || m.module_name || m.api_name || String(m.id)
-      };
+
+    /* Module names (lower-cased) to exclude from generated_type === "default" */
+    var EXCLUDED_DEFAULT = [
+      'home', 'workqueue', 'salesinbox', 'feeds', 'social', 'visits',
+      'forecasts', 'documents', 'analytics', 'reports', 'calls', 'meetings',
+      'tasks', 'activities', 'expense items', 'estimates'
+    ];
+
+    var seenLabels = {};
+    var filtered   = [];
+
+    modules.forEach(function (m) {
+      var genType     = m.generated_type || '';
+      var status      = m.status         || '';
+      var pluralLabel = (m.plural_label  || m.display_label || m.module_name || m.api_name || '').trim();
+      var apiName     = (m.api_name      || '').trim();
+
+      /* Only custom or default modules */
+      if (genType !== 'custom' && genType !== 'default') { return; }
+
+      /* Skip hidden / integrated modules */
+      if (status === 'user_hidden') { return; }
+
+      /* For default modules, apply the exclusion list */
+      if (genType === 'default') {
+        var labelLow = pluralLabel.toLowerCase();
+        var apiLow   = apiName.toLowerCase();
+        if (EXCLUDED_DEFAULT.indexOf(labelLow) !== -1 ||
+            EXCLUDED_DEFAULT.indexOf(apiLow)   !== -1) { return; }
+      }
+
+      /* Deduplicate by plural_label */
+      if (!pluralLabel || seenLabels[pluralLabel]) { return; }
+      seenLabels[pluralLabel] = true;
+
+      filtered.push({
+        id:   apiName || m.module_name || String(m.id),
+        name: pluralLabel
+      });
     });
+
+    MF_MODULES = filtered;
     renderMfChips();
     if ($('#mfSelect').hasClass('mf-open')) { renderMfList(); }
   }
@@ -1848,11 +1889,19 @@ $(function () {
   }
 
   function renderMfList() {
-    var html = '';
+    var html  = '';
+    var query = (($('#mfSearch').val() || '')).toLowerCase().trim();
+
+    var visible = query
+      ? MF_MODULES.filter(function (m) { return m.name.toLowerCase().indexOf(query) !== -1; })
+      : MF_MODULES;
+
     if (MF_MODULES.length === 0) {
       html = '<div style="padding:12px 14px;font-size:12px;color:var(--text-muted)">Loading modules…</div>';
+    } else if (visible.length === 0) {
+      html = '<div style="padding:12px 14px;font-size:12px;color:var(--text-muted)">No modules found.</div>';
     } else {
-      MF_MODULES.forEach(function (m) {
+      visible.forEach(function (m) {
         var checked = mfSelected.indexOf(m.id) !== -1;
         html += '<div class="mf-item' + (checked ? ' mf-item-checked' : '') + '" ' +
                 'data-uid="' + escHtml(m.id) + '" role="option" aria-selected="' + checked + '">' +
@@ -1864,7 +1913,6 @@ $(function () {
                 '<span class="mf-item-avatar">' + escHtml(m.name.charAt(0).toUpperCase()) + '</span>' +
                 '<span class="mf-item-text">' +
                 '<span class="mf-item-name">' + escHtml(m.name) + '</span>' +
-                '<span class="mf-item-role">' + escHtml(m.id) + '</span>' +
                 '</span></div>';
       });
     }
@@ -1892,6 +1940,7 @@ $(function () {
     $('#mfDropdown').addClass('mf-dd-open');
     $sel.addClass('mf-open mf-active');
     $sel.attr('aria-expanded', 'true');
+    setTimeout(function () { $('#mfSearch').focus(); }, 50);
   }
 
   function closeMf() {
@@ -1900,6 +1949,7 @@ $(function () {
     if (mfSelected.length === 0) { $sel.removeClass('mf-active'); }
     $sel.attr('aria-expanded', 'false');
     $('#mfDropdown').removeClass('mf-dd-open');
+    $('#mfSearch').val('');
   }
 
   function initMf() {
@@ -1939,10 +1989,16 @@ $(function () {
       renderMfList();
     });
 
-    /* Select All */
+    /* Select All – selects all modules currently visible in the filtered list */
     $(document).on('click', '#mfSelectAll', function (e) {
       e.stopPropagation();
-      mfSelected = MF_MODULES.map(function (m) { return m.id; });
+      var query = ($('#mfSearch').val() || '').toLowerCase().trim();
+      var visibleIds = query
+        ? MF_MODULES.filter(function (m) { return m.name.toLowerCase().indexOf(query) !== -1; }).map(function (m) { return m.id; })
+        : MF_MODULES.map(function (m) { return m.id; });
+      visibleIds.forEach(function (id) {
+        if (mfSelected.indexOf(id) === -1) { mfSelected.push(id); }
+      });
       renderMfChips();
       renderMfList();
     });
@@ -1967,6 +2023,15 @@ $(function () {
       mfSelected = mfSnapshot.slice();
       renderMfChips();
       closeMf();
+    });
+
+    /* Search input – filter the list in real time; prevent dropdown from closing */
+    $(document).on('input', '#mfSearch', function (e) {
+      e.stopPropagation();
+      renderMfList();
+    });
+    $(document).on('click keydown', '#mfSearch', function (e) {
+      e.stopPropagation();
     });
 
     /* Close when clicking outside */

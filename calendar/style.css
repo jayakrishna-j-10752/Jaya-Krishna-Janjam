@@ -1492,15 +1492,49 @@ input, select, textarea {
   transform: translateY(0) scale(1);
 }
 
-/* Actions row: Select All / Clear All */
+/* Actions row: Search + Select All / Clear All */
 .mf-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
   flex-shrink: 0;
+}
+.mf-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.mf-search-icon {
+  position: absolute;
+  left: 8px;
+  width: 13px;
+  height: 13px;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.mf-search-input {
+  width: 100%;
+  padding: 5px 8px 5px 26px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  outline: none;
+  transition: border-color .12s;
+  box-sizing: border-box;
+}
+.mf-search-input:focus { border-color: var(--z-blue); }
+.mf-search-input::placeholder { color: var(--text-muted); }
+.mf-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .mf-action-btn {
   padding: 4px 12px;
