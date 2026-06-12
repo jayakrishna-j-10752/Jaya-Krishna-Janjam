@@ -1826,8 +1826,20 @@ $(function () {
     var EXCLUDED_DEFAULT = [
       'home', 'workqueue', 'salesinbox', 'feeds', 'social', 'visits',
       'forecasts', 'documents', 'analytics', 'reports', 'calls', 'meetings',
-      'tasks', 'activities', 'expense items', 'estimates'
+      'tasks', 'activities', 'expense items', 'estimates',
+      'notes', 'attachments', 'emails'
     ];
+
+    /* api_name values that must be excluded (duplicate / integrated versions) */
+    var EXCLUDED_API_NAMES = ['CustomModule5001', 'CustomModule5004', 'CustomModule5003'];
+
+    /* For Invoices / Sales Orders / Purchase Orders, only the native api_name is allowed.
+       Keys are the plural_label in lower-case; values are the expected native api_name. */
+    var ALLOWED_API_NAMES = {
+      'invoices':       'Invoices',
+      'sales orders':   'Sales_Orders',
+      'purchase orders':'Purchase_Orders'
+    };
 
     var seenLabels = {};
     var filtered   = [];
@@ -1844,12 +1856,21 @@ $(function () {
       /* Skip hidden / integrated modules */
       if (status === 'user_hidden') { return; }
 
+      /* Skip explicitly excluded api_names (integrated / duplicate versions) */
+      if (EXCLUDED_API_NAMES.indexOf(apiName) !== -1) { return; }
+
       /* For default modules, apply the exclusion list */
       if (genType === 'default') {
         var labelLow = pluralLabel.toLowerCase();
         var apiLow   = apiName.toLowerCase();
         if (EXCLUDED_DEFAULT.indexOf(labelLow) !== -1 ||
             EXCLUDED_DEFAULT.indexOf(apiLow)   !== -1) { return; }
+      }
+
+      /* For Invoices, Sales Orders, Purchase Orders: only allow the native api_name */
+      var labelKey = pluralLabel.toLowerCase();
+      if (ALLOWED_API_NAMES.hasOwnProperty(labelKey)) {
+        if (apiName !== ALLOWED_API_NAMES[labelKey]) { return; }
       }
 
       /* Deduplicate by plural_label */
