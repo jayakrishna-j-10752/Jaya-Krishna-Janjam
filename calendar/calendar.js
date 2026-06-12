@@ -1803,7 +1803,7 @@ $(function () {
   ────────────────────────────────────────────────────────── */
 
   /**
-   * MF_MODULES holds the CRM module list fetched via ZOHO.CRM.META.getModules().
+   * MF_MODULES holds the CRM module list fetched via GET /crm/v8/settings/modules.
    * Each entry: { id: <api_name>, name: <display_label> }
    */
   var MF_MODULES  = [];
@@ -1811,7 +1811,7 @@ $(function () {
   var mfSnapshot  = []; /* snapshot of mfSelected taken when dropdown opens (used by Cancel) */
 
   /**
-   * Populate MF_MODULES from the raw ZOHO.CRM.META.getModules() response and
+   * Populate MF_MODULES from the GET /crm/v8/settings/modules response and
    * re-render the chip strip to reflect any now-resolved names.
    * Rules:
    *  - Only include modules whose generated_type is "custom" or "default".
@@ -2199,12 +2199,13 @@ $(function () {
      On PageLoad, fetch CRM modules to populate the
      "Meetings For" multi-select dropdown.
   ────────────────────────────────────────────────────────── */
-  ZOHO.embeddedApp.on('PageLoad', function (data) {
+  var zrc = ZOHO.CRM.API;
+
+  ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
-    ZOHO.CRM.META.getModules().then(function (response) {
-      console.log(response);
-      populateMfModules(response);
-    });
+    var response = await zrc.get('/crm/v8/settings/modules');
+    console.log(response);
+    populateMfModules(response);
   });
   ZOHO.embeddedApp.init();
 
