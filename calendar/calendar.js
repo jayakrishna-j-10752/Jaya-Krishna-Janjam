@@ -2199,9 +2199,11 @@ $(function () {
      On PageLoad, fetch CRM modules to populate the
      "Meetings For" multi-select dropdown.
   ────────────────────────────────────────────────────────── */
+  var zrc = ZOHO.CRM.REST;
+
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
-    var response = await ZOHO.CRM.REST.get('/crm/v8/settings/modules');
+    var response = await zrc.get('/crm/v8/settings/modules');
     console.log(response);
     populateMfModules(response);
   });
