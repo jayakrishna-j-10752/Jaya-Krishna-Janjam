@@ -160,6 +160,37 @@ input, select, textarea {
   position: relative;
 }
 
+/* ── Settings Back Button ── */
+.settings-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  margin: 8px 16px;
+  align-self: flex-start;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  transition: border-color .15s, color .15s, background .15s, box-shadow .15s;
+  cursor: pointer;
+}
+.settings-back-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.settings-back-btn:hover {
+  border-color: var(--z-blue);
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--z-blue) 12%, transparent);
+}
+.settings-back-btn:active { transform: scale(.96); }
+
 /* ── Toolbar row (top of header) ── */
 .header-toolbar {
   display: flex;

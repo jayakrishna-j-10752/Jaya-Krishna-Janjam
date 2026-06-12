@@ -2194,6 +2194,35 @@ $(function () {
   init();
 
   /* ──────────────────────────────────────────────────────────
+     BEAT PLAN / SETTINGS VIEW HELPERS
+  ────────────────────────────────────────────────────────── */
+  var $meetingsBar    = $('.meetings-bar');
+  var $otherContent   = $('.header-toolbar, .header-main, .cal-body');
+  var $settingsBackBtn = $('#settingsBackBtn');
+
+  function showMeetingsBarOnly() {
+    $meetingsBar.show();
+    $otherContent.hide();
+  }
+
+  function showMainContent() {
+    $meetingsBar.hide();
+    $settingsBackBtn.hide();
+    $otherContent.show();
+  }
+
+  /* Settings icon → show meetings-bar + back button, hide rest */
+  $('#settingsIconBtn').on('click', function () {
+    showMeetingsBarOnly();
+    $settingsBackBtn.show();
+  });
+
+  /* Back button → hide meetings-bar + back button, show rest */
+  $settingsBackBtn.on('click', function () {
+    showMainContent();
+  });
+
+  /* ──────────────────────────────────────────────────────────
      ZOHO EMBEDDED APP INTEGRATION
      Subscribe to PageLoad before calling embeddedApp.init().
      On PageLoad, fetch CRM modules to populate the
@@ -2201,6 +2230,19 @@ $(function () {
   ────────────────────────────────────────────────────────── */
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
+
+    /* ── Beat Plan Reference check ── */
+    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References');
+    var hasRecords = dailyBeatPlanPreferences &&
+                     dailyBeatPlanPreferences.data &&
+                     dailyBeatPlanPreferences.data.length > 0;
+
+    if (!hasRecords) {
+      showMeetingsBarOnly();
+    } else {
+      showMainContent();
+    }
+
     var response = await zrc.get('/crm/v8/settings/modules');
     console.log(response);
     populateMfModules(response);
