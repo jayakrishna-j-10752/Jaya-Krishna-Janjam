@@ -2232,7 +2232,8 @@ $(function () {
     console.log(data);
 
     /* ── Beat Plan Reference check ── */
-    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References');
+    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=id,Name,Owner');
+    console.log('dailyBeatPlanPreferences', dailyBeatPlanPreferences);
     var hasRecords = dailyBeatPlanPreferences &&
                      dailyBeatPlanPreferences.data &&
                      dailyBeatPlanPreferences.data.length > 0;
