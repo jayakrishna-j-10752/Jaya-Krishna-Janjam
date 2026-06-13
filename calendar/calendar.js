@@ -2081,12 +2081,13 @@ $(function () {
         if (!mfField) {
           /* ── 4. Create "Meeting For" picklist field ── */
           console.log('Creating "Meeting For" field');
-          await zrc.patch(
-            '/crm/v8/settings/fields/' + layoutId + '?module=' + MODULE,
+          await zrc.post(
+            '/crm/v8/settings/fields?module=' + MODULE,
             {
               fields: [{
                 field_label:     MF_FIELD_LABEL,
                 data_type:       'picklist',
+                layout_id:       layoutId,
                 pick_list_values: pickListValues
               }]
             }
@@ -2095,27 +2096,23 @@ $(function () {
           /* ── 5a. Update picklist values for the existing field ── */
           console.log('Updating "Meeting For" picklist values', mfField.api_name);
           await zrc.patch(
-            '/crm/v8/settings/fields/' + layoutId + '?module=' + MODULE,
+            '/crm/v8/settings/fields/' + mfField.id + '?module=' + MODULE,
             {
               fields: [{
-                id:              mfField.id,
                 pick_list_values: pickListValues
               }]
             }
           );
 
           /* ── 5b. If the field is in unused, move it to used ── */
-          var mfInUnused = allFields.some(function (f) {
-            return f.id === mfField.id && f.section && f.section === 'unused';
-          }) || (mfField.section && mfField.section === 'unused');
+          var mfInUnused = (mfField.section && mfField.section === 'unused');
 
           if (mfInUnused) {
             console.log('Moving "Meeting For" to used section');
             await zrc.patch(
-              '/crm/v8/settings/fields/' + layoutId + '?module=' + MODULE,
+              '/crm/v8/settings/fields/' + mfField.id + '?module=' + MODULE,
               {
                 fields: [{
-                  id:      mfField.id,
                   section: 'used'
                 }]
               }
@@ -2126,7 +2123,6 @@ $(function () {
         /* ── 6 & 7. Handle Lookup fields per selected chip ── */
         for (var i = 0; i < selectedChips.length; i++) {
           var chip = selectedChips[i];
-          /* Lookup field api_name convention: <chipId>_Lookup */
           var existingLookup = allFields.find(function (f) {
             return f.data_type === 'lookup' &&
                    (f.lookup_module === chip.id ||
@@ -2136,27 +2132,26 @@ $(function () {
           if (!existingLookup) {
             /* Create Lookup field for this chip */
             console.log('Creating Lookup field for', chip.name);
-            await zrc.patch(
-              '/crm/v8/settings/fields/' + layoutId + '?module=' + MODULE,
+            await zrc.post(
+              '/crm/v8/settings/fields?module=' + MODULE,
               {
                 fields: [{
                   field_label:   chip.name,
                   data_type:     'lookup',
                   lookup_module: chip.id,
+                  layout_id:     layoutId,
                   section:       'used'
                 }]
               }
             );
           } else {
             /* Ensure existing matching Lookup is in used section */
-            var lookupSection = existingLookup.section || '';
-            if (lookupSection === 'unused') {
+            if ((existingLookup.section || '') === 'unused') {
               console.log('Moving Lookup field to used section:', existingLookup.api_name);
               await zrc.patch(
-                '/crm/v8/settings/fields/' + layoutId + '?module=' + MODULE,
+                '/crm/v8/settings/fields/' + existingLookup.id + '?module=' + MODULE,
                 {
                   fields: [{
-                    id:      existingLookup.id,
                     section: 'used'
                   }]
                 }
@@ -2166,7 +2161,6 @@ $(function () {
         }
 
         /* ── 7. Move non-selected Lookup fields to unused (except Owner & Month) ── */
-        var selectedIds = selectedChips.map(function (c) { return c.id; });
         var lookupsToUnuse = allFields.filter(function (f) {
           if (f.data_type !== 'lookup') { return false; }
           var apiName = f.api_name || '';
@@ -2186,10 +2180,9 @@ $(function () {
           if ((lf.section || '') !== 'unused') {
             console.log('Moving Lookup field to unused section:', lf.api_name);
             await zrc.patch(
-              '/crm/v8/settings/fields/' + layoutId + '?module=' + MODULE,
+              '/crm/v8/settings/fields/' + lf.id + '?module=' + MODULE,
               {
                 fields: [{
-                  id:      lf.id,
                   section: 'unused'
                 }]
               }
