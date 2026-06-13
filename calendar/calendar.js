@@ -2136,11 +2136,15 @@ $(function () {
               '/crm/v8/settings/fields?module=' + MODULE,
               {
                 fields: [{
-                  field_label:   chip.name,
-                  data_type:     'lookup',
-                  lookup_module: chip.id,
-                  layout_id:     layoutId,
-                  section:       'used'
+                  field_label: chip.name,
+                  data_type:   'lookup',
+                  lookup: {
+                    module: {
+                      api_name: chip.id
+                    }
+                  },
+                  layout_id:   layoutId,
+                  section:     'used'
                 }]
               }
             );
