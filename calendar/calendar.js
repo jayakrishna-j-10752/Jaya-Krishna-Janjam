@@ -2096,13 +2096,21 @@ $(function () {
           console.log("Updating Meetings For picklist safely");
 
           const existingPicklist = mfField.pick_list_values || [];
-          const existingDisplayValues = new Set(
-            existingPicklist.map(v => v.display_value)
+          const selectedSet = new Set(selectedValues);
+
+          // Keep existing entries that are still selected (preserves their id)
+          // or are the system '-None-' entry
+          const keptEntries = existingPicklist.filter(
+            v => selectedSet.has(v.display_value) || v.display_value === '-None-'
           );
+
+          // Add truly new entries (not yet in the picklist) without id
+          const keptDisplayValues = new Set(keptEntries.map(v => v.display_value));
           const newEntries = selectedValues
-            .filter(v => !existingDisplayValues.has(v))
+            .filter(v => !keptDisplayValues.has(v))
             .map(v => ({ display_value: v, actual_value: v }));
-          const finalPicklist = [...existingPicklist, ...newEntries];
+
+          const finalPicklist = [...keptEntries, ...newEntries];
 
           console.log("Final picklist values:", finalPicklist);
 
@@ -2154,7 +2162,7 @@ $(function () {
                   lookup: {
                     display_label: value,
                     module: {
-                      api_name: "Leads"
+                      api_name: value
                     }
                   }
                 }]
@@ -2246,7 +2254,7 @@ $(function () {
         const payload = {
           layouts: [{
             id: layout.id,
-            sectionJSON: [
+            sections: [
               {
                 id: usedSection.id,
                 display_label: usedSection.display_label,
