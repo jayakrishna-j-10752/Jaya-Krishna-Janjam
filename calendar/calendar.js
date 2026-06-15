@@ -2045,14 +2045,15 @@ $(function () {
 
       var MODULE = 'beatplanner__Daily_Beat_Plans';
       var MF_FIELD_LABEL = 'Meeting For';
-      /* Field api_names excluded from used/unused rebalancing */
+      /* Field api_names excluded from lookup rebalancing (always stay in used section) */
       var EXCLUDED_LOOKUP_API_NAMES = ['Owner', 'Month'];
 
       try {
-        /* ── 1. Fetch layout and extract layoutId ── */
-        var layoutResp = await zrc.get('/crm/v8/settings/layouts?module=' + MODULE);
-        var layouts = (layoutResp && layoutResp.data && layoutResp.data.layouts) ? layoutResp.data.layouts : [];
-        var layoutId = layouts.length > 0 ? layouts[0].id : null;
+        /* ── 1. Fetch layouts list → layoutId ── */
+        var layoutListResp = await zrc.get('/crm/v8/settings/layouts?module=' + MODULE);
+        var layoutsList = (layoutListResp && layoutListResp.data && layoutListResp.data.layouts)
+          ? layoutListResp.data.layouts : [];
+        var layoutId = layoutsList.length > 0 ? layoutsList[0].id : null;
         console.log('layoutId', layoutId);
 
         if (!layoutId) {
@@ -2060,139 +2061,148 @@ $(function () {
           return;
         }
 
-        /* ── 2. Fetch all fields ── */
-        var fieldsResp = await zrc.get('/crm/v8/settings/fields?module=' + MODULE);
-        var allFields = (fieldsResp && fieldsResp.data && fieldsResp.data.fields) ? fieldsResp.data.fields : [];
+        /* ── 2. Fetch full layout metadata (sections with IDs, fields, unused_fields) ── */
+        var layoutMetaResp = await zrc.get('/crm/v8/settings/layouts/' + layoutId + '?module=' + MODULE);
+        var layoutMeta = (layoutMetaResp && layoutMetaResp.data && layoutMetaResp.data.layouts)
+          ? layoutMetaResp.data.layouts[0] : null;
+
+        if (!layoutMeta) {
+          console.warn('Could not retrieve layout metadata for layoutId', layoutId);
+          return;
+        }
+
+        var sections    = layoutMeta.sections      || [];
+        var unusedFields = layoutMeta.unused_fields || [];
+
+        /* Collect ALL fields (used + unused) for presence checks */
+        var allFields = [];
+        sections.forEach(function (sec) {
+          (sec.fields || []).forEach(function (f) {
+            allFields.push(Object.assign({}, f, { _isUnused: false }));
+          });
+        });
+        unusedFields.forEach(function (f) {
+          allFields.push(Object.assign({}, f, { _isUnused: true }));
+        });
         console.log('allFields', allFields);
 
-        /* ── 3. Check whether "Meeting For" field exists ── */
+        /* Find the existing "Meeting For" field (if any) */
         var mfField = allFields.find(function (f) {
           return (f.display_label || f.field_label || '') === MF_FIELD_LABEL;
         });
 
         /* Build picklist values from selected chips */
         var pickListValues = selectedChips.map(function (chip) {
-          return {
-            display_value: chip.name,
-            actual_value:  chip.id
-          };
+          return { display_value: chip.name, actual_value: chip.id };
         });
 
-        if (!mfField) {
-          /* ── 4. Create "Meeting For" picklist field ── */
-          console.log('Creating "Meeting For" field');
-          await zrc.post(
-            '/crm/v8/settings/fields?module=' + MODULE,
-            {
-              fields: [{
-                field_label:     MF_FIELD_LABEL,
-                data_type:       'picklist',
-                layout_id:       layoutId,
+        /* ── 3. Rebuild every section for the layout PUT ──
+         *
+         * Rules:
+         *  • Keep all non-lookup / non-MF fields exactly where they are.
+         *  • Keep lookup fields that are in EXCLUDED_LOOKUP_API_NAMES.
+         *  • Drop all other lookup fields from sections (they become unused).
+         *  • In the first section add / update the "Meeting For" picklist.
+         *  • In the first section add each selected chip's Lookup field
+         *    (existing → reference by api_name; new → inline definition).
+         */
+        var updatedSections = sections.map(function (sec, secIdx) {
+          var sectionFields = (sec.fields || [])
+            .filter(function (f) {
+              var label   = f.display_label || f.field_label || '';
+              var dtype   = f.data_type || '';
+              var apiName = f.api_name || '';
+
+              /* Remove "Meeting For" – re-added below with current values */
+              if (label === MF_FIELD_LABEL) { return false; }
+
+              /* For lookup fields: keep only excluded ones */
+              if (dtype === 'lookup') {
+                return EXCLUDED_LOOKUP_API_NAMES.some(function (ex) {
+                  return apiName === ex || label === ex;
+                });
+              }
+
+              return true; /* keep everything else */
+            })
+            .map(function (f) { return { api_name: f.api_name }; });
+
+          /* First section: inject MF field and selected Lookup fields */
+          if (secIdx === 0) {
+            /* "Meeting For" picklist */
+            if (mfField && mfField.api_name) {
+              /* Existing field – reference by api_name; values updated in step 4 */
+              sectionFields.push({ api_name: mfField.api_name });
+            } else {
+              /* New field – created inline as part of the layout update */
+              console.log('Creating "Meeting For" field inline via layout update');
+              sectionFields.push({
+                field_label:      MF_FIELD_LABEL,
+                data_type:        'picklist',
                 pick_list_values: pickListValues
-              }]
+              });
             }
-          );
-        } else {
-          /* ── 5a. Update picklist values for the existing field ── */
+
+            /* Selected Lookup fields */
+            selectedChips.forEach(function (chip) {
+              var existingLookup = allFields.find(function (f) {
+                if (f.data_type !== 'lookup') { return false; }
+                /* Match by lookup module api_name or by display / field label */
+                var lkpModule = f.lookup
+                  ? (typeof f.lookup.module === 'string'
+                      ? f.lookup.module
+                      : (f.lookup.module && f.lookup.module.api_name) || '')
+                  : (f.lookup_module || '');
+                return lkpModule === chip.id ||
+                       (f.display_label || f.field_label || '') === chip.name;
+              });
+
+              if (existingLookup && existingLookup.api_name) {
+                /* Existing – move / keep in used section by referencing api_name */
+                console.log('Adding existing Lookup to section:', existingLookup.api_name);
+                sectionFields.push({ api_name: existingLookup.api_name });
+              } else {
+                /* New – created inline as part of the layout update */
+                console.log('Creating Lookup field inline for', chip.name);
+                sectionFields.push({
+                  field_label:   chip.name,
+                  data_type:     'lookup',
+                  lookup: {
+                    module:        chip.id,
+                    display_label: chip.name
+                  }
+                });
+              }
+            });
+          }
+
+          return { id: sec.id, fields: sectionFields };
+        });
+
+        console.log('Updating layout sections', JSON.stringify(updatedSections));
+
+        /* ── 4. Update the layout (creates new fields inline, moves existing ones) ── */
+        await zrc.put(
+          '/crm/v8/settings/layouts/' + layoutId + '?module=' + MODULE,
+          {
+            layouts: [{
+              id:       layoutId,
+              sections: updatedSections
+            }]
+          }
+        );
+
+        /* ── 5. If "Meeting For" already existed, refresh its picklist values ── */
+        if (mfField && mfField.id && pickListValues.length > 0) {
           console.log('Updating "Meeting For" picklist values', mfField.api_name);
           await zrc.patch(
             '/crm/v8/settings/fields/' + mfField.id + '?module=' + MODULE,
             {
-              fields: [{
-                pick_list_values: pickListValues
-              }]
+              fields: [{ pick_list_values: pickListValues }]
             }
           );
-
-          /* ── 5b. If the field is in unused, move it to used ── */
-          var mfInUnused = (mfField.section && mfField.section === 'unused');
-
-          if (mfInUnused) {
-            console.log('Moving "Meeting For" to used section');
-            await zrc.patch(
-              '/crm/v8/settings/fields/' + mfField.id + '?module=' + MODULE,
-              {
-                fields: [{
-                  section: 'used'
-                }]
-              }
-            );
-          }
         }
 
-        /* ── 6 & 7. Handle Lookup fields per selected chip ── */
-        for (var i = 0; i < selectedChips.length; i++) {
-          var chip = selectedChips[i];
-          var existingLookup = allFields.find(function (f) {
-            return f.data_type === 'lookup' &&
-                   (f.lookup_module === chip.id ||
-                    (f.display_label || f.field_label || '') === chip.name);
-          });
-
-          if (!existingLookup) {
-            /* Create Lookup field for this chip */
-            console.log('Creating Lookup field for', chip.name);
-            await zrc.post(
-              '/crm/v8/settings/fields?module=' + MODULE,
-              {
-                fields: [{
-                  field_label: chip.name,
-                  data_type:   'lookup',
-                  lookup: {
-                    module: {
-                      api_name: chip.id
-                    }
-                  },
-                  layout_id:   layoutId,
-                  section:     'used'
-                }]
-              }
-            );
-          } else {
-            /* Ensure existing matching Lookup is in used section */
-            if ((existingLookup.section || '') === 'unused') {
-              console.log('Moving Lookup field to used section:', existingLookup.api_name);
-              await zrc.patch(
-                '/crm/v8/settings/fields/' + existingLookup.id + '?module=' + MODULE,
-                {
-                  fields: [{
-                    section: 'used'
-                  }]
-                }
-              );
-            }
-          }
-        }
-
-        /* ── 7. Move non-selected Lookup fields to unused (except Owner & Month) ── */
-        var lookupsToUnuse = allFields.filter(function (f) {
-          if (f.data_type !== 'lookup') { return false; }
-          var apiName = f.api_name || '';
-          /* Exclude Owner, Month and other protected fields */
-          if (EXCLUDED_LOOKUP_API_NAMES.some(function (ex) {
-            return apiName === ex || (f.display_label || f.field_label || '') === ex;
-          })) { return false; }
-          /* Only move if not matching any selected chip */
-          return !selectedChips.some(function (chip) {
-            return f.lookup_module === chip.id ||
-                   (f.display_label || f.field_label || '') === chip.name;
-          });
-        });
-
-        for (var j = 0; j < lookupsToUnuse.length; j++) {
-          var lf = lookupsToUnuse[j];
-          if ((lf.section || '') !== 'unused') {
-            console.log('Moving Lookup field to unused section:', lf.api_name);
-            await zrc.patch(
-              '/crm/v8/settings/fields/' + lf.id + '?module=' + MODULE,
-              {
-                fields: [{
-                  section: 'unused'
-                }]
-              }
-            );
-          }
-        }
       } catch (err) {
         console.error('mfDone field sync error:', err);
       }
