@@ -2093,7 +2093,16 @@ $(function () {
         // UPDATE PICKLIST VALUES
         } else {
 
-          console.log("Updating Meetings For picklist");
+          console.log("Updating Meetings For picklist safely");
+
+          const existingValues = new Set(
+            (mfField.pick_list_values || []).map(v => v.display_value)
+          );
+          const mergedValues = new Set([...existingValues, ...selectedValues]);
+          const finalPicklist = Array.from(mergedValues).map(v => ({
+            display_value: v,
+            actual_value: v
+          }));
 
           await zrc.patch(
             `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
@@ -2101,10 +2110,7 @@ $(function () {
               fields: [
                 {
                   id: mfField.id,
-                  pick_list_values: selectedValues.map(v => ({
-                    display_value: v,
-                    actual_value: v
-                  }))
+                  pick_list_values: finalPicklist
                 }
               ]
             }
