@@ -2037,184 +2037,230 @@ $(function () {
       e.stopPropagation();
       closeMf();
 
-      var MODULE          = 'beatplanner__Daily_Beat_Plans';
-      var MF_FIELD_LABEL  = 'Meetings For';
-
       try {
-        /* ── 1. Collect selected chip display labels ── */
-        var selectedValues = $('.mf-chip-text').map(function () {
-          return $(this).text().trim();
-        }).get();
+        const moduleName = 'beatplanner__Daily_Beat_Plans';
 
-        /* ── 2. Fetch all fields for the module ── */
-        var fieldsResp = await zrc.get('/crm/v8/settings/fields?module=' + MODULE);
-        var fields = (fieldsResp && fieldsResp.data && fieldsResp.data.fields)
-          ? fieldsResp.data.fields : [];
+        // --------------------------------------------
+        // STEP 1: Selected MF values
+        // --------------------------------------------
 
-        /* ── 3. Check if "Meetings For" picklist already exists ── */
-        var meetingsForField = fields.find(function (f) {
-          return f.field_label === MF_FIELD_LABEL;
-        });
+        const selectedValues = $('.mf-chip')
+          .map(function () {
+            return $(this).text().trim();
+          })
+          .get();
 
-        /* ── 4. Create or update the "Meetings For" picklist ── */
-        if (!meetingsForField) {
-          console.log('Creating "Meetings For" field');
-          var createFieldResp = await zrc.post(
-            '/crm/v8/settings/fields?module=' + MODULE,
+        console.log("Selected MF:", selectedValues);
+
+        // --------------------------------------------
+        // STEP 2: Fetch fields metadata
+        // --------------------------------------------
+
+        const fieldsResp = await zrc.get(
+          `/crm/v8/settings/fields?module=${moduleName}`
+        );
+
+        const fields = fieldsResp?.data?.data || [];
+
+        // --------------------------------------------
+        // STEP 3: Meetings For field check/create/update
+        // --------------------------------------------
+
+        let mfField = fields.find(
+          f => f.field_label === "Meetings For"
+        );
+
+        if (!mfField) {
+
+          console.log("Creating Meetings For field");
+
+          const createResp = await zrc.post(
+            `/crm/v8/settings/fields?module=${moduleName}`,
             {
               fields: [{
-                field_label:      MF_FIELD_LABEL,
-                data_type:        'picklist',
-                pick_list_values: selectedValues.map(function (v) {
-                  return { display_value: v, actual_value: v };
-                })
+                field_label: "Meetings For",
+                data_type: "picklist",
+                pick_list_values: selectedValues.map(v => ({
+                  display_value: v,
+                  actual_value: v
+                }))
               }]
             }
           );
-          meetingsForField = createFieldResp && createFieldResp.data && createFieldResp.data.fields
-            ? createFieldResp.data.fields[0] : null;
-          console.log('Meetings For field created');
+
+          mfField = createResp?.data?.data?.[0];
+
+        // UPDATE PICKLIST VALUES
         } else {
-          console.log('Meetings For already exists – updating picklist values');
-          /* Build the updated picklist: always keep -None- first, then selected values */
-          var existingValues = meetingsForField.pick_list_values || [];
-          var noneEntry = existingValues.find(function (v) { return v.actual_value === '-None-'; });
-          var updatedPicklist = [];
-          if (noneEntry) {
-            updatedPicklist.push({ display_value: '-None-', actual_value: '-None-' });
-          }
-          selectedValues.forEach(function (v) {
-            updatedPicklist.push({ display_value: v, actual_value: v });
-          });
-          try {
-            /* NOTE: field ID goes in the body only – NOT in the URL path */
-            await zrc.patch(
-              '/crm/v8/settings/fields?module=' + MODULE,
-              {
-                fields: [{
-                  id:               meetingsForField.id,
-                  pick_list_values: updatedPicklist
-                }]
-              }
-            );
-            console.log('Meetings For picklist updated');
-          } catch (patchErr) {
-            console.error('Meetings For picklist update failed:', patchErr);
-          }
+
+          console.log("Updating Meetings For picklist");
+
+          await zrc.patch(
+            `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
+            {
+              pick_list_values: selectedValues.map(v => ({
+                display_value: v,
+                actual_value: v
+              }))
+            }
+          );
         }
 
-        /* ── 5. Refresh fields metadata ── */
-        var refreshResp = await zrc.get('/crm/v8/settings/fields?module=' + MODULE);
-        var allFields = (refreshResp && refreshResp.data && refreshResp.data.fields)
-          ? refreshResp.data.fields : [];
+        // --------------------------------------------
+        // STEP 4: Refresh fields after update
+        // --------------------------------------------
 
-        /* ── 6. Create missing lookup fields; collect their IDs ── */
-        var selectedLookupIds = [];
+        const refreshed = await zrc.get(
+          `/crm/v8/settings/fields?module=${moduleName}`
+        );
 
-        for (var vi = 0; vi < selectedValues.length; vi++) {
-          var value = selectedValues[vi];
-          var lookupField = allFields.find(function (f) {
-            return f.field_label === value && f.data_type === 'lookup';
-          });
+        const allFields = refreshed?.data?.data || [];
+
+        // --------------------------------------------
+        // STEP 5: Ensure lookup fields exist
+        // --------------------------------------------
+
+        const selectedLookupIds = [];
+
+        for (const value of selectedValues) {
+
+          let lookupField = allFields.find(
+            f => f.field_label === value
+          );
 
           if (!lookupField) {
-            console.log('Creating Lookup field for', value);
-            var lookupResp = await zrc.post(
-              '/crm/v8/settings/fields?module=' + MODULE,
+
+            console.log("Creating lookup:", value);
+
+            const lookupResp = await zrc.post(
+              `/crm/v8/settings/fields?module=${moduleName}`,
               {
                 fields: [{
                   field_label: value,
-                  data_type:   'lookup',
+                  data_type: "lookup",
                   lookup: {
-                    display_label: value + ' Name',
+                    display_label: value,
                     module: {
-                      api_name: value
+                      api_name: "Leads"
                     }
                   }
                 }]
               }
             );
-            lookupField = lookupResp && lookupResp.data && lookupResp.data.fields
-              ? lookupResp.data.fields[0] : null;
-            console.log('Lookup created for', value);
+
+            lookupField = lookupResp?.data?.data?.[0];
           }
 
-          if (lookupField && lookupField.id) {
+          if (lookupField?.id) {
             selectedLookupIds.push(lookupField.id);
           }
         }
 
-        /* ── 7. Fetch layout metadata ── */
-        var layoutListResp = await zrc.get('/crm/v8/settings/layouts?module=' + MODULE);
-        var layoutsList = (layoutListResp && layoutListResp.data && layoutListResp.data.layouts)
-          ? layoutListResp.data.layouts : [];
-        var layout = layoutsList.length > 0 ? layoutsList[0] : null;
+        // --------------------------------------------
+        // STEP 6: Get layout metadata
+        // --------------------------------------------
 
-        if (!layout) {
-          throw new Error('Layout not found');
-        }
-
-        var sections = layout.sections || [];
-
-        console.log('Layout sections:', sections.map(function (s) {
-          return { display_label: s.display_label, column_count: s.column_count, id: s.id };
-        }));
-
-        /* ── 8 & 9. Build updated sections ──
-         *  - Keep ALL sections (not just 2) so nothing is accidentally lost.
-         *  - For each section, strip out non-selected lookup fields.
-         *  - Add selected lookup fields to the first visible section
-         *    if they are not already placed in any section.
-         *  Fields removed from every section automatically become "unused" in Zoho.
-         */
-        var updatedSections = sections.map(function (section) {
-          var sectionFields = (section.fields || []).filter(function (f) {
-            var fieldData = allFields.find(function (af) { return af.id === f.id; });
-            if (!fieldData) { return true; }                          // unknown – keep
-            if (fieldData.data_type !== 'lookup') { return true; }   // non-lookup – keep
-            if (fieldData.api_name === 'beatplanner__Month') { return true; }
-            if (fieldData.system_mandatory === true) { return true; }
-            return selectedLookupIds.indexOf(f.id) !== -1;           // keep if selected
-          });
-          return { id: section.id, fields: sectionFields };
-        });
-
-        /* Collect field IDs that are already placed in some section */
-        var alreadyPlacedIds = [];
-        updatedSections.forEach(function (s) {
-          s.fields.forEach(function (f) { alreadyPlacedIds.push(f.id); });
-        });
-
-        /* Add selected lookups that are not yet in any section → first visible section */
-        var firstVisibleIdx = -1;
-        for (var fvi = 0; fvi < sections.length; fvi++) {
-          if ((sections[fvi].column_count == null || sections[fvi].column_count > 0)) {
-            firstVisibleIdx = fvi;
-            break;
-          }
-        }
-
-        selectedLookupIds.forEach(function (fieldId) {
-          if (alreadyPlacedIds.indexOf(fieldId) === -1 && firstVisibleIdx !== -1) {
-            updatedSections[firstVisibleIdx].fields.push({ id: fieldId });
-          }
-        });
-
-        /* ── 10. PATCH the layout with ALL sections ── */
-        await zrc.patch(
-          '/crm/v8/settings/layouts/' + layout.id,
-          {
-            layouts: [{
-              id:       layout.id,
-              sections: updatedSections
-            }]
-          }
+        const layoutResp = await zrc.get(
+          `/crm/v8/settings/layouts?module=${moduleName}`
         );
 
-        console.log('Meetings For sync completed successfully');
+        const layout = layoutResp?.data?.data?.[0];
+
+        const sections = layout?.sectionJSON || [];
+
+        const usedSection = sections.find(
+          s => s.display_label?.toLowerCase().includes("used")
+        );
+
+        const unusedSection = sections.find(
+          s => s.display_label?.toLowerCase().includes("unused")
+        );
+
+        if (!usedSection || !unusedSection) {
+          throw new Error("Used/Unused sections not found");
+        }
+
+        // --------------------------------------------
+        // STEP 7: Build lookup field maps
+        // --------------------------------------------
+
+        const selectedSet = new Set(selectedLookupIds);
+
+        const protectedFields = new Set([
+          "beatplanner__Month"
+        ]);
+
+        const allLookupFields = allFields.filter(
+          f => f.data_type === "lookup"
+        );
+
+        const usedFields = [];
+        const unusedFields = [];
+
+        // IMPORTANT: rebuild state cleanly
+        for (const field of allLookupFields) {
+
+          const isProtected = protectedFields.has(field.api_name);
+          const isSelected = selectedSet.has(field.id);
+
+          const fieldObj = {
+            id: field.id,
+            field_label: field.field_label
+          };
+
+          if (isProtected) {
+            usedFields.push(fieldObj);
+            continue;
+          }
+
+          if (isSelected) {
+            usedFields.push(fieldObj);
+          } else {
+            unusedFields.push({
+              id: field.id,
+              field_label: field.field_label,
+              _delete: {
+                permanent: false
+              }
+            });
+          }
+        }
+
+        // --------------------------------------------
+        // STEP 8: PATCH layout using sectionJSON (IMPORTANT FIX)
+        // --------------------------------------------
+
+        const payload = {
+          layouts: [{
+            id: layout.id,
+            sectionJSON: [
+              {
+                id: usedSection.id,
+                display_label: usedSection.display_label,
+                fields: usedFields
+              },
+              {
+                id: unusedSection.id,
+                display_label: unusedSection.display_label,
+                fields: unusedFields
+              }
+            ]
+          }]
+        };
+
+        const patchResp = await zrc.patch(
+          `/crm/v8/settings/layouts/${layout.id}?module=${moduleName}`,
+          payload
+        );
+
+        console.log("LAYOUT SYNC SUCCESS:", patchResp);
 
       } catch (err) {
-        console.error('mfDone field sync error:', err);
+
+        console.error(
+          "FINAL ERROR:",
+          JSON.stringify(err?.response?.data || err, null, 2)
+        );
       }
     });
 
