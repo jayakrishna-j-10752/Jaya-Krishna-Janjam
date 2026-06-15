@@ -2075,8 +2075,32 @@ $(function () {
             ? createFieldResp.data.fields[0] : null;
           console.log('Meetings For field created');
         } else {
-          console.log('Meetings For already exists – skipping picklist update');
-          console.log('Current field metadata:', meetingsForField);
+          console.log('Meetings For already exists – updating picklist values');
+          /* Build the updated picklist: always keep -None- first, then selected values */
+          var existingValues = meetingsForField.pick_list_values || [];
+          var noneEntry = existingValues.find(function (v) { return v.actual_value === '-None-'; });
+          var updatedPicklist = [];
+          if (noneEntry) {
+            updatedPicklist.push({ display_value: '-None-', actual_value: '-None-' });
+          }
+          selectedValues.forEach(function (v) {
+            updatedPicklist.push({ display_value: v, actual_value: v });
+          });
+          try {
+            /* NOTE: field ID goes in the body only – NOT in the URL path */
+            await zrc.patch(
+              '/crm/v8/settings/fields?module=' + MODULE,
+              {
+                fields: [{
+                  id:               meetingsForField.id,
+                  pick_list_values: updatedPicklist
+                }]
+              }
+            );
+            console.log('Meetings For picklist updated');
+          } catch (patchErr) {
+            console.error('Meetings For picklist update failed:', patchErr);
+          }
         }
 
         /* ── 5. Refresh fields metadata ── */
@@ -2090,7 +2114,7 @@ $(function () {
         for (var vi = 0; vi < selectedValues.length; vi++) {
           var value = selectedValues[vi];
           var lookupField = allFields.find(function (f) {
-            return f.field_label === value;
+            return f.field_label === value && f.data_type === 'lookup';
           });
 
           if (!lookupField) {
@@ -2136,71 +2160,53 @@ $(function () {
           return { display_label: s.display_label, column_count: s.column_count, id: s.id };
         }));
 
-        var usedSection = null;
-        var unusedSection = null;
-        for (var si = 0; si < sections.length; si++) {
-          if (sections[si].display_label === 'Used Fields')   { usedSection   = sections[si]; }
-          if (sections[si].display_label === 'Unused Fields') { unusedSection = sections[si]; }
-        }
+        /* ── 8 & 9. Build updated sections ──
+         *  - Keep ALL sections (not just 2) so nothing is accidentally lost.
+         *  - For each section, strip out non-selected lookup fields.
+         *  - Add selected lookup fields to the first visible section
+         *    if they are not already placed in any section.
+         *  Fields removed from every section automatically become "unused" in Zoho.
+         */
+        var updatedSections = sections.map(function (section) {
+          var sectionFields = (section.fields || []).filter(function (f) {
+            var fieldData = allFields.find(function (af) { return af.id === f.id; });
+            if (!fieldData) { return true; }                          // unknown – keep
+            if (fieldData.data_type !== 'lookup') { return true; }   // non-lookup – keep
+            if (fieldData.api_name === 'beatplanner__Month') { return true; }
+            if (fieldData.system_mandatory === true) { return true; }
+            return selectedLookupIds.indexOf(f.id) !== -1;           // keep if selected
+          });
+          return { id: section.id, fields: sectionFields };
+        });
 
-        /* Fallback: Zoho marks the unused/hidden section with column_count === 0 */
-        if (!unusedSection) {
-          for (var si2 = 0; si2 < sections.length; si2++) {
-            if (sections[si2].column_count === 0) { unusedSection = sections[si2]; break; }
+        /* Collect field IDs that are already placed in some section */
+        var alreadyPlacedIds = [];
+        updatedSections.forEach(function (s) {
+          s.fields.forEach(function (f) { alreadyPlacedIds.push(f.id); });
+        });
+
+        /* Add selected lookups that are not yet in any section → first visible section */
+        var firstVisibleIdx = -1;
+        for (var fvi = 0; fvi < sections.length; fvi++) {
+          if ((sections[fvi].column_count == null || sections[fvi].column_count > 0)) {
+            firstVisibleIdx = fvi;
+            break;
           }
         }
-        if (!usedSection) {
-          for (var si3 = 0; si3 < sections.length; si3++) {
-            if (sections[si3] !== unusedSection && sections[si3].column_count > 0) {
-              usedSection = sections[si3]; break;
-            }
-          }
-        }
 
-        if (!usedSection || !unusedSection) {
-          console.warn('Used/Unused section not found – skipping layout update. Sections:', sections);
-          console.log('Meetings For sync completed (layout step skipped)');
-          return;
-        }
-
-        var usedFields   = (usedSection.fields   || []).slice();
-        var unusedFields = (unusedSection.fields || []).slice();
-
-        /* ── 8. Move selected lookups to Used section ── */
         selectedLookupIds.forEach(function (fieldId) {
-          var existsInUsed = usedFields.some(function (f) { return f.id === fieldId; });
-          if (!existsInUsed) {
-            usedFields.push({ id: fieldId });
-          }
-          unusedFields = unusedFields.filter(function (f) { return f.id !== fieldId; });
-        });
-
-        /* ── 9. Move non-selected lookup fields to Unused section ── */
-        var lookupFields = allFields.filter(function (f) { return f.data_type === 'lookup'; });
-        lookupFields.forEach(function (field) {
-          var isSelected    = selectedLookupIds.indexOf(field.id) !== -1;
-          var isMonthField  = field.api_name === 'beatplanner__Month';
-          var isSystemField = field.system_mandatory === true;
-
-          if (!isSelected && !isMonthField && !isSystemField) {
-            var alreadyInUnused = unusedFields.some(function (item) { return item.id === field.id; });
-            if (!alreadyInUnused) {
-              unusedFields.push({ id: field.id });
-            }
-            usedFields = usedFields.filter(function (item) { return item.id !== field.id; });
+          if (alreadyPlacedIds.indexOf(fieldId) === -1 && firstVisibleIdx !== -1) {
+            updatedSections[firstVisibleIdx].fields.push({ id: fieldId });
           }
         });
 
-        /* ── 10. PATCH the layout ── */
+        /* ── 10. PATCH the layout with ALL sections ── */
         await zrc.patch(
           '/crm/v8/settings/layouts/' + layout.id,
           {
             layouts: [{
               id:       layout.id,
-              sections: [
-                { id: usedSection.id,   fields: usedFields   },
-                { id: unusedSection.id, fields: unusedFields }
-              ]
+              sections: updatedSections
             }]
           }
         );
