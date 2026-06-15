@@ -2044,7 +2044,7 @@ $(function () {
         // STEP 1: Selected MF values
         // --------------------------------------------
 
-        const selectedValues = $('.mf-chip')
+        const selectedValues = $('.mf-chip-text')
           .map(function () {
             return $(this).text().trim();
           })
@@ -2060,7 +2060,7 @@ $(function () {
           `/crm/v8/settings/fields?module=${moduleName}`
         );
 
-        const fields = fieldsResp?.data?.data || [];
+        const fields = fieldsResp?.data?.fields || [];
 
         // --------------------------------------------
         // STEP 3: Meetings For field check/create/update
@@ -2088,7 +2088,7 @@ $(function () {
             }
           );
 
-          mfField = createResp?.data?.data?.[0];
+          mfField = createResp?.data?.fields?.[0];
 
         // UPDATE PICKLIST VALUES
         } else {
@@ -2114,7 +2114,7 @@ $(function () {
           `/crm/v8/settings/fields?module=${moduleName}`
         );
 
-        const allFields = refreshed?.data?.data || [];
+        const allFields = refreshed?.data?.fields || [];
 
         // --------------------------------------------
         // STEP 5: Ensure lookup fields exist
@@ -2148,7 +2148,7 @@ $(function () {
               }
             );
 
-            lookupField = lookupResp?.data?.data?.[0];
+            lookupField = lookupResp?.data?.fields?.[0];
           }
 
           if (lookupField?.id) {
@@ -2164,7 +2164,7 @@ $(function () {
           `/crm/v8/settings/layouts?module=${moduleName}`
         );
 
-        const layout = layoutResp?.data?.data?.[0];
+        const layout = layoutResp?.data?.layouts?.[0];
 
         const sections = layout?.sectionJSON || [];
 
