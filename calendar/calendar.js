@@ -2094,29 +2094,43 @@ $(function () {
           return { display_value: chip.name, actual_value: chip.id };
         });
 
-        /* ── 3. Build minimal payload: only the MF picklist and selected Lookup fields ── */
+        /* ── 3. Ensure all required fields exist, collect their api_names ── */
         var firstSectionId = sections.length > 0 ? sections[0].id : null;
-        var fieldsToUpdate = [];
+        var fieldsForLayout = [];  /* api_name refs to place in the layout section */
 
         /* "Meeting For" picklist */
+        var mfApiName;
         if (mfField && mfField.api_name) {
-          /* Existing field – reference by api_name and include updated picklist values */
-          fieldsToUpdate.push({
-            api_name:         mfField.api_name,
-            pick_list_values: pickListValues
-          });
+          /* Existing – update its picklist values via the fields API */
+          mfApiName = mfField.api_name;
+          console.log('Updating "Meeting For" picklist values', mfApiName);
+          await zrc.patch(
+            '/crm/v8/settings/fields/' + mfField.id + '?module=' + MODULE,
+            { fields: [{ pick_list_values: pickListValues }] }
+          );
         } else {
-          /* New field – created inline as part of the layout update */
-          console.log('Creating "Meeting For" field inline via layout update');
-          fieldsToUpdate.push({
-            field_label:      MF_FIELD_LABEL,
-            data_type:        'picklist',
-            pick_list_values: pickListValues
-          });
+          /* New – create via the fields API first */
+          console.log('Creating "Meeting For" field via fields API');
+          var mfCreateResp = await zrc.post(
+            '/crm/v8/settings/fields?module=' + MODULE,
+            {
+              fields: [{
+                field_label:      MF_FIELD_LABEL,
+                data_type:        'picklist',
+                pick_list_values: pickListValues
+              }]
+            }
+          );
+          var createdMf = mfCreateResp && mfCreateResp.data && mfCreateResp.data.fields
+            ? mfCreateResp.data.fields[0] : null;
+          mfApiName = createdMf ? createdMf.api_name : null;
+          console.log('Created "Meeting For" field, api_name:', mfApiName);
         }
+        if (mfApiName) { fieldsForLayout.push({ api_name: mfApiName }); }
 
         /* Selected Lookup fields */
-        selectedChips.forEach(function (chip) {
+        for (var ci = 0; ci < selectedChips.length; ci++) {
+          var chip = selectedChips[ci];
           var existingLookup = allFields.find(function (f) {
             if (f.data_type !== 'lookup') { return false; }
             /* Match by lookup module api_name or by display / field label */
@@ -2129,27 +2143,38 @@ $(function () {
                    (f.display_label || f.field_label || '') === chip.name;
           });
 
+          var lookupApiName;
           if (existingLookup && existingLookup.api_name) {
             /* Existing – reference by api_name */
-            console.log('Adding existing Lookup to section:', existingLookup.api_name);
-            fieldsToUpdate.push({ api_name: existingLookup.api_name });
+            lookupApiName = existingLookup.api_name;
+            console.log('Using existing Lookup:', lookupApiName);
           } else {
-            /* New – created inline as part of the layout update */
-            console.log('Creating Lookup field inline for', chip.name);
-            fieldsToUpdate.push({
-              field_label: chip.name,
-              data_type:   'lookup',
-              lookup: {
-                module:        chip.id,
-                display_label: chip.name
+            /* New – create via the fields API first */
+            console.log('Creating Lookup field via fields API for', chip.name);
+            var lkpCreateResp = await zrc.post(
+              '/crm/v8/settings/fields?module=' + MODULE,
+              {
+                fields: [{
+                  field_label: chip.name,
+                  data_type:   'lookup',
+                  lookup: {
+                    module:        { api_name: chip.id },
+                    display_label: chip.name
+                  }
+                }]
               }
-            });
+            );
+            var createdLkp = lkpCreateResp && lkpCreateResp.data && lkpCreateResp.data.fields
+              ? lkpCreateResp.data.fields[0] : null;
+            lookupApiName = createdLkp ? createdLkp.api_name : null;
+            console.log('Created Lookup field, api_name:', lookupApiName);
           }
-        });
+          if (lookupApiName) { fieldsForLayout.push({ api_name: lookupApiName }); }
+        }
 
-        console.log('Updating layout fields', JSON.stringify(fieldsToUpdate));
+        console.log('Updating layout with fields', JSON.stringify(fieldsForLayout));
 
-        /* ── 4. PATCH the layout with only the required fields ── */
+        /* ── 4. PATCH the layout – all fields are guaranteed to exist by this point ── */
         await zrc.patch(
           '/crm/v8/settings/layouts/' + layoutId + '?module=' + MODULE,
           {
@@ -2157,7 +2182,7 @@ $(function () {
               id:       layoutId,
               sections: [{
                 id:     firstSectionId,
-                fields: fieldsToUpdate
+                fields: fieldsForLayout
               }]
             }]
           }
