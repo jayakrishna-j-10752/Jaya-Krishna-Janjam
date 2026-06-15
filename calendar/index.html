@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar – Zoho CRM</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="theme-light">
+
+  <!-- ══════════════════════ APP SHELL ══════════════════════ -->
+  <div class="cal-app" id="calApp">
+
+    <!-- ── TOP HEADER ── -->
+    <header class="cal-header">
+
+      <!-- ── SETTINGS BACK BUTTON ── -->
+      <button class="settings-back-btn" id="settingsBackBtn" style="display:none;" aria-label="Back">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 3L5 8l5 5"/>
+        </svg>
+        Back
+      </button>
+
+      <!-- ── MEETINGS FOR MULTI-SELECT ── -->
+      <div class="meetings-bar">
+        <p class="mf-step-label">Step 1: Meetings For</p>
+        <div class="mf-select" id="mfSelect" tabindex="0" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false" aria-label="Meetings For">
+          <span class="mf-label" id="mfLabel">Meetings For</span>
+          <div class="mf-chips-wrap" id="mfChipsWrap"></div>
+          <span class="mf-arrow" aria-hidden="true">
+            <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── TOOLBAR ROW ── -->
+      <div class="header-toolbar">
+        <div class="toolbar-left">
+          <button class="toolbar-btn" id="btnPreview" title="Preview" aria-label="Preview">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
+              <circle cx="8" cy="8" r="2"/>
+            </svg>
+            Preview
+          </button>
+          <button class="toolbar-btn" id="btnDownload" title="Download" aria-label="Download">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 2v8M5 7l3 3 3-3"/>
+              <line x1="3" y1="13" x2="13" y2="13"/>
+            </svg>
+            Download
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <button class="toolbar-settings-btn" id="settingsIconBtn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── MAIN HEADER ROW ── -->
+      <div class="header-main">
+        <div class="header-left">
+          <!-- User Profile -->
+          <button class="user-profile" id="userProfile" aria-label="User menu" aria-haspopup="true" aria-expanded="false">
+            <span class="user-avatar">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="16" cy="16" r="16" fill="#6B9FD4"/>
+                <circle cx="16" cy="12" r="5.5" fill="#D0E8FF" fill-opacity="0.95"/>
+                <path d="M3 30c0-7.18 5.82-12 13-12s13 4.82 13 12" fill="#D0E8FF" fill-opacity="0.95"/>
+              </svg>
+            </span>
+            <span class="user-name">Jaya Krishna Janjam</span>
+            <svg class="user-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+              <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <!-- User Profile Dropdown -->
+          <div class="user-dropdown" id="userDropdown" role="listbox" aria-label="Select user">
+            <div class="ud-search-wrap">
+              <svg class="ud-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                <circle cx="6.5" cy="6.5" r="4.5"/>
+                <line x1="10" y1="10" x2="14" y2="14"/>
+              </svg>
+              <input type="text" class="ud-search-input" id="udSearch" placeholder="Search users..." autocomplete="off" aria-label="Search users" />
+            </div>
+            <div class="ud-list" id="udList"></div>
+          </div>
+
+          <div class="nav-group">
+            <button class="nav-arrow" id="btnPrev" title="Previous">&#8249;</button>
+            <button class="btn-today" id="btnToday">Today</button>
+            <button class="nav-arrow" id="btnNext" title="Next">&#8250;</button>
+          </div>
+
+          <div class="period-group">
+            <svg class="cal-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="2" y="4" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M2 8h16" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M6 2v4M14 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <h2 class="period-label" id="periodLabel"></h2>
+          </div>
+
+          <!-- Theme Toggle (placed here so it shares a row with period-label on mobile) -->
+          <button class="theme-toggle-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="6"/>
+              <line x1="12" y1="18" x2="12" y2="22"/>
+              <line x1="2" y1="12" x2="6" y2="12"/>
+              <line x1="18" y1="12" x2="22" y2="12"/>
+              <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+              <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+              <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+              <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+            </svg>
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="header-right">
+          <!-- View Switcher -->
+          <div class="view-tabs" role="tablist" aria-label="Calendar views">
+            <button class="view-tab active" data-view="month" role="tab" aria-selected="true">Month</button>
+            <button class="view-tab" data-view="week"  role="tab" aria-selected="false">Week</button>
+            <button class="view-tab" data-view="day"   role="tab" aria-selected="false">Day</button>
+          </div>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- ── CALENDAR CANVAS ── -->
+    <div class="cal-body">
+      <div class="cal-canvas" id="calCanvas"></div>
+    </div>
+
+  </div><!-- /.cal-app -->
+
+
+  <!-- ══════════════════════ EVENT MODAL ══════════════════════ -->
+  <div class="modal-backdrop" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
+    <div class="modal-box">
+
+      <div class="modal-head">
+        <h3 class="modal-heading" id="modalHeading">Create Event</h3>
+        <button class="modal-x" id="modalClose" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field-group">
+          <label for="fTitle">Event Title <span class="req">*</span></label>
+          <input type="text" id="fTitle" class="field-input" placeholder="Add a title" autocomplete="off" />
+          <span class="field-error" id="fTitleErr">Title is required</span>
+        </div>
+
+        <div class="field-group">
+          <label for="fDate">Date</label>
+          <input type="date" id="fDate" class="field-input" />
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label for="fStart">Start Time</label>
+            <input type="time" id="fStart" class="field-input" value="09:00" />
+          </div>
+          <div class="field-group">
+            <label for="fEnd">End Time</label>
+            <input type="time" id="fEnd" class="field-input" value="10:00" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="fDesc">Description</label>
+          <textarea id="fDesc" class="field-input field-textarea" rows="3" placeholder="Add description (optional)"></textarea>
+        </div>
+
+        <div class="field-group">
+          <label>Color</label>
+          <div class="color-row" id="colorRow">
+            <span class="color-dot active" data-color="#1565C0" style="background:#1565C0" title="Blue"></span>
+            <span class="color-dot" data-color="#2E7D32" style="background:#2E7D32" title="Green"></span>
+            <span class="color-dot" data-color="#E65100" style="background:#E65100" title="Orange"></span>
+            <span class="color-dot" data-color="#C62828" style="background:#C62828" title="Red"></span>
+            <span class="color-dot" data-color="#6A1B9A" style="background:#6A1B9A" title="Purple"></span>
+            <span class="color-dot" data-color="#00838F" style="background:#00838F" title="Teal"></span>
+            <span class="color-dot" data-color="#F57F17" style="background:#F57F17" title="Amber"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn-ghost" id="modalCancel">Cancel</button>
+        <button class="btn-primary" id="modalSave">Save Event</button>
+      </div>
+
+    </div>
+  </div><!-- /#eventModal -->
+
+
+  <!-- ══════════════════════ EVENT DETAIL POPUP ══════════════════════ -->
+  <div class="evt-popup" id="evtPopup" role="tooltip">
+    <div class="popup-head">
+      <span class="popup-dot" id="popupDot"></span>
+      <span class="popup-title" id="popupTitle"></span>
+      <div class="popup-acts">
+        <button class="popup-act" id="paCopy"   title="Copy event"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="7" height="8" rx="1.25"/><path d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v6A1.5 1.5 0 0 0 3.5 12H5"/></svg></button>
+        <button class="popup-act" id="paEdit"   title="Edit event"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg></button>
+        <button class="popup-act" id="paDelete" title="Delete event"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5"/><rect x="3.5" y="4.5" width="9" height="9" rx="1.25"/><line x1="6.5" y1="7" x2="6.5" y2="11"/><line x1="9.5" y1="7" x2="9.5" y2="11"/></svg></button>
+        <button class="popup-act" id="paClose"  title="Close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
+      </div>
+    </div>
+    <div class="popup-body">
+      <p class="popup-row" id="popupWhen"></p>
+      <p class="popup-row" id="popupDesc"></p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════ TOAST NOTIFICATION ══════════════════════ -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ══════════════════════ MONTH/YEAR PICKER ══════════════════════ -->
+  <div class="cal-picker" id="calPicker" role="dialog" aria-label="Date picker" aria-modal="true">
+    <div class="cp-header">
+      <div class="cp-header-btns">
+        <button class="cp-range-btn" id="cpMonthBtn" aria-label="Switch to month view"></button>
+        <button class="cp-range-btn" id="cpRangeBtn"></button>
+      </div>
+      <div class="cp-nav">
+        <button class="cp-nav-btn" id="cpPrev" aria-label="Previous">&#8249;</button>
+        <button class="cp-nav-btn" id="cpNext" aria-label="Next">&#8250;</button>
+      </div>
+    </div>
+    <div class="cp-day-names" id="cpDayNames"></div>
+    <div class="cp-grid" id="cpGrid"></div>
+    <div class="cp-footer" id="cpFooter">
+      <button class="cp-footer-btn" id="cpFooterBtn"></button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ DAY EVENTS POPUP ══════════════════════ -->
+  <div class="day-events-popup" id="dayEventsPopup" role="dialog" aria-modal="true" aria-labelledby="depDate">
+    <div class="dep-head">
+      <span class="dep-date" id="depDate"></span>
+      <button class="dep-close" id="depClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="dep-list" id="depList"></div>
+  </div>
+
+
+  <!-- ══════════════════════ MEETINGS-FOR DROPDOWN ══════════════════════ -->
+  <div class="mf-dropdown" id="mfDropdown" role="listbox" aria-multiselectable="true" aria-label="Select modules for meetings">
+    <div class="mf-actions">
+      <div class="mf-search-wrap">
+        <svg class="mf-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="4.5"/>
+          <line x1="10" y1="10" x2="14" y2="14"/>
+        </svg>
+        <input type="text" id="mfSearch" class="mf-search-input" placeholder="Search modules…" autocomplete="off" aria-label="Search modules" />
+      </div>
+      <div class="mf-action-btns">
+        <button class="mf-action-btn" id="mfSelectAll">Select All</button>
+        <button class="mf-action-btn" id="mfClearAll">Clear All</button>
+      </div>
+    </div>
+    <div class="mf-list" id="mfList"></div>
+    <div class="mf-footer">
+      <button class="mf-action-btn" id="mfCancel">Cancel</button>
+      <button class="mf-action-btn mf-btn-done" id="mfDone">Done</button>
+    </div>
+  </div>
+
+
+  <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
+  <script src="jquery.min.js"></script>
+  <script src="calendar.js"></script>
+</body>
+</html>
