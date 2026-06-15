@@ -2112,6 +2112,7 @@ $(function () {
                   field_label: value,
                   data_type:   'lookup',
                   lookup: {
+                    display_label: value + ' Name',
                     module: {
                       api_name: value
                     }
