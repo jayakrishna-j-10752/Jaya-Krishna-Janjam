@@ -2075,18 +2075,8 @@ $(function () {
             ? createFieldResp.data.fields[0] : null;
           console.log('Meetings For field created');
         } else {
-          console.log('Meetings For already exists – updating picklist values');
-          await zrc.patch(
-            '/crm/v8/settings/fields/' + meetingsForField.id + '?module=' + MODULE,
-            {
-              fields: [{
-                id:               meetingsForField.id,
-                pick_list_values: selectedValues.map(function (v) {
-                  return { display_value: v, actual_value: v };
-                })
-              }]
-            }
-          );
+          console.log('Meetings For already exists – skipping picklist update');
+          console.log('Current field metadata:', meetingsForField);
         }
 
         /* ── 5. Refresh fields metadata ── */
