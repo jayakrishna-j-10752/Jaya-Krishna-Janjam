@@ -2098,10 +2098,15 @@ $(function () {
           await zrc.patch(
             `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
             {
-              pick_list_values: selectedValues.map(v => ({
-                display_value: v,
-                actual_value: v
-              }))
+              fields: [
+                {
+                  id: mfField.id,
+                  pick_list_values: selectedValues.map(v => ({
+                    display_value: v,
+                    actual_value: v
+                  }))
+                }
+              ]
             }
           );
         }
