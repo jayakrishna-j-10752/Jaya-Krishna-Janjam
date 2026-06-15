@@ -2045,8 +2045,6 @@ $(function () {
 
       var MODULE = 'beatplanner__Daily_Beat_Plans';
       var MF_FIELD_LABEL = 'Meeting For';
-      /* Field api_names excluded from lookup rebalancing (always stay in used section) */
-      var EXCLUDED_LOOKUP_API_NAMES = ['Owner', 'Month'];
 
       try {
         /* ── 1. Fetch layouts list → layoutId ── */
@@ -2096,112 +2094,74 @@ $(function () {
           return { display_value: chip.name, actual_value: chip.id };
         });
 
-        /* ── 3. Rebuild every section for the layout PUT ──
-         *
-         * Rules:
-         *  • Keep all non-lookup / non-MF fields exactly where they are.
-         *  • Keep lookup fields that are in EXCLUDED_LOOKUP_API_NAMES.
-         *  • Drop all other lookup fields from sections (they become unused).
-         *  • In the first section add / update the "Meeting For" picklist.
-         *  • In the first section add each selected chip's Lookup field
-         *    (existing → reference by api_name; new → inline definition).
-         */
-        var updatedSections = sections.map(function (sec, secIdx) {
-          var sectionFields = (sec.fields || [])
-            .filter(function (f) {
-              var label   = f.display_label || f.field_label || '';
-              var dtype   = f.data_type || '';
-              var apiName = f.api_name || '';
+        /* ── 3. Build minimal payload: only the MF picklist and selected Lookup fields ── */
+        var firstSectionId = sections.length > 0 ? sections[0].id : null;
+        var fieldsToUpdate = [];
 
-              /* Remove "Meeting For" – re-added below with current values */
-              if (label === MF_FIELD_LABEL) { return false; }
+        /* "Meeting For" picklist */
+        if (mfField && mfField.api_name) {
+          /* Existing field – reference by api_name and include updated picklist values */
+          fieldsToUpdate.push({
+            api_name:         mfField.api_name,
+            pick_list_values: pickListValues
+          });
+        } else {
+          /* New field – created inline as part of the layout update */
+          console.log('Creating "Meeting For" field inline via layout update');
+          fieldsToUpdate.push({
+            field_label:      MF_FIELD_LABEL,
+            data_type:        'picklist',
+            pick_list_values: pickListValues
+          });
+        }
 
-              /* For lookup fields: keep only excluded ones */
-              if (dtype === 'lookup') {
-                return EXCLUDED_LOOKUP_API_NAMES.some(function (ex) {
-                  return apiName === ex || label === ex;
-                });
-              }
+        /* Selected Lookup fields */
+        selectedChips.forEach(function (chip) {
+          var existingLookup = allFields.find(function (f) {
+            if (f.data_type !== 'lookup') { return false; }
+            /* Match by lookup module api_name or by display / field label */
+            var lkpModule = f.lookup
+              ? (typeof f.lookup.module === 'string'
+                  ? f.lookup.module
+                  : (f.lookup.module && f.lookup.module.api_name) || '')
+              : (f.lookup_module || '');
+            return lkpModule === chip.id ||
+                   (f.display_label || f.field_label || '') === chip.name;
+          });
 
-              return true; /* keep everything else */
-            })
-            .map(function (f) { return { api_name: f.api_name }; });
-
-          /* First section: inject MF field and selected Lookup fields */
-          if (secIdx === 0) {
-            /* "Meeting For" picklist */
-            if (mfField && mfField.api_name) {
-              /* Existing field – reference by api_name; values updated in step 4 */
-              sectionFields.push({ api_name: mfField.api_name });
-            } else {
-              /* New field – created inline as part of the layout update */
-              console.log('Creating "Meeting For" field inline via layout update');
-              sectionFields.push({
-                field_label:      MF_FIELD_LABEL,
-                data_type:        'picklist',
-                pick_list_values: pickListValues
-              });
-            }
-
-            /* Selected Lookup fields */
-            selectedChips.forEach(function (chip) {
-              var existingLookup = allFields.find(function (f) {
-                if (f.data_type !== 'lookup') { return false; }
-                /* Match by lookup module api_name or by display / field label */
-                var lkpModule = f.lookup
-                  ? (typeof f.lookup.module === 'string'
-                      ? f.lookup.module
-                      : (f.lookup.module && f.lookup.module.api_name) || '')
-                  : (f.lookup_module || '');
-                return lkpModule === chip.id ||
-                       (f.display_label || f.field_label || '') === chip.name;
-              });
-
-              if (existingLookup && existingLookup.api_name) {
-                /* Existing – move / keep in used section by referencing api_name */
-                console.log('Adding existing Lookup to section:', existingLookup.api_name);
-                sectionFields.push({ api_name: existingLookup.api_name });
-              } else {
-                /* New – created inline as part of the layout update */
-                console.log('Creating Lookup field inline for', chip.name);
-                sectionFields.push({
-                  field_label:   chip.name,
-                  data_type:     'lookup',
-                  lookup: {
-                    module:        chip.id,
-                    display_label: chip.name
-                  }
-                });
+          if (existingLookup && existingLookup.api_name) {
+            /* Existing – reference by api_name */
+            console.log('Adding existing Lookup to section:', existingLookup.api_name);
+            fieldsToUpdate.push({ api_name: existingLookup.api_name });
+          } else {
+            /* New – created inline as part of the layout update */
+            console.log('Creating Lookup field inline for', chip.name);
+            fieldsToUpdate.push({
+              field_label: chip.name,
+              data_type:   'lookup',
+              lookup: {
+                module:        chip.id,
+                display_label: chip.name
               }
             });
           }
-
-          return { id: sec.id, fields: sectionFields };
         });
 
-        console.log('Updating layout sections', JSON.stringify(updatedSections));
+        console.log('Updating layout fields', JSON.stringify(fieldsToUpdate));
 
-        /* ── 4. Update the layout (creates new fields inline, moves existing ones) ── */
-        await zrc.put(
+        /* ── 4. PATCH the layout with only the required fields ── */
+        await zrc.patch(
           '/crm/v8/settings/layouts/' + layoutId + '?module=' + MODULE,
           {
             layouts: [{
               id:       layoutId,
-              sections: updatedSections
+              sections: [{
+                id:     firstSectionId,
+                fields: fieldsToUpdate
+              }]
             }]
           }
         );
-
-        /* ── 5. If "Meeting For" already existed, refresh its picklist values ── */
-        if (mfField && mfField.id && pickListValues.length > 0) {
-          console.log('Updating "Meeting For" picklist values', mfField.api_name);
-          await zrc.patch(
-            '/crm/v8/settings/fields/' + mfField.id + '?module=' + MODULE,
-            {
-              fields: [{ pick_list_values: pickListValues }]
-            }
-          );
-        }
 
       } catch (err) {
         console.error('mfDone field sync error:', err);
