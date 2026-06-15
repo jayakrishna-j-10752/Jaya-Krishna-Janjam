@@ -2095,14 +2095,16 @@ $(function () {
 
           console.log("Updating Meetings For picklist safely");
 
-          const existingValues = new Set(
-            (mfField.pick_list_values || []).map(v => v.display_value)
+          const existingPicklist = mfField.pick_list_values || [];
+          const existingDisplayValues = new Set(
+            existingPicklist.map(v => v.display_value)
           );
-          const mergedValues = new Set([...existingValues, ...selectedValues]);
-          const finalPicklist = Array.from(mergedValues).map(v => ({
-            display_value: v,
-            actual_value: v
-          }));
+          const newEntries = selectedValues
+            .filter(v => !existingDisplayValues.has(v))
+            .map(v => ({ display_value: v, actual_value: v }));
+          const finalPicklist = [...existingPicklist, ...newEntries];
+
+          console.log("Final picklist values:", finalPicklist);
 
           await zrc.patch(
             `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
