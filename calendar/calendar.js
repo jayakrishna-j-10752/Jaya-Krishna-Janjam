@@ -2132,6 +2132,10 @@ $(function () {
 
         var sections = layout.sections || [];
 
+        console.log('Layout sections:', sections.map(function (s) {
+          return { display_label: s.display_label, column_count: s.column_count, id: s.id };
+        }));
+
         var usedSection = null;
         var unusedSection = null;
         for (var si = 0; si < sections.length; si++) {
@@ -2139,8 +2143,24 @@ $(function () {
           if (sections[si].display_label === 'Unused Fields') { unusedSection = sections[si]; }
         }
 
+        /* Fallback: Zoho marks the unused/hidden section with column_count === 0 */
+        if (!unusedSection) {
+          for (var si2 = 0; si2 < sections.length; si2++) {
+            if (sections[si2].column_count === 0) { unusedSection = sections[si2]; break; }
+          }
+        }
+        if (!usedSection) {
+          for (var si3 = 0; si3 < sections.length; si3++) {
+            if (sections[si3] !== unusedSection && sections[si3].column_count > 0) {
+              usedSection = sections[si3]; break;
+            }
+          }
+        }
+
         if (!usedSection || !unusedSection) {
-          throw new Error('Used/Unused section not found');
+          console.warn('Used/Unused section not found – skipping layout update. Sections:', sections);
+          console.log('Meetings For sync completed (layout step skipped)');
+          return;
         }
 
         var usedFields   = (usedSection.fields   || []).slice();
