@@ -2110,7 +2110,12 @@ $(function () {
               {
                 fields: [{
                   field_label: value,
-                  data_type:   'lookup'
+                  data_type:   'lookup',
+                  lookup: {
+                    module: {
+                      api_name: value
+                    }
+                  }
                 }]
               }
             );
