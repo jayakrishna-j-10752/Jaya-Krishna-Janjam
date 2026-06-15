@@ -2129,8 +2129,8 @@ $(function () {
         if (mfApiName) { fieldsForLayout.push({ api_name: mfApiName }); }
 
         /* Selected Lookup fields */
-        for (var ci = 0; ci < selectedChips.length; ci++) {
-          var chip = selectedChips[ci];
+        for (var chipIndex = 0; chipIndex < selectedChips.length; chipIndex++) {
+          var chip = selectedChips[chipIndex];
           var existingLookup = allFields.find(function (f) {
             if (f.data_type !== 'lookup') { return false; }
             /* Match by lookup module api_name or by display / field label */
