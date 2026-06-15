@@ -2187,22 +2187,16 @@ $(function () {
 
         const layout = layoutResp?.data?.layouts?.[0];
 
-        const sections = layout?.sectionJSON || [];
+        const sections = layout?.sections || [];
 
-        const usedSection = sections.find(
-          s => s.display_label?.toLowerCase().includes("used")
-        );
-
-        const unusedSection = sections.find(
-          s => s.display_label?.toLowerCase().includes("unused")
-        );
-
-        if (!usedSection || !unusedSection) {
-          throw new Error("Used/Unused sections not found");
+        if (sections.length < 2) {
+          throw new Error("Expected at least 2 sections in the layout");
         }
 
+        const targetSection = sections[1];
+
         // --------------------------------------------
-        // STEP 7: Build lookup field maps
+        // STEP 7: Build lookup field list for second section
         // --------------------------------------------
 
         const selectedSet = new Set(selectedLookupIds);
@@ -2215,8 +2209,7 @@ $(function () {
           f => f.data_type === "lookup"
         );
 
-        const usedFields = [];
-        const unusedFields = [];
+        const sectionFields = [];
 
         // IMPORTANT: rebuild state cleanly
         for (const field of allLookupFields) {
@@ -2224,31 +2217,16 @@ $(function () {
           const isProtected = protectedFields.has(field.api_name);
           const isSelected = selectedSet.has(field.id);
 
-          const fieldObj = {
-            id: field.id,
-            field_label: field.field_label
-          };
-
-          if (isProtected) {
-            usedFields.push(fieldObj);
-            continue;
-          }
-
-          if (isSelected) {
-            usedFields.push(fieldObj);
-          } else {
-            unusedFields.push({
+          if (isProtected || isSelected) {
+            sectionFields.push({
               id: field.id,
-              field_label: field.field_label,
-              _delete: {
-                permanent: false
-              }
+              field_label: field.field_label
             });
           }
         }
 
         // --------------------------------------------
-        // STEP 8: PATCH layout using sectionJSON (IMPORTANT FIX)
+        // STEP 8: PATCH layout – update second section fields
         // --------------------------------------------
 
         const payload = {
@@ -2256,14 +2234,9 @@ $(function () {
             id: layout.id,
             sections: [
               {
-                id: usedSection.id,
-                display_label: usedSection.display_label,
-                fields: usedFields
-              },
-              {
-                id: unusedSection.id,
-                display_label: unusedSection.display_label,
-                fields: unusedFields
+                id: targetSection.id,
+                display_label: targetSection.display_label,
+                fields: sectionFields
               }
             ]
           }]
@@ -2280,7 +2253,7 @@ $(function () {
 
         console.error(
           "FINAL ERROR:",
-          JSON.stringify(err?.response?.data || err, null, 2)
+          err?.message || JSON.stringify(err?.response?.data || err, null, 2)
         );
       }
     });
