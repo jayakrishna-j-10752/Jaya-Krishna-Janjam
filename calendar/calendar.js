@@ -2199,12 +2199,10 @@ $(function () {
 
         const sections = layout?.sections || [];
 
-        if (sections.length < 2) {
-          throw new Error("Expected at least 2 sections in the layout");
-        }
-
-        // The second section (index 1) is where the lookup fields live
-        const activeSection = sections[1];
+        // Find the "Daily Beat Plans Information" section by label; fall back to index 1
+        const activeSection = sections.find(
+          s => s.display_label?.toLowerCase() === 'daily beat plans information'
+        ) || sections[1];
 
         // The Unused Fields section – find by label (case-insensitive exact match)
         const unusedSection = sections.find(
