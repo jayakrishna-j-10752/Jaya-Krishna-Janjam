@@ -2039,26 +2039,59 @@ $(function () {
 
       try {
 
-        const MODULE = 'beatplanner__Daily_Beat_Plans';
-
         //------------------------------------------
-        // Lookup Mapping
+        // Configuration
         //------------------------------------------
 
-        const LOOKUP_MODULE_MAP = {
-          Doctor: 'Doctors',
-          Retailer: 'Retailers',
-          Hospital: 'Hospitals',
-          Distributor: 'Distributors'
+        const MF_SYNC_CONFIG = {
+
+          module:
+            'beatplanner__Daily_Beat_Plans',
+
+          targetSectionLabel:
+            'Daily Beat Plans Information',
+
+          meetingsForFieldLabel:
+            'Meetings For',
+
+          protectedFieldApiNames: [
+            'beatplanner__Month'
+          ],
+
+          /**
+           * Returns true when `lookupField` corresponds to `selectedMF`.
+           * Override this function to change the matching strategy.
+           */
+          lookupMatcher:
+            function (lookupField, selectedMF) {
+              return (
+                lookupField.field_label ===
+                selectedMF
+              );
+            },
+
+          /**
+           * Maps a selected MF label to the CRM lookup target.
+           * Returns { moduleApiName, fieldLabel } or null if no mapping exists.
+           */
+          lookupResolver:
+            function (selectedMF) {
+              var map = {
+                Doctor:      { moduleApiName: 'Doctors',      fieldLabel: 'Doctor'      },
+                Retailer:    { moduleApiName: 'Retailers',    fieldLabel: 'Retailer'    },
+                Hospital:    { moduleApiName: 'Hospitals',    fieldLabel: 'Hospital'    },
+                Distributor: { moduleApiName: 'Distributors', fieldLabel: 'Distributor' }
+              };
+              return map[selectedMF] || null;
+            }
+
         };
 
-        //------------------------------------------
-        // Protected Fields
-        //------------------------------------------
-
-        const PROTECTED_FIELDS = [
-          'beatplanner__Month'
-        ];
+        const MODULE             = MF_SYNC_CONFIG.module;
+        const PROTECTED_FIELDS   = MF_SYNC_CONFIG.protectedFieldApiNames;
+        const MEETINGS_FOR_LABEL = MF_SYNC_CONFIG.meetingsForFieldLabel;
+        const lookupMatcher      = MF_SYNC_CONFIG.lookupMatcher;
+        const lookupResolver     = MF_SYNC_CONFIG.lookupResolver;
 
         //------------------------------------------
         // Get Selected MF Values
@@ -2066,7 +2099,10 @@ $(function () {
 
         const selectedMFs = $('.mf-chip')
           .map(function () {
-            return $(this).text().trim();
+            return $(this)
+              .find('.mf-chip-text')
+              .text()
+              .trim();
           })
           .get()
           .filter(Boolean);
@@ -2106,20 +2142,20 @@ $(function () {
           layoutResp.data?.layouts?.[0];
 
         //------------------------------------------
-        // Find Information Section
+        // Find Target Section
         //------------------------------------------
 
-        const infoSection =
+        const targetSection =
           layout.sections.find(
             section =>
               section.display_label ===
-              'Daily Beat Plans Information'
+              MF_SYNC_CONFIG.targetSectionLabel
           );
 
-        if (!infoSection) {
+        if (!targetSection) {
 
           throw new Error(
-            'Daily Beat Plans Information section not found'
+            `Target section "${MF_SYNC_CONFIG.targetSectionLabel}" not found`
           );
 
         }
@@ -2132,7 +2168,7 @@ $(function () {
           allFields.find(
             field =>
               field.field_label ===
-              'Meetings For'
+              MEETINGS_FOR_LABEL
           );
 
         //------------------------------------------
@@ -2142,14 +2178,14 @@ $(function () {
         if (!meetingsForField) {
 
           console.log(
-            'Creating Meetings For field'
+            `Creating "${MEETINGS_FOR_LABEL}" field`
           );
 
           const createPayload = {
             fields: [
               {
                 field_label:
-                  'Meetings For',
+                  MEETINGS_FOR_LABEL,
                 data_type:
                   'picklist',
                 pick_list_values:
@@ -2179,7 +2215,7 @@ $(function () {
             (refreshResp.data?.fields || []).find(
               field =>
                 field.field_label ===
-                'Meetings For'
+                MEETINGS_FOR_LABEL
             );
 
         }
@@ -2191,7 +2227,7 @@ $(function () {
         else {
 
           console.log(
-            'Updating Meetings For'
+            `Updating "${MEETINGS_FOR_LABEL}"`
           );
 
           const updatePayload = {
@@ -2245,9 +2281,11 @@ $(function () {
           )
           .forEach(field => {
 
-            lookupMap[
-              field.field_label.trim()
-            ] = field;
+            selectedMFs.forEach(mf => {
+              if (lookupMatcher(field, mf)) {
+                lookupMap[mf] = field;
+              }
+            });
 
           });
 
@@ -2255,25 +2293,25 @@ $(function () {
         // Create Missing Lookup Fields
         //------------------------------------------
 
-        for (const value of selectedMFs) {
+        for (const mf of selectedMFs) {
 
-          if (lookupMap[value]) {
+          if (lookupMap[mf]) {
 
             console.log(
-              `${value} lookup already exists`
+              `${mf} lookup already exists`
             );
 
             continue;
 
           }
 
-          const moduleApiName =
-            LOOKUP_MODULE_MAP[value];
+          const resolved =
+            lookupResolver(mf);
 
-          if (!moduleApiName) {
+          if (!resolved) {
 
             console.warn(
-              `No lookup mapping found for ${value}`
+              `No lookup mapping found for ${mf}`
             );
 
             continue;
@@ -2281,20 +2319,20 @@ $(function () {
           }
 
           console.log(
-            `Creating lookup for ${value}`
+            `Creating lookup for ${mf}`
           );
 
           const lookupPayload = {
             fields: [
               {
                 field_label:
-                  value,
+                  resolved.fieldLabel,
                 data_type:
                   'lookup',
                 lookup: {
                   module: {
                     api_name:
-                      moduleApiName
+                      resolved.moduleApiName
                   }
                 }
               }
@@ -2332,7 +2370,7 @@ $(function () {
         // Preserve Existing Non-Lookup Fields
         //------------------------------------------
 
-        infoSection.fields.forEach(
+        targetSection.fields.forEach(
           layoutField => {
 
             const fieldMeta =
@@ -2392,15 +2430,16 @@ $(function () {
               return;
             }
 
+            const isSelected =
+              selectedMFs.some(
+                mf => lookupMatcher(field, mf)
+              );
+
             //----------------------------------
             // Selected -> Used
             //----------------------------------
 
-            if (
-              selectedMFs.includes(
-                field.field_label
-              )
-            ) {
+            if (isSelected) {
 
               if (
                 !processedFieldIds.has(
@@ -2467,9 +2506,9 @@ $(function () {
               sections: [
                 {
                   id:
-                    infoSection.id,
+                   targetSection.id,
                   display_label:
-                    infoSection.display_label,
+                   targetSection.display_label,
                   fields:
                     layoutFieldActions
                 }
