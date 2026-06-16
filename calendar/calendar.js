@@ -2253,8 +2253,14 @@ $(function () {
       const keepLabels = new Set([
         'Owner',
         'beatplanner__Month',
+        'Month',
         'Meetings For',
         ...selectedValues.map(chip => chip.label)
+      ]);
+
+      // Guard by api_name as well (field_label may differ from api_name)
+      const keepApiNames = new Set([
+        'beatplanner__Month'
       ]);
 
       const keepIds = new Set([
@@ -2266,11 +2272,12 @@ $(function () {
         .filter(f =>
           f.data_type === 'lookup' &&
           !keepLabels.has(f.field_label) &&
+          !keepApiNames.has(f.api_name) &&
           !keepIds.has(f.id)
         )
         .map(f => ({
           id: f.id,
-          field_label: f.field_label,
+          api_name: f.api_name,
           _delete: { permanent: false }
         }));
 
