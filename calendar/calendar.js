@@ -2214,7 +2214,7 @@ $(function () {
         );
 
         if (!unusedSection) {
-          throw new Error("Unused Fields section not found in layout");
+          console.warn("Unused Fields section not found in layout – skipping unused-section update");
         }
 
         // --------------------------------------------
@@ -2258,19 +2258,24 @@ $(function () {
         // STEP 8: PATCH layout – update both sections
         // --------------------------------------------
 
+        const sectionsToUpdate = [
+          {
+            id: activeSection.id,
+            fields: activeSectionFields
+          }
+        ];
+
+        if (unusedSection) {
+          sectionsToUpdate.push({
+            id: unusedSection.id,
+            fields: unusedSectionFields
+          });
+        }
+
         const payload = {
           layouts: [{
             id: layout.id,
-            sections: [
-              {
-                id: activeSection.id,
-                fields: activeSectionFields
-              },
-              {
-                id: unusedSection.id,
-                fields: unusedSectionFields
-              }
-            ]
+            sections: sectionsToUpdate
           }]
         };
 
