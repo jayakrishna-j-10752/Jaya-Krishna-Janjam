@@ -2042,6 +2042,25 @@ $(function () {
         const MODULE = 'beatplanner__Daily_Beat_Plans';
 
         //------------------------------------------
+        // Lookup Mapping
+        //------------------------------------------
+
+        const LOOKUP_MODULE_MAP = {
+          Doctor: 'Doctors',
+          Retailer: 'Retailers',
+          Hospital: 'Hospitals',
+          Distributor: 'Distributors'
+        };
+
+        //------------------------------------------
+        // Protected Fields
+        //------------------------------------------
+
+        const PROTECTED_FIELDS = [
+          'beatplanner__Month'
+        ];
+
+        //------------------------------------------
         // Get Selected MF Values
         //------------------------------------------
 
@@ -2052,17 +2071,21 @@ $(function () {
           .get()
           .filter(Boolean);
 
-        console.log("Selected MFs:", selectedMFs);
+        console.log(
+          'Selected MFs:',
+          selectedMFs
+        );
 
         //------------------------------------------
-        // Fetch Fields
+        // Fetch Fields Metadata
         //------------------------------------------
 
         const fieldsResp = await zrc.get(
           `/crm/v8/settings/fields?module=${MODULE}`
         );
 
-        const allFields = fieldsResp.fields || [];
+        const allFields =
+          fieldsResp.fields || [];
 
         //------------------------------------------
         // Fetch Layout
@@ -2072,39 +2095,45 @@ $(function () {
           `/crm/v8/settings/layouts?module=${MODULE}`
         );
 
-        const LAYOUT_ID = layoutsListResp.layouts?.[0]?.id;
+        const LAYOUT_ID =
+          layoutsListResp.layouts?.[0]?.id;
 
         const layoutResp = await zrc.get(
           `/crm/v8/settings/layouts/${LAYOUT_ID}?module=${MODULE}`
         );
 
-        const layout = layoutResp.layouts[0];
+        const layout =
+          layoutResp.layouts[0];
 
         //------------------------------------------
         // Find Information Section
         //------------------------------------------
 
-        const infoSection = layout.sections.find(
-          section =>
-            section.display_label ===
-            'Daily Beat Plans Information'
-        );
+        const infoSection =
+          layout.sections.find(
+            section =>
+              section.display_label ===
+              'Daily Beat Plans Information'
+          );
 
         if (!infoSection) {
+
           throw new Error(
             'Daily Beat Plans Information section not found'
           );
+
         }
 
         //------------------------------------------
         // Find Meetings For Field
         //------------------------------------------
 
-        let meetingsForField = allFields.find(
-          field =>
-            field.field_label ===
-            'Meetings For'
-        );
+        let meetingsForField =
+          allFields.find(
+            field =>
+              field.field_label ===
+              'Meetings For'
+          );
 
         //------------------------------------------
         // Create Meetings For Field
@@ -2119,13 +2148,17 @@ $(function () {
           const createPayload = {
             fields: [
               {
-                field_label: 'Meetings For',
-                data_type: 'picklist',
+                field_label:
+                  'Meetings For',
+                data_type:
+                  'picklist',
                 pick_list_values:
                   selectedMFs.map(
                     value => ({
-                      display_value: value,
-                      actual_value: value
+                      display_value:
+                        value,
+                      actual_value:
+                        value
                     })
                   )
               }
@@ -2149,21 +2182,30 @@ $(function () {
                 'Meetings For'
             );
 
+        }
+
         //------------------------------------------
-        // Update Picklist Values
+        // Update Meetings For Picklist
         //------------------------------------------
 
-        } else {
+        else {
+
+          console.log(
+            'Updating Meetings For'
+          );
 
           const updatePayload = {
             fields: [
               {
-                id: meetingsForField.id,
+                id:
+                  meetingsForField.id,
                 pick_list_values:
                   selectedMFs.map(
                     value => ({
-                      display_value: value,
-                      actual_value: value
+                      display_value:
+                        value,
+                      actual_value:
+                        value
                     })
                   )
               }
@@ -2175,9 +2217,6 @@ $(function () {
             updatePayload
           );
 
-          console.log(
-            'Meetings For updated'
-          );
         }
 
         //------------------------------------------
@@ -2216,13 +2255,6 @@ $(function () {
         // Create Missing Lookup Fields
         //------------------------------------------
 
-        const LOOKUP_MODULE_MAP = {
-          Doctor: 'Doctors',
-          Retailer: 'Retailers',
-          Hospital: 'Hospitals',
-          Distributor: 'Distributors'
-        };
-
         for (const value of selectedMFs) {
 
           if (lookupMap[value]) {
@@ -2232,6 +2264,7 @@ $(function () {
             );
 
             continue;
+
           }
 
           const moduleApiName =
@@ -2240,10 +2273,11 @@ $(function () {
           if (!moduleApiName) {
 
             console.warn(
-              `No lookup mapping configured for ${value}`
+              `No lookup mapping found for ${value}`
             );
 
             continue;
+
           }
 
           console.log(
@@ -2253,8 +2287,10 @@ $(function () {
           const lookupPayload = {
             fields: [
               {
-                field_label: value,
-                data_type: 'lookup',
+                field_label:
+                  value,
+                data_type:
+                  'lookup',
                 lookup: {
                   module: {
                     api_name:
@@ -2269,6 +2305,7 @@ $(function () {
             `/crm/v8/settings/fields?module=${MODULE}`,
             lookupPayload
           );
+
         }
 
         //------------------------------------------
@@ -2284,10 +2321,59 @@ $(function () {
           refreshedResp.fields || [];
 
         //------------------------------------------
-        // Build Lookup Map Again
+        // Build Layout Field Actions
         //------------------------------------------
 
-        const refreshedLookupMap = {};
+        const layoutFieldActions = [];
+        const processedFieldIds =
+          new Set();
+
+        //------------------------------------------
+        // Preserve Existing Non-Lookup Fields
+        //------------------------------------------
+
+        infoSection.fields.forEach(
+          layoutField => {
+
+            const fieldMeta =
+              refreshedFields.find(
+                field =>
+                  field.id ===
+                  layoutField.id
+              );
+
+            if (!fieldMeta) {
+              return;
+            }
+
+            if (
+              fieldMeta.system_mandatory ||
+              PROTECTED_FIELDS.includes(
+                fieldMeta.api_name
+              ) ||
+              fieldMeta.data_type !==
+                'lookup'
+            ) {
+
+              layoutFieldActions.push(
+                {
+                  id:
+                    fieldMeta.id
+                }
+              );
+
+              processedFieldIds.add(
+                fieldMeta.id
+              );
+
+            }
+
+          }
+        );
+
+        //------------------------------------------
+        // Process Lookup Fields
+        //------------------------------------------
 
         refreshedFields
           .filter(
@@ -2297,114 +2383,109 @@ $(function () {
           )
           .forEach(field => {
 
-            refreshedLookupMap[
-              field.field_label.trim()
-            ] = field;
+            if (
+              field.system_mandatory ||
+              PROTECTED_FIELDS.includes(
+                field.api_name
+              )
+            ) {
+              return;
+            }
+
+            //----------------------------------
+            // Selected -> Used
+            //----------------------------------
+
+            if (
+              selectedMFs.includes(
+                field.field_label
+              )
+            ) {
+
+              if (
+                !processedFieldIds.has(
+                  field.id
+                )
+              ) {
+
+                layoutFieldActions.push(
+                  {
+                    id:
+                      field.id
+                  }
+                );
+
+                processedFieldIds.add(
+                  field.id
+                );
+
+              }
+
+            }
+
+            //----------------------------------
+            // Unselected -> Unused
+            //----------------------------------
+
+            else {
+
+              if (
+                !processedFieldIds.has(
+                  field.id
+                )
+              ) {
+
+                layoutFieldActions.push(
+                  {
+                    id:
+                      field.id,
+                    _delete: {
+                      permanent:
+                        false
+                    }
+                  }
+                );
+
+                processedFieldIds.add(
+                  field.id
+                );
+
+              }
+
+            }
 
           });
 
         //------------------------------------------
-        // Used Field IDs
-        //------------------------------------------
-
-        const usedFieldIds =
-          new Set(
-            infoSection.fields.map(
-              field => field.id
-            )
-          );
-
-        //------------------------------------------
-        // Add Selected Lookup Fields
-        //------------------------------------------
-
-        selectedMFs.forEach(value => {
-
-          const lookupField =
-            refreshedLookupMap[value];
-
-          if (!lookupField) {
-            return;
-          }
-
-          if (
-            !usedFieldIds.has(
-              lookupField.id
-            )
-          ) {
-
-            infoSection.fields.push({
-              id: lookupField.id
-            });
-
-          }
-
-        });
-
-        //------------------------------------------
-        // Remove Unselected Lookup Fields
-        //------------------------------------------
-
-        const protectedFields = [
-          'beatplanner__Month'
-        ];
-
-        infoSection.fields =
-          infoSection.fields.filter(
-            layoutField => {
-
-              const fieldMeta =
-                refreshedFields.find(
-                  field =>
-                    field.id ===
-                    layoutField.id
-                );
-
-              if (!fieldMeta) {
-                return true;
-              }
-
-              if (
-                fieldMeta.system_mandatory
-              ) {
-                return true;
-              }
-
-              if (
-                protectedFields.includes(
-                  fieldMeta.api_name
-                )
-              ) {
-                return true;
-              }
-
-              if (
-                fieldMeta.data_type !==
-                'lookup'
-              ) {
-                return true;
-              }
-
-              return selectedMFs.includes(
-                fieldMeta.field_label
-              );
-
-            }
-          );
-
-        //------------------------------------------
-        // Update Layout
+        // Layout Update Payload
         //------------------------------------------
 
         const layoutPayload = {
           layouts: [
             {
               id: layout.id,
-              sections:
-                layout.sections
+              sections: [
+                {
+                  id:
+                    infoSection.id,
+                  display_label:
+                    infoSection.display_label,
+                  fields:
+                    layoutFieldActions
+                }
+              ]
             }
           ]
         };
+
+        console.log(
+          'Layout Payload:',
+          layoutPayload
+        );
+
+        //------------------------------------------
+        // Update Layout
+        //------------------------------------------
 
         await zrc.patch(
           `/crm/v8/settings/layouts/${layout.id}?module=${MODULE}`,
