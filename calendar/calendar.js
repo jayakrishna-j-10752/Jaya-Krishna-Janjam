@@ -2208,6 +2208,7 @@ $(function () {
                     field_label: chip,
                     data_type:   'lookup',
                     lookup: {
+                      display_label: chip,
                       module: {
                         api_name: 'Contacts'
                       }
