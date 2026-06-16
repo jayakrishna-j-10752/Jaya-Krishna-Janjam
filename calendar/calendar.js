@@ -2045,7 +2045,7 @@ $(function () {
         .filter(Boolean);
 
       try {
-        await updateMeetingsForField(selectedValues);
+        await syncMeetingsFor(selectedValues);
       } catch (err) {
         console.error('Failed to sync Meetings For field:', err);
       }
@@ -2088,34 +2088,20 @@ $(function () {
   ────────────────────────────────────────────────────────── */
 
   /**
-   * Creates or updates the "Meetings For" multiselectpicklist field in the
+   * Syncs the "Meetings For" picklist (single-select) and lookup field in the
    * beatplanner__Daily_Beat_Plans module to reflect the given selectedValues.
+   * Reuses an existing unused lookup field if available; otherwise creates one.
    */
-  async function updateMeetingsForField(selectedValues) {
+  async function syncMeetingsFor(selectedValues) {
 
     const moduleAPI = 'beatplanner__Daily_Beat_Plans';
+    const SECTION_NAME = 'Daily Beat Plans Information';
 
     try {
 
-      // ==================================================
-      // STEP 1: GET ALL FIELDS
-      // ==================================================
-
-      const fieldsResp = await zrc.get(
-        `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
-      );
-
-      const fields = fieldsResp?.data?.fields || [];
-
-      let meetingsForField = fields.find(
-        field =>
-          field.field_label === 'Meetings For' ||
-          field.api_name === 'Meetings_For'
-      );
-
-      // ==================================================
-      // STEP 2: GET LAYOUTS
-      // ==================================================
+      // ======================================================
+      // 1. GET LAYOUTS
+      // ======================================================
 
       const layoutsResp = await zrc.get(
         `/crm/v8/settings/layouts?module=${moduleAPI}`
@@ -2123,146 +2109,269 @@ $(function () {
 
       const layouts = layoutsResp?.data?.layouts || [];
 
-      let layoutId = null;
-      let sectionId = null;
+      let layout = layouts.find(l =>
+        (l.sections || []).some(sec =>
+          sec.display_label === SECTION_NAME ||
+          sec.name === SECTION_NAME
+        )
+      );
 
-      for (const layout of layouts) {
+      if (!layout) {
+        throw new Error('Layout not found');
+      }
 
-        const section = (layout.sections || []).find(
-          sec => sec.display_label === 'Daily Beat Plans Information'
+      const section = layout.sections.find(sec =>
+        sec.display_label === SECTION_NAME ||
+        sec.name === SECTION_NAME
+      );
+
+      const layoutId = layout.id;
+      const sectionId = section.id;
+
+      // ======================================================
+      // 2. GET FIELD METADATA
+      // ======================================================
+
+      const fieldsResp = await zrc.get(
+        `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
+      );
+
+      const fields = fieldsResp?.data?.fields || [];
+
+      // ------------------------------------------------------
+      // PICKLIST FIELD (SINGLE SELECT)
+      // ------------------------------------------------------
+      let picklistField = fields.find(f =>
+        f.field_label === 'Meetings For' &&
+        f.data_type === 'picklist'
+      );
+
+      // ------------------------------------------------------
+      // LOOKUP FIELD
+      // ------------------------------------------------------
+      let lookupField = fields.find(f =>
+        f.field_label === 'Meetings For' &&
+        f.data_type === 'lookup'
+      );
+
+      // ======================================================
+      // 3. CREATE PICKLIST FIELD IF NOT EXISTS
+      // ======================================================
+
+      if (!picklistField) {
+
+        await zrc.post(
+          `/crm/v8/settings/fields?module=${moduleAPI}`,
+          {
+            fields: [
+              {
+                field_label: 'Meetings For',
+                data_type: 'picklist',
+                pick_list_values: selectedValues.map(v => ({
+                  display_value: v,
+                  actual_value: v
+                }))
+              }
+            ]
+          }
         );
 
-        if (section) {
-          layoutId = layout.id;
-          sectionId = section.id;
-          break;
+        const refresh = await zrc.get(
+          `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
+        );
+
+        picklistField = refresh?.data?.fields.find(f =>
+          f.field_label === 'Meetings For' &&
+          f.data_type === 'picklist'
+        );
+
+      }
+
+      // ======================================================
+      // 4. CREATE / REUSE LOOKUP FIELD
+      // ======================================================
+
+      if (!lookupField) {
+
+        const unusedLookup = fields.find(f =>
+          f.data_type === 'lookup' &&
+          f.type === 'unused'
+        );
+
+        if (unusedLookup) {
+
+          lookupField = unusedLookup;
+
+        } else {
+
+          await zrc.post(
+            `/crm/v8/settings/fields?module=${moduleAPI}`,
+            {
+              fields: [
+                {
+                  field_label: 'Meetings For',
+                  data_type: 'lookup'
+                }
+              ]
+            }
+          );
+
+          const refresh = await zrc.get(
+            `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
+          );
+
+          lookupField = refresh?.data?.fields.find(f =>
+            f.field_label === 'Meetings For' &&
+            f.data_type === 'lookup'
+          );
+
         }
 
       }
 
-      if (!layoutId || !sectionId) {
-        throw new Error('Daily Beat Plans Information section not found');
-      }
+      // ======================================================
+      // 5. BUILD PICKLIST VALUES (SINGLE SELECT LOGIC)
+      // ======================================================
 
-      // ==================================================
-      // STEP 3: CREATE FIELD IF NOT EXISTS
-      // ==================================================
-
-      if (!meetingsForField) {
-
-        const createFieldPayload = {
-          fields: [
-            {
-              field_label: 'Meetings For',
-              data_type: 'picklist',
-              pick_list_values: selectedValues.map(
-                value => ({
-                  display_value: value,
-                  actual_value: value
-                })
-              )
-            }
-          ]
-        };
-
-        await zrc.post(
-          `/crm/v8/settings/fields?module=${moduleAPI}`,
-          createFieldPayload
-        );
-
-        /* Re-fetch field metadata */
-        const refreshFieldsResp = await zrc.get(
-          `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
-        );
-
-        const refreshedFields = refreshFieldsResp?.data?.fields || [];
-
-        meetingsForField = refreshedFields.find(
-          field =>
-            field.field_label === 'Meetings For' ||
-            field.api_name === 'Meetings_For'
-        );
-
-        console.log('Meetings For field created successfully');
-        return { success: true, message: 'Meetings For field created successfully' };
-
-      }
-
-      // ==================================================
-      // STEP 4: BUILD PICKLIST VALUES
-      // ==================================================
-
-      const existingPicklistValues = meetingsForField.pick_list_values || [];
+      const existingPicklist = picklistField.pick_list_values || [];
 
       const pickListValues = [];
 
-      for (const selectedValue of selectedValues) {
+      for (const val of selectedValues) {
 
-        const existingValue = existingPicklistValues.find(
-          value =>
-            value.display_value === selectedValue ||
-            value.actual_value === selectedValue
+        const existing = existingPicklist.find(v =>
+          v.display_value === val ||
+          v.actual_value === val
         );
 
-        if (existingValue) {
+        if (existing) {
 
-          /* Existing Used/Unused value */
           pickListValues.push({
-            id: existingValue.id,
-            display_value: existingValue.display_value
+            id: existing.id,
+            display_value: existing.display_value,
+            actual_value: existing.actual_value
           });
 
         } else {
 
-          /* New value */
           pickListValues.push({
-            display_value: selectedValue,
-            actual_value: selectedValue
+            display_value: val,
+            actual_value: val
           });
 
         }
 
       }
 
-      // ==================================================
-      // STEP 5: UPDATE LAYOUT
-      // ==================================================
+      // ======================================================
+      // 6. BUILD FINAL LAYOUT PAYLOAD
+      // ======================================================
 
-      const layoutUpdatePayload = {
+      const updatedSections = layout.sections.map(sec => {
+
+        if (sec.id !== sectionId) {
+          return sec;
+        }
+
+        return {
+          ...sec,
+          fields: [
+            {
+              id: picklistField.id,
+              pick_list_values: pickListValues
+            },
+            {
+              id: lookupField.id,
+              lookup: {}
+            }
+          ]
+        };
+
+      });
+
+      const payload = {
+        layouts: [
+          {
+            id: layoutId,
+            sections: updatedSections
+          }
+        ]
+      };
+
+      console.log(
+        'FINAL PAYLOAD:',
+        JSON.stringify(payload, null, 2)
+      );
+
+      // ======================================================
+      // 7. APPLY LAYOUT UPDATE (USED STATE)
+      // ======================================================
+
+      await zrc.patch(
+        `/crm/v8/settings/layouts/${layoutId}?module=${moduleAPI}`,
+        payload
+      );
+
+      // ======================================================
+      // 8. MOVE OTHER FIELDS TO UNUSED (_delete)
+      // ======================================================
+
+      const allFields = section.fields || [];
+
+      const keepIds = new Set([
+        picklistField.id,
+        lookupField.id
+      ]);
+
+      const deletePayload = {
         layouts: [
           {
             id: layoutId,
             sections: [
               {
                 id: sectionId,
-                fields: [
-                  {
-                    id: meetingsForField.id,
-                    pick_list_values: pickListValues
-                  }
-                ]
+                fields: allFields
+                  .filter(f => !keepIds.has(f.id))
+                  .map(f => ({
+                    id: f.id,
+                    _delete: {
+                      permanent: false
+                    }
+                  }))
               }
             ]
           }
         ]
       };
 
-      console.log(
-        'Layout Update Payload:',
-        JSON.stringify(layoutUpdatePayload, null, 2)
-      );
-
-      const updateResp = await zrc.patch(
+      await zrc.patch(
         `/crm/v8/settings/layouts/${layoutId}?module=${moduleAPI}`,
-        layoutUpdatePayload
+        deletePayload
       );
 
-      return updateResp;
+      // ======================================================
+      // FINAL RESPONSE
+      // ======================================================
+
+      return {
+        success: true,
+        message: 'Picklist (single) + Lookup synced successfully',
+        data: {
+          layoutId,
+          sectionId,
+          picklistFieldId: picklistField.id,
+          lookupFieldId: lookupField.id
+        }
+      };
 
     } catch (error) {
 
-      console.error('Error updating Meetings For field', error);
-      throw error;
+      console.error('Sync failed:', error);
+
+      return {
+        success: false,
+        error
+      };
 
     }
 
