@@ -2252,7 +2252,7 @@ $(function () {
         JSON.stringify(layoutUpdatePayload, null, 2)
       );
 
-      const updateResp = await zrc.put(
+      const updateResp = await zrc.patch(
         `/crm/v8/settings/layouts/${layoutId}`,
         layoutUpdatePayload
       );
