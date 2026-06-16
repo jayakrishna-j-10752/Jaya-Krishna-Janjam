@@ -2039,10 +2039,13 @@ $(function () {
 
       const selectedValues = $('.mf-chip')
         .map(function () {
-          return $(this).find('.mf-chip-text').text().trim();
+          return {
+            label:   $(this).find('.mf-chip-text').text().trim(),
+            apiName: $(this).data('uid') || ''
+          };
         })
         .get()
-        .filter(Boolean);
+        .filter(function (v) { return v.label; });
 
       try {
         await syncMeetingsFor(selectedValues);
@@ -2157,15 +2160,15 @@ $(function () {
 
       const existingOptions = picklistField.pick_list_values || [];
 
-      const pickListValues = selectedValues.map(val => {
+      const pickListValues = selectedValues.map(chip => {
 
         const existing = existingOptions.find(o =>
-          o.display_value === val || o.actual_value === val
+          o.display_value === chip.label || o.actual_value === chip.label
         );
 
         return existing
           ? { id: existing.id, display_value: existing.display_value, actual_value: existing.actual_value }
-          : { display_value: val, actual_value: val };
+          : { display_value: chip.label, actual_value: chip.label };
 
       });
 
@@ -2180,14 +2183,14 @@ $(function () {
         f.type      === 'unused'
       );
 
-      const lookupFields = []; // { id, field_label }
+      const lookupFields = []; // { id, label }
 
       for (const chip of selectedValues) {
 
         // 1) Is there already an active lookup field with this exact label?
         let lookupField = fields.find(f =>
           f.data_type   === 'lookup' &&
-          f.field_label === chip
+          f.field_label === chip.label
         );
 
         if (!lookupField) {
@@ -2205,12 +2208,12 @@ $(function () {
               {
                 fields: [
                   {
-                    field_label: chip,
+                    field_label: chip.label,
                     data_type:   'lookup',
                     lookup: {
-                      display_label: chip,
+                      display_label: chip.label,
                       module: {
-                        api_name: 'Contacts'
+                        api_name: chip.apiName
                       }
                     }
                   }
@@ -2225,7 +2228,7 @@ $(function () {
             fields = refresh?.data?.fields || [];
 
             lookupField = fields.find(f =>
-              f.field_label === chip &&
+              f.field_label === chip.label &&
               f.data_type   === 'lookup'
             );
 
@@ -2234,10 +2237,10 @@ $(function () {
         }
 
         if (!lookupField) {
-          throw new Error(`Could not obtain lookup field for chip: ${chip}`);
+          throw new Error(`Could not obtain lookup field for chip: ${chip.label}`);
         }
 
-        lookupFields.push({ id: lookupField.id, field_label: chip });
+        lookupFields.push({ id: lookupField.id, label: chip.label });
 
       }
 
@@ -2251,7 +2254,7 @@ $(function () {
         'Owner',
         'beatplanner__Month',
         'Meetings For',
-        ...selectedValues
+        ...selectedValues.map(chip => chip.label)
       ]);
 
       const keepIds = new Set([
