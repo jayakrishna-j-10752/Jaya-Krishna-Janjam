@@ -2063,6 +2063,16 @@ $(function () {
         const fields = fieldsResp?.data?.fields || [];
 
         // --------------------------------------------
+        // STEP 2b: Fetch layout metadata (needed for layout id in field PATCH)
+        // --------------------------------------------
+
+        const layoutResp = await zrc.get(
+          `/crm/v8/settings/layouts?module=${moduleName}`
+        );
+
+        const layout = layoutResp?.data?.layouts?.[0];
+
+        // --------------------------------------------
         // STEP 3: Meetings For field check/create/update
         // --------------------------------------------
 
@@ -2125,7 +2135,7 @@ $(function () {
           console.log("Final picklist values:", finalPicklist);
 
           await zrc.patch(
-            `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
+            `/crm/v8/settings/fields/${layout.id}?module=${moduleName}`,
             {
               fields: [
                 {
@@ -2188,14 +2198,8 @@ $(function () {
         }
 
         // --------------------------------------------
-        // STEP 6: Get layout metadata
+        // STEP 6: Use layout metadata (already fetched above)
         // --------------------------------------------
-
-        const layoutResp = await zrc.get(
-          `/crm/v8/settings/layouts?module=${moduleName}`
-        );
-
-        const layout = layoutResp?.data?.layouts?.[0];
 
         const sections = layout?.sections || [];
 
