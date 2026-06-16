@@ -2085,7 +2085,7 @@ $(function () {
         );
 
         const allFields =
-          fieldsResp.fields || [];
+          fieldsResp.data?.fields || [];
 
         //------------------------------------------
         // Fetch Layout
@@ -2096,14 +2096,14 @@ $(function () {
         );
 
         const LAYOUT_ID =
-          layoutsListResp.layouts?.[0]?.id;
+          layoutsListResp.data?.layouts?.[0]?.id;
 
         const layoutResp = await zrc.get(
           `/crm/v8/settings/layouts/${LAYOUT_ID}?module=${MODULE}`
         );
 
         const layout =
-          layoutResp.layouts[0];
+          layoutResp.data?.layouts?.[0];
 
         //------------------------------------------
         // Find Information Section
@@ -2176,7 +2176,7 @@ $(function () {
             );
 
           meetingsForField =
-            refreshResp.fields.find(
+            (refreshResp.data?.fields || []).find(
               field =>
                 field.field_label ===
                 'Meetings For'
@@ -2229,7 +2229,7 @@ $(function () {
           );
 
         const latestFields =
-          latestFieldsResp.fields || [];
+          latestFieldsResp.data?.fields || [];
 
         //------------------------------------------
         // Existing Lookup Fields
@@ -2318,7 +2318,7 @@ $(function () {
           );
 
         const refreshedFields =
-          refreshedResp.fields || [];
+          refreshedResp.data?.fields || [];
 
         //------------------------------------------
         // Build Layout Field Actions
