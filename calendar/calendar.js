@@ -2039,13 +2039,13 @@ $(function () {
 
       try {
 
-        //------------------------------------------
-        // Configuration
-        //------------------------------------------
+        //--------------------------------------------------
+        // CONFIGURATION
+        //--------------------------------------------------
 
-        const MF_SYNC_CONFIG = {
+        const CONFIG = {
 
-          module:
+          moduleApiName:
             'beatplanner__Daily_Beat_Plans',
 
           targetSectionLabel:
@@ -2087,11 +2087,11 @@ $(function () {
 
         };
 
-        const MODULE             = MF_SYNC_CONFIG.module;
-        const PROTECTED_FIELDS   = MF_SYNC_CONFIG.protectedFieldApiNames;
-        const MEETINGS_FOR_LABEL = MF_SYNC_CONFIG.meetingsForFieldLabel;
-        const lookupMatcher      = MF_SYNC_CONFIG.lookupMatcher;
-        const lookupResolver     = MF_SYNC_CONFIG.lookupResolver;
+        const MODULE             = CONFIG.moduleApiName;
+        const PROTECTED_FIELDS   = CONFIG.protectedFieldApiNames;
+        const MEETINGS_FOR_LABEL = CONFIG.meetingsForFieldLabel;
+        const lookupMatcher      = CONFIG.lookupMatcher;
+        const lookupResolver     = CONFIG.lookupResolver;
 
         //------------------------------------------
         // Get Selected MF Values
@@ -2149,13 +2149,13 @@ $(function () {
           layout.sections.find(
             section =>
               section.display_label ===
-              MF_SYNC_CONFIG.targetSectionLabel
+              CONFIG.targetSectionLabel
           );
 
         if (!targetSection) {
 
           throw new Error(
-            `Target section "${MF_SYNC_CONFIG.targetSectionLabel}" not found`
+            `Target section "${CONFIG.targetSectionLabel}" not found`
           );
 
         }
