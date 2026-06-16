@@ -2190,11 +2190,13 @@ $(function () {
                   'picklist',
                 pick_list_values:
                   selectedMFs.map(
-                    value => ({
+                    (value, index) => ({
                       display_value:
                         value,
                       actual_value:
-                        value
+                        value,
+                      sequence_number:
+                        index + 1
                     })
                   )
               }
@@ -2237,11 +2239,13 @@ $(function () {
                   meetingsForField.id,
                 pick_list_values:
                   selectedMFs.map(
-                    value => ({
+                    (value, index) => ({
                       display_value:
                         value,
                       actual_value:
-                        value
+                        value,
+                      sequence_number:
+                        index + 1
                     })
                   )
               }
