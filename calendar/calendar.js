@@ -2270,6 +2270,7 @@ $(function () {
         )
         .map(f => ({
           id: f.id,
+          field_label: f.field_label,
           _delete: { permanent: false }
         }));
 
