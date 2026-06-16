@@ -2104,13 +2104,23 @@ $(function () {
             v => selectedSet.has(v.display_value) || v.display_value === '-None-'
           );
 
+          // Explicitly delete entries that are no longer selected
+          const deletedEntries = existingPicklist
+            .filter(v => !selectedSet.has(v.display_value) && v.display_value !== '-None-')
+            .map(v => ({
+              id: v.id,
+              display_value: v.display_value,
+              actual_value: v.actual_value,
+              _delete: true
+            }));
+
           // Add truly new entries (not yet in the picklist) without id
           const keptDisplayValues = new Set(keptEntries.map(v => v.display_value));
           const newEntries = selectedValues
             .filter(v => !keptDisplayValues.has(v))
             .map(v => ({ display_value: v, actual_value: v }));
 
-          const finalPicklist = [...keptEntries, ...newEntries];
+          const finalPicklist = [...keptEntries, ...newEntries, ...deletedEntries];
 
           console.log("Final picklist values:", finalPicklist);
 
@@ -2193,10 +2203,22 @@ $(function () {
           throw new Error("Expected at least 2 sections in the layout");
         }
 
-        const targetSection = sections[1];
+        // The second section (index 1) is where the lookup fields live
+        const activeSection = sections[1];
+
+        // The Unused Fields section – find by label (case-insensitive exact match)
+        const unusedSection = sections.find(
+          s => s.display_label?.toLowerCase() === 'unused fields'
+        ) || sections.find(
+          s => s.display_label?.toLowerCase().includes('unused')
+        );
+
+        if (!unusedSection) {
+          throw new Error("Unused Fields section not found in layout");
+        }
 
         // --------------------------------------------
-        // STEP 7: Build lookup field list for second section
+        // STEP 7: Build field lists for both sections
         // --------------------------------------------
 
         const selectedSet = new Set(selectedLookupIds);
@@ -2209,24 +2231,31 @@ $(function () {
           f => f.data_type === "lookup"
         );
 
-        const sectionFields = [];
+        // IDs of every lookup field (used to distinguish non-lookup fields in the active section)
+        const lookupFieldIdSet = new Set(allLookupFields.map(f => f.id));
 
-        // IMPORTANT: rebuild state cleanly
-        for (const field of allLookupFields) {
+        // Preserve non-lookup fields already in the active section (e.g. "Meetings For" picklist)
+        const nonLookupActiveSectionFields = (activeSection.fields || [])
+          .filter(f => !lookupFieldIdSet.has(f.id))
+          .map(f => ({ id: f.id }));
 
-          const isProtected = protectedFields.has(field.api_name);
-          const isSelected = selectedSet.has(field.id);
+        // Lookup fields that belong in the active section (selected + protected)
+        const activeLookupFields = allLookupFields
+          .filter(f => selectedSet.has(f.id) || protectedFields.has(f.api_name))
+          .map(f => ({ id: f.id }));
 
-          if (isProtected || isSelected) {
-            sectionFields.push({
-              id: field.id,
-              field_label: field.field_label
-            });
-          }
-        }
+        const activeSectionFields = [...nonLookupActiveSectionFields, ...activeLookupFields];
+
+        // Lookup fields that should go to Unused (not selected and not protected)
+        const unusedSectionFields = allLookupFields
+          .filter(f => !selectedSet.has(f.id) && !protectedFields.has(f.api_name))
+          .map(f => ({ id: f.id }));
+
+        console.log("Active section fields:", activeSectionFields);
+        console.log("Unused section fields:", unusedSectionFields);
 
         // --------------------------------------------
-        // STEP 8: PATCH layout – update second section fields
+        // STEP 8: PATCH layout – update both sections
         // --------------------------------------------
 
         const payload = {
@@ -2234,9 +2263,12 @@ $(function () {
             id: layout.id,
             sections: [
               {
-                id: targetSection.id,
-                display_label: targetSection.display_label,
-                fields: sectionFields
+                id: activeSection.id,
+                fields: activeSectionFields
+              },
+              {
+                id: unusedSection.id,
+                fields: unusedSectionFields
               }
             ]
           }]
