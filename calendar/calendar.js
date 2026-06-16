@@ -2033,268 +2033,397 @@ $(function () {
     });
 
     /* Done – confirm current selections, sync CRM fields, then close */
-    $(document).on('click', '#mfDone', async function (e) {
-      e.stopPropagation();
+    $('#mfDone').on('click', async function () {
+
       closeMf();
 
       try {
-        const moduleName = 'beatplanner__Daily_Beat_Plans';
 
-        // --------------------------------------------
-        // STEP 1: Selected MF values
-        // --------------------------------------------
+        const MODULE = 'beatplanner__Daily_Beat_Plans';
 
-        const selectedValues = $('.mf-chip-text')
+        //------------------------------------------
+        // Get Selected MF Values
+        //------------------------------------------
+
+        const selectedMFs = $('.mf-chip')
           .map(function () {
             return $(this).text().trim();
           })
-          .get();
+          .get()
+          .filter(Boolean);
 
-        console.log("Selected MF:", selectedValues);
+        console.log("Selected MFs:", selectedMFs);
 
-        // --------------------------------------------
-        // STEP 2: Fetch fields metadata
-        // --------------------------------------------
+        //------------------------------------------
+        // Fetch Fields
+        //------------------------------------------
 
         const fieldsResp = await zrc.get(
-          `/crm/v8/settings/fields?module=${moduleName}`
+          `/crm/v8/settings/fields?module=${MODULE}`
         );
 
-        const fields = fieldsResp?.data?.fields || [];
+        const allFields = fieldsResp.fields || [];
 
-        // --------------------------------------------
-        // STEP 2b: Fetch layout metadata (needed for layout id in field PATCH)
-        // --------------------------------------------
+        //------------------------------------------
+        // Fetch Layout
+        //------------------------------------------
+
+        const layoutsListResp = await zrc.get(
+          `/crm/v8/settings/layouts?module=${MODULE}`
+        );
+
+        const LAYOUT_ID = layoutsListResp.layouts?.[0]?.id;
 
         const layoutResp = await zrc.get(
-          `/crm/v8/settings/layouts?module=${moduleName}`
+          `/crm/v8/settings/layouts/${LAYOUT_ID}?module=${MODULE}`
         );
 
-        const layout = layoutResp?.data?.layouts?.[0];
+        const layout = layoutResp.layouts[0];
 
-        // --------------------------------------------
-        // STEP 3: Meetings For field check/create/update
-        // --------------------------------------------
+        //------------------------------------------
+        // Find Information Section
+        //------------------------------------------
 
-        let mfField = fields.find(
-          f => f.field_label === "Meetings For"
+        const infoSection = layout.sections.find(
+          section =>
+            section.display_label ===
+            'Daily Beat Plans Information'
         );
 
-        if (!mfField) {
-
-          console.log("Creating Meetings For field");
-
-          const createResp = await zrc.post(
-            `/crm/v8/settings/fields?module=${moduleName}`,
-            {
-              fields: [{
-                field_label: "Meetings For",
-                data_type: "picklist",
-                pick_list_values: selectedValues.map(v => ({
-                  display_value: v,
-                  actual_value: v
-                }))
-              }]
-            }
-          );
-
-          mfField = createResp?.data?.fields?.[0];
-
-        // UPDATE PICKLIST VALUES
-        } else {
-
-          console.log("Updating Meetings For picklist safely");
-
-          const existingPicklist = mfField.pick_list_values || [];
-          const selectedSet = new Set(selectedValues);
-
-          // Keep existing entries that are still selected (preserves their id)
-          // or are the system '-None-' entry
-          const keptEntries = existingPicklist.filter(
-            v => selectedSet.has(v.display_value) || v.display_value === '-None-'
-          );
-
-          // Explicitly delete entries that are no longer selected
-          const deletedEntries = existingPicklist
-            .filter(v => !selectedSet.has(v.display_value) && v.display_value !== '-None-')
-            .map(v => ({
-              id: v.id,
-              display_value: v.display_value,
-              actual_value: v.actual_value,
-              _delete: true
-            }));
-
-          // Add truly new entries (not yet in the picklist) without id
-          const keptDisplayValues = new Set(keptEntries.map(v => v.display_value));
-          const newEntries = selectedValues
-            .filter(v => !keptDisplayValues.has(v))
-            .map(v => ({ display_value: v, actual_value: v }));
-
-          const finalPicklist = [...keptEntries, ...newEntries, ...deletedEntries];
-
-          console.log("Final picklist values:", finalPicklist);
-
-          await zrc.patch(
-            `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
-            {
-              fields: [
-                {
-                  id: mfField.id,
-                  pick_list_values: finalPicklist
-                }
-              ]
-            }
+        if (!infoSection) {
+          throw new Error(
+            'Daily Beat Plans Information section not found'
           );
         }
 
-        // --------------------------------------------
-        // STEP 4: Refresh fields after update
-        // --------------------------------------------
+        //------------------------------------------
+        // Find Meetings For Field
+        //------------------------------------------
 
-        const refreshed = await zrc.get(
-          `/crm/v8/settings/fields?module=${moduleName}`
+        let meetingsForField = allFields.find(
+          field =>
+            field.field_label ===
+            'Meetings For'
         );
 
-        const allFields = refreshed?.data?.fields || [];
+        //------------------------------------------
+        // Create Meetings For Field
+        //------------------------------------------
 
-        // --------------------------------------------
-        // STEP 5: Ensure lookup fields exist
-        // --------------------------------------------
+        if (!meetingsForField) {
 
-        const selectedLookupIds = [];
-
-        for (const value of selectedValues) {
-
-          let lookupField = allFields.find(
-            f => f.field_label === value
+          console.log(
+            'Creating Meetings For field'
           );
 
-          if (!lookupField) {
-
-            console.log("Creating lookup:", value);
-
-            const lookupResp = await zrc.post(
-              `/crm/v8/settings/fields?module=${moduleName}`,
+          const createPayload = {
+            fields: [
               {
-                fields: [{
-                  field_label: value,
-                  data_type: "lookup",
-                  lookup: {
-                    display_label: value,
-                    module: {
-                      api_name: value
-                    }
-                  }
-                }]
+                field_label: 'Meetings For',
+                data_type: 'picklist',
+                pick_list_values:
+                  selectedMFs.map(
+                    value => ({
+                      display_value: value,
+                      actual_value: value
+                    })
+                  )
               }
+            ]
+          };
+
+          await zrc.post(
+            `/crm/v8/settings/fields?module=${MODULE}`,
+            createPayload
+          );
+
+          const refreshResp =
+            await zrc.get(
+              `/crm/v8/settings/fields?module=${MODULE}`
             );
 
-            lookupField = lookupResp?.data?.fields?.[0];
-          }
+          meetingsForField =
+            refreshResp.fields.find(
+              field =>
+                field.field_label ===
+                'Meetings For'
+            );
 
-          if (lookupField?.id) {
-            selectedLookupIds.push(lookupField.id);
-          }
+        //------------------------------------------
+        // Update Picklist Values
+        //------------------------------------------
+
+        } else {
+
+          const updatePayload = {
+            fields: [
+              {
+                id: meetingsForField.id,
+                pick_list_values:
+                  selectedMFs.map(
+                    value => ({
+                      display_value: value,
+                      actual_value: value
+                    })
+                  )
+              }
+            ]
+          };
+
+          await zrc.patch(
+            `/crm/v8/settings/fields/${meetingsForField.id}?module=${MODULE}`,
+            updatePayload
+          );
+
+          console.log(
+            'Meetings For updated'
+          );
         }
 
-        // --------------------------------------------
-        // STEP 6: Use layout metadata (already fetched above)
-        // --------------------------------------------
+        //------------------------------------------
+        // Refresh Fields
+        //------------------------------------------
 
-        const sections = layout?.sections || [];
+        const latestFieldsResp =
+          await zrc.get(
+            `/crm/v8/settings/fields?module=${MODULE}`
+          );
 
-        // Find the "Daily Beat Plans Information" section by label; fall back to index 1
-        const activeSection = sections.find(
-          s => s.display_label?.toLowerCase() === 'daily beat plans information'
-        ) || sections[1];
+        const latestFields =
+          latestFieldsResp.fields || [];
 
-        // The Unused Fields section – find by label (case-insensitive exact match)
-        const unusedSection = sections.find(
-          s => s.display_label?.toLowerCase() === 'unused fields'
-        ) || sections.find(
-          s => s.display_label?.toLowerCase().includes('unused')
-        );
+        //------------------------------------------
+        // Existing Lookup Fields
+        //------------------------------------------
 
-        if (!unusedSection) {
-          console.warn("Unused Fields section not found in layout – skipping unused-section update");
-        }
+        const lookupMap = {};
 
-        // --------------------------------------------
-        // STEP 7: Build field lists for both sections
-        // --------------------------------------------
+        latestFields
+          .filter(
+            field =>
+              field.data_type ===
+              'lookup'
+          )
+          .forEach(field => {
 
-        const selectedSet = new Set(selectedLookupIds);
+            lookupMap[
+              field.field_label.trim()
+            ] = field;
 
-        const protectedFields = new Set([
-          "beatplanner__Month"
-        ]);
-
-        const allLookupFields = allFields.filter(
-          f => f.data_type === "lookup"
-        );
-
-        // IDs of every lookup field (used to distinguish non-lookup fields in the active section)
-        const lookupFieldIdSet = new Set(allLookupFields.map(f => f.id));
-
-        // Preserve non-lookup fields already in the active section (e.g. "Meetings For" picklist)
-        const nonLookupActiveSectionFields = (activeSection.fields || [])
-          .filter(f => !lookupFieldIdSet.has(f.id))
-          .map(f => ({ id: f.id }));
-
-        // Lookup fields that belong in the active section (selected + protected)
-        const activeLookupFields = allLookupFields
-          .filter(f => selectedSet.has(f.id) || protectedFields.has(f.api_name))
-          .map(f => ({ id: f.id }));
-
-        const activeSectionFields = [...nonLookupActiveSectionFields, ...activeLookupFields];
-
-        // Lookup fields that should go to Unused (not selected and not protected)
-        const unusedSectionFields = allLookupFields
-          .filter(f => !selectedSet.has(f.id) && !protectedFields.has(f.api_name))
-          .map(f => ({ id: f.id }));
-
-        console.log("Active section fields:", activeSectionFields);
-        console.log("Unused section fields:", unusedSectionFields);
-
-        // --------------------------------------------
-        // STEP 8: PATCH layout – update both sections
-        // --------------------------------------------
-
-        const sectionsToUpdate = [
-          {
-            id: activeSection.id,
-            fields: activeSectionFields
-          }
-        ];
-
-        if (unusedSection) {
-          sectionsToUpdate.push({
-            id: unusedSection.id,
-            fields: unusedSectionFields
           });
-        }
 
-        const payload = {
-          layouts: [{
-            id: layout.id,
-            sections: sectionsToUpdate
-          }]
+        //------------------------------------------
+        // Create Missing Lookup Fields
+        //------------------------------------------
+
+        const LOOKUP_MODULE_MAP = {
+          Doctor: 'Doctors',
+          Retailer: 'Retailers',
+          Hospital: 'Hospitals',
+          Distributor: 'Distributors'
         };
 
-        const patchResp = await zrc.patch(
-          `/crm/v8/settings/layouts/${layout.id}?module=${moduleName}`,
-          payload
+        for (const value of selectedMFs) {
+
+          if (lookupMap[value]) {
+
+            console.log(
+              `${value} lookup already exists`
+            );
+
+            continue;
+          }
+
+          const moduleApiName =
+            LOOKUP_MODULE_MAP[value];
+
+          if (!moduleApiName) {
+
+            console.warn(
+              `No lookup mapping configured for ${value}`
+            );
+
+            continue;
+          }
+
+          console.log(
+            `Creating lookup for ${value}`
+          );
+
+          const lookupPayload = {
+            fields: [
+              {
+                field_label: value,
+                data_type: 'lookup',
+                lookup: {
+                  module: {
+                    api_name:
+                      moduleApiName
+                  }
+                }
+              }
+            ]
+          };
+
+          await zrc.post(
+            `/crm/v8/settings/fields?module=${MODULE}`,
+            lookupPayload
+          );
+        }
+
+        //------------------------------------------
+        // Refresh Fields Again
+        //------------------------------------------
+
+        const refreshedResp =
+          await zrc.get(
+            `/crm/v8/settings/fields?module=${MODULE}`
+          );
+
+        const refreshedFields =
+          refreshedResp.fields || [];
+
+        //------------------------------------------
+        // Build Lookup Map Again
+        //------------------------------------------
+
+        const refreshedLookupMap = {};
+
+        refreshedFields
+          .filter(
+            field =>
+              field.data_type ===
+              'lookup'
+          )
+          .forEach(field => {
+
+            refreshedLookupMap[
+              field.field_label.trim()
+            ] = field;
+
+          });
+
+        //------------------------------------------
+        // Used Field IDs
+        //------------------------------------------
+
+        const usedFieldIds =
+          new Set(
+            infoSection.fields.map(
+              field => field.id
+            )
+          );
+
+        //------------------------------------------
+        // Add Selected Lookup Fields
+        //------------------------------------------
+
+        selectedMFs.forEach(value => {
+
+          const lookupField =
+            refreshedLookupMap[value];
+
+          if (!lookupField) {
+            return;
+          }
+
+          if (
+            !usedFieldIds.has(
+              lookupField.id
+            )
+          ) {
+
+            infoSection.fields.push({
+              id: lookupField.id
+            });
+
+          }
+
+        });
+
+        //------------------------------------------
+        // Remove Unselected Lookup Fields
+        //------------------------------------------
+
+        const protectedFields = [
+          'beatplanner__Month'
+        ];
+
+        infoSection.fields =
+          infoSection.fields.filter(
+            layoutField => {
+
+              const fieldMeta =
+                refreshedFields.find(
+                  field =>
+                    field.id ===
+                    layoutField.id
+                );
+
+              if (!fieldMeta) {
+                return true;
+              }
+
+              if (
+                fieldMeta.system_mandatory
+              ) {
+                return true;
+              }
+
+              if (
+                protectedFields.includes(
+                  fieldMeta.api_name
+                )
+              ) {
+                return true;
+              }
+
+              if (
+                fieldMeta.data_type !==
+                'lookup'
+              ) {
+                return true;
+              }
+
+              return selectedMFs.includes(
+                fieldMeta.field_label
+              );
+
+            }
+          );
+
+        //------------------------------------------
+        // Update Layout
+        //------------------------------------------
+
+        const layoutPayload = {
+          layouts: [
+            {
+              id: layout.id,
+              sections:
+                layout.sections
+            }
+          ]
+        };
+
+        await zrc.patch(
+          `/crm/v8/settings/layouts/${layout.id}?module=${MODULE}`,
+          layoutPayload
         );
 
-        console.log("LAYOUT SYNC SUCCESS:", patchResp);
+        console.log(
+          'Meetings For configuration updated successfully'
+        );
 
-      } catch (err) {
+      } catch (error) {
 
         console.error(
-          "FINAL ERROR:",
-          err?.message || JSON.stringify(err?.response?.data || err, null, 2)
+          'Error:',
+          error
         );
+
       }
+
     });
 
     /* Cancel – discard pending changes and close */
