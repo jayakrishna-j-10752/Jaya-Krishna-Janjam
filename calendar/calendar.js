@@ -2032,9 +2032,24 @@ $(function () {
       renderMfList();
     });
 
-    /* Done – confirm current selections and close */
-    $('#mfDone').on('click', function () {
+    /* Done – confirm current selections, sync CRM picklist field, then close */
+    $('#mfDone').on('click', async function () {
+
       closeMf();
+
+      const selectedValues = $('.mf-chip')
+        .map(function () {
+          return $(this).find('.mf-chip-text').text().trim();
+        })
+        .get()
+        .filter(Boolean);
+
+      try {
+        await updateMeetingsForField(selectedValues);
+      } catch (err) {
+        console.error('Failed to sync Meetings For field:', err);
+      }
+
     });
 
     /* Cancel – discard pending changes and close */
@@ -2066,6 +2081,191 @@ $(function () {
     $(window).on('resize.mf', function () {
       if ($('#mfSelect').hasClass('mf-open')) { positionMfDropdown(); }
     });
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     MEETINGS-FOR CRM FIELD SYNC
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Creates or updates the "Meetings For" multiselectpicklist field in the
+   * beatplanner__Daily_Beat_Plans module to reflect the given selectedValues.
+   */
+  async function updateMeetingsForField(selectedValues) {
+
+    const moduleAPI = 'beatplanner__Daily_Beat_Plans';
+
+    try {
+
+      // ==================================================
+      // STEP 1: GET ALL FIELDS
+      // ==================================================
+
+      const fieldsResp = await zrc.get(
+        `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
+      );
+
+      const fields = fieldsResp?.data?.fields || [];
+
+      let meetingsForField = fields.find(
+        field =>
+          field.field_label === 'Meetings For' ||
+          field.api_name === 'Meetings_For'
+      );
+
+      // ==================================================
+      // STEP 2: GET LAYOUTS
+      // ==================================================
+
+      const layoutsResp = await zrc.get(
+        `/crm/v8/settings/layouts?module=${moduleAPI}`
+      );
+
+      const layouts = layoutsResp?.data?.layouts || [];
+
+      let layoutId = null;
+      let sectionId = null;
+
+      for (const layout of layouts) {
+
+        const section = (layout.sections || []).find(
+          sec => sec.display_label === 'Daily Beat Plans Information'
+        );
+
+        if (section) {
+          layoutId = layout.id;
+          sectionId = section.id;
+          break;
+        }
+
+      }
+
+      if (!layoutId || !sectionId) {
+        throw new Error('Daily Beat Plans Information section not found');
+      }
+
+      // ==================================================
+      // STEP 3: CREATE FIELD IF NOT EXISTS
+      // ==================================================
+
+      if (!meetingsForField) {
+
+        const createFieldPayload = {
+          fields: [
+            {
+              field_label: 'Meetings For',
+              data_type: 'multiselectpicklist',
+              pick_list_values: selectedValues.map(
+                value => ({
+                  display_value: value,
+                  actual_value: value
+                })
+              )
+            }
+          ]
+        };
+
+        await zrc.post(
+          `/crm/v8/settings/fields?module=${moduleAPI}`,
+          createFieldPayload
+        );
+
+        /* Re-fetch field metadata */
+        const refreshFieldsResp = await zrc.get(
+          `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
+        );
+
+        const refreshedFields = refreshFieldsResp?.data?.fields || [];
+
+        meetingsForField = refreshedFields.find(
+          field =>
+            field.field_label === 'Meetings For' ||
+            field.api_name === 'Meetings_For'
+        );
+
+        console.log('Meetings For field created successfully');
+        return { success: true, message: 'Meetings For field created successfully' };
+
+      }
+
+      // ==================================================
+      // STEP 4: BUILD PICKLIST VALUES
+      // ==================================================
+
+      const existingPicklistValues = meetingsForField.pick_list_values || [];
+
+      const pickListValues = [];
+
+      for (const selectedValue of selectedValues) {
+
+        const existingValue = existingPicklistValues.find(
+          value =>
+            value.display_value === selectedValue ||
+            value.actual_value === selectedValue
+        );
+
+        if (existingValue) {
+
+          /* Existing Used/Unused value */
+          pickListValues.push({
+            id: existingValue.id,
+            display_value: existingValue.display_value
+          });
+
+        } else {
+
+          /* New value */
+          pickListValues.push({
+            display_value: selectedValue,
+            actual_value: selectedValue
+          });
+
+        }
+
+      }
+
+      // ==================================================
+      // STEP 5: UPDATE LAYOUT
+      // ==================================================
+
+      const layoutUpdatePayload = {
+        layouts: [
+          {
+            id: layoutId,
+            sections: [
+              {
+                id: sectionId,
+                fields: [
+                  {
+                    id: meetingsForField.id,
+                    pick_list_values: pickListValues
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      console.log(
+        'Layout Update Payload:',
+        JSON.stringify(layoutUpdatePayload, null, 2)
+      );
+
+      const updateResp = await zrc.put(
+        `/crm/v8/settings/layouts/${layoutId}`,
+        layoutUpdatePayload
+      );
+
+      return updateResp;
+
+    } catch (error) {
+
+      console.error('Error updating Meetings For field', error);
+      throw error;
+
+    }
+
   }
 
   function init() {
