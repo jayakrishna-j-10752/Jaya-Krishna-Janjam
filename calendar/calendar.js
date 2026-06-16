@@ -2253,7 +2253,7 @@ $(function () {
       );
 
       const updateResp = await zrc.patch(
-        `/crm/v8/settings/layouts/${layoutId}`,
+        `/crm/v8/settings/layouts/${layoutId}?module=${moduleAPI}`,
         layoutUpdatePayload
       );
 
