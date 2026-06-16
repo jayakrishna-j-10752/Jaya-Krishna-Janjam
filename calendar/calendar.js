@@ -2135,7 +2135,7 @@ $(function () {
           console.log("Final picklist values:", finalPicklist);
 
           await zrc.patch(
-            `/crm/v8/settings/fields/${layout.id}?module=${moduleName}`,
+            `/crm/v8/settings/fields/${mfField.id}?module=${moduleName}`,
             {
               fields: [
                 {
