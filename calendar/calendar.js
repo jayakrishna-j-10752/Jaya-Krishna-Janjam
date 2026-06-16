@@ -2154,7 +2154,7 @@ $(function () {
           fields: [
             {
               field_label: 'Meetings For',
-              data_type: 'multiselectpicklist',
+              data_type: 'picklist',
               pick_list_values: selectedValues.map(
                 value => ({
                   display_value: value,
