@@ -1810,6 +1810,33 @@ $(function () {
   var mfSelected  = []; /* api_names of currently confirmed selections */
   var mfSnapshot  = []; /* snapshot of mfSelected taken when dropdown opens (used by Cancel) */
 
+  /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
+  var mfColors = (function () {
+    try { return JSON.parse(localStorage.getItem('zcrm_mf_colors') || '{}'); }
+    catch (e) { return {}; }
+  }());
+
+  function saveMfColors() {
+    try { localStorage.setItem('zcrm_mf_colors', JSON.stringify(mfColors)); }
+    catch (e) { /* ignore */ }
+  }
+
+  /* Default palette – cycles when a new module is first assigned a color */
+  var MCP_DEFAULT_PALETTE = [
+    '#1565C0', '#2E7D32', '#E65100', '#C62828',
+    '#6A1B9A', '#00838F', '#F57F17', '#AD1457',
+    '#558B2F', '#4527A0', '#00695C', '#37474F'
+  ];
+
+  function chipColorFor(apiName) {
+    if (!mfColors[apiName]) {
+      var idx = Object.keys(mfColors).length % MCP_DEFAULT_PALETTE.length;
+      mfColors[apiName] = MCP_DEFAULT_PALETTE[idx];
+      saveMfColors();
+    }
+    return mfColors[apiName];
+  }
+
   /**
    * Populate MF_MODULES from the GET /crm/v8/settings/modules response and
    * re-render the chip strip to reflect any now-resolved names.
@@ -1893,9 +1920,13 @@ $(function () {
     var $sel  = $('#mfSelect');
     var html  = '';
     mfSelected.forEach(function (id) {
-      var m = MF_MODULES.find(function (x) { return x.id === id; });
+      var m     = MF_MODULES.find(function (x) { return x.id === id; });
       var label = m ? m.name : id;
-      html += '<span class="mf-chip" data-uid="' + escHtml(id) + '">' +
+      var color = chipColorFor(id);
+      html += '<span class="mf-chip" data-uid="' + escHtml(id) + '" data-color="' + escHtml(color) + '">' +
+              '<span class="mf-chip-dot" data-uid="' + escHtml(id) + '" ' +
+                'style="background:' + escHtml(color) + '" ' +
+                'title="Change color" role="button" aria-label="Change color for ' + escHtml(label) + '"></span>' +
               '<span class="mf-chip-text">' + escHtml(label) + '</span>' +
               '<span class="mf-chip-remove" data-uid="' + escHtml(id) + '" role="button" ' +
                 'aria-label="Remove ' + escHtml(label) + '" title="Remove">&#215;</span>' +
@@ -1974,9 +2005,10 @@ $(function () {
   }
 
   function initMf() {
-    /* Toggle on click of the trigger box (ignore clicks on chip ×) */
+    /* Toggle on click of the trigger box (ignore clicks on chip × and chip dot) */
     $(document).on('click', '#mfSelect', function (e) {
       if ($(e.target).closest('.mf-chip-remove').length) return;
+      if ($(e.target).closest('.mf-chip-dot').length) return;
       e.stopPropagation();
       if ($(this).hasClass('mf-open')) { closeMf(); } else { openMf(); }
     });
@@ -2041,7 +2073,8 @@ $(function () {
         .map(function () {
           return {
             label:   $(this).find('.mf-chip-text').text().trim(),
-            apiName: $(this).data('uid') || ''
+            apiName: $(this).data('uid') || '',
+            color:   $(this).data('color') || chipColorFor($(this).data('uid') || '')
           };
         })
         .get()
@@ -2075,7 +2108,8 @@ $(function () {
     /* Close when clicking outside */
     $(document).on('click.mf', function (e) {
       if (!$(e.target).closest('#mfDropdown').length &&
-          !$(e.target).closest('#mfSelect').length) {
+          !$(e.target).closest('#mfSelect').length &&
+          !$(e.target).closest('#mfChipColorPicker').length) {
         closeMf();
       }
     });
@@ -2084,7 +2118,352 @@ $(function () {
     $(window).on('resize.mf', function () {
       if ($('#mfSelect').hasClass('mf-open')) { positionMfDropdown(); }
     });
+
+    /* Initialise the chip color picker */
+    initChipColorPicker();
   }
+
+  /* ──────────────────────────────────────────────────────────
+     CHIP COLOR PICKER
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Full HSV color picker for individual .mf-chip dots.
+   * Opens anchored to the dot that was clicked and writes back
+   * to mfColors[apiName], then re-renders the chip.
+   */
+  function initChipColorPicker() {
+
+    var MCP_PRESETS = [
+      '#1565C0', '#2E7D32', '#E65100', '#C62828',
+      '#6A1B9A', '#00838F', '#F57F17', '#AD1457',
+      '#558B2F', '#4527A0', '#00695C', '#37474F'
+    ];
+
+    /* ── Internal state ── */
+    var mcp = {
+      open:    false,
+      apiName: null,
+      h: 220, s: 80, v: 78,   /* current HSV */
+      dragging: false
+    };
+
+    /* ── Colour math helpers ── */
+    function hsvToRgb(h, s, v) {
+      s /= 100; v /= 100;
+      var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+      var r, g, b;
+      if (h < 60)       { r = c; g = x; b = 0; }
+      else if (h < 120) { r = x; g = c; b = 0; }
+      else if (h < 180) { r = 0; g = c; b = x; }
+      else if (h < 240) { r = 0; g = x; b = c; }
+      else if (h < 300) { r = x; g = 0; b = c; }
+      else              { r = c; g = 0; b = x; }
+      return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+    }
+
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+      var h = 0, s = max === 0 ? 0 : d / max, v = max;
+      if (d !== 0) {
+        if (max === r)      h = ((g - b) / d + 6) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else                h = (r - g) / d + 4;
+        h *= 60;
+      }
+      return [h, s * 100, v * 100];
+    }
+
+    function hexToRgb(hex) {
+      hex = hex.replace('#', '');
+      if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+      if (hex.length !== 6) return null;
+      var n = parseInt(hex, 16);
+      if (isNaN(n)) return null;
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(function (val) {
+        return Math.max(0, Math.min(255, Math.round(val))).toString(16).padStart(2, '0');
+      }).join('');
+    }
+
+    /* ── Canvas ── */
+    function drawCanvas() {
+      var canvas = document.getElementById('mcpCanvas');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+      var w = canvas.width, h = canvas.height;
+      var rgb = hsvToRgb(mcp.h, 100, 100);
+      var hGrad = ctx.createLinearGradient(0, 0, w, 0);
+      hGrad.addColorStop(0, 'rgba(255,255,255,1)');
+      hGrad.addColorStop(1, 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')');
+      ctx.fillStyle = hGrad;
+      ctx.fillRect(0, 0, w, h);
+      var vGrad = ctx.createLinearGradient(0, 0, 0, h);
+      vGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      vGrad.addColorStop(1, 'rgba(0,0,0,1)');
+      ctx.fillStyle = vGrad;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    function updatePointer() {
+      var $canvas = $('#mcpCanvas');
+      var $ptr    = $('#mcpPointer');
+      if (!$canvas.length) return;
+      var w = $canvas.outerWidth();
+      var h = $canvas.outerHeight();
+      $ptr.css({ left: (mcp.s / 100) * w, top: (1 - mcp.v / 100) * h });
+    }
+
+    function updatePreview() {
+      var rgb = hsvToRgb(mcp.h, mcp.s, mcp.v);
+      var hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+      $('#mcpPreview').css('background', hex);
+      $('#mcpHueSlider').val(mcp.h);
+
+      if ($('#mcpHexRow').is(':hidden')) {
+        $('#mcpR').val(rgb[0]);
+        $('#mcpG').val(rgb[1]);
+        $('#mcpB').val(rgb[2]);
+      } else {
+        $('#mcpHex').val(hex);
+      }
+
+      $('#mcpPresets .mcp-preset-dot').each(function () {
+        $(this).toggleClass('mcp-preset-active', $(this).data('color') === hex);
+      });
+    }
+
+    function commitColor() {
+      var rgb = hsvToRgb(mcp.h, mcp.s, mcp.v);
+      var hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+      if (mcp.apiName) {
+        mfColors[mcp.apiName] = hex;
+        saveMfColors();
+        var $chip = $('.mf-chip[data-uid="' + mcp.apiName + '"]');
+        $chip.attr('data-color', hex);
+        $chip.find('.mf-chip-dot').css('background', hex);
+      }
+    }
+
+    /* ── Canvas interaction ── */
+    function canvasPickAt(offsetX, offsetY) {
+      var $canvas = $('#mcpCanvas');
+      var w = $canvas.outerWidth(), h = $canvas.outerHeight();
+      mcp.s = Math.max(0, Math.min(100, (offsetX / w) * 100));
+      mcp.v = Math.max(0, Math.min(100, (1 - offsetY / h) * 100));
+      updatePointer();
+      updatePreview();
+      commitColor();
+    }
+
+    $(document).on('mousedown.mcp', '#mcpCanvas', function (e) {
+      mcp.dragging = true;
+      var rect = this.getBoundingClientRect();
+      canvasPickAt(e.clientX - rect.left, e.clientY - rect.top);
+      e.preventDefault();
+    });
+
+    $(document).on('mousemove.mcp', function (e) {
+      if (!mcp.dragging) return;
+      var canvas = document.getElementById('mcpCanvas');
+      if (!canvas) return;
+      var rect = canvas.getBoundingClientRect();
+      canvasPickAt(
+        Math.max(0, Math.min(rect.width,  e.clientX - rect.left)),
+        Math.max(0, Math.min(rect.height, e.clientY - rect.top))
+      );
+    });
+
+    $(document).on('mouseup.mcp', function () { mcp.dragging = false; });
+
+    /* Touch support */
+    $(document).on('touchstart.mcp', '#mcpCanvas', function (e) {
+      mcp.dragging = true;
+      var rect = this.getBoundingClientRect();
+      var t = e.originalEvent.touches[0];
+      canvasPickAt(t.clientX - rect.left, t.clientY - rect.top);
+      e.preventDefault();
+    });
+    $(document).on('touchmove.mcp', function (e) {
+      if (!mcp.dragging) return;
+      var canvas = document.getElementById('mcpCanvas');
+      if (!canvas) return;
+      var rect = canvas.getBoundingClientRect();
+      var t = e.originalEvent.touches[0];
+      canvasPickAt(
+        Math.max(0, Math.min(rect.width,  t.clientX - rect.left)),
+        Math.max(0, Math.min(rect.height, t.clientY - rect.top))
+      );
+    });
+    $(document).on('touchend.mcp', function () { mcp.dragging = false; });
+
+    /* ── Hue slider ── */
+    $(document).on('input.mcp', '#mcpHueSlider', function () {
+      mcp.h = parseFloat($(this).val()) || 0;
+      drawCanvas();
+      updatePointer();
+      updatePreview();
+      commitColor();
+    });
+
+    /* ── RGB inputs ── */
+    $(document).on('change.mcp input.mcp', '#mcpR, #mcpG, #mcpB', function () {
+      var r = parseInt($('#mcpR').val(), 10) || 0;
+      var g = parseInt($('#mcpG').val(), 10) || 0;
+      var b = parseInt($('#mcpB').val(), 10) || 0;
+      var hsv = rgbToHsv(r, g, b);
+      mcp.h = hsv[0]; mcp.s = hsv[1]; mcp.v = hsv[2];
+      $('#mcpHueSlider').val(mcp.h);
+      drawCanvas();
+      updatePointer();
+      $('#mcpPreview').css('background', rgbToHex(r, g, b));
+      commitColor();
+    });
+
+    /* ── HEX input ── */
+    $(document).on('change.mcp', '#mcpHex', function () {
+      var rgb = hexToRgb($(this).val().trim());
+      if (!rgb) return;
+      var hsv = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+      mcp.h = hsv[0]; mcp.s = hsv[1]; mcp.v = hsv[2];
+      $('#mcpHueSlider').val(mcp.h);
+      drawCanvas();
+      updatePointer();
+      updatePreview();
+      commitColor();
+    });
+
+    /* ── Mode toggle (RGB ↔ HEX) ── */
+    $(document).on('click.mcp', '#mcpModeBtn, #mcpModeBtnHex', function (e) {
+      e.stopPropagation();
+      var $rgb = $('#mcpR').closest('.mcp-rgb-row');
+      var $hex = $('#mcpHexRow');
+      $rgb.toggle(); $hex.toggle();
+      updatePreview();
+    });
+
+    /* ── Preset dots ── */
+    function buildPresets() {
+      var html = '';
+      MCP_PRESETS.forEach(function (c) {
+        html += '<span class="mcp-preset-dot" data-color="' + escHtml(c) + '" ' +
+                'style="background:' + escHtml(c) + '" title="' + escHtml(c) + '"></span>';
+      });
+      $('#mcpPresets').html(html);
+    }
+
+    $(document).on('click.mcp', '.mcp-preset-dot', function (e) {
+      e.stopPropagation();
+      var hex = $(this).data('color');
+      var rgb = hexToRgb(hex);
+      if (!rgb) return;
+      var hsv = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+      mcp.h = hsv[0]; mcp.s = hsv[1]; mcp.v = hsv[2];
+      $('#mcpHueSlider').val(mcp.h);
+      drawCanvas();
+      updatePointer();
+      updatePreview();
+      commitColor();
+    });
+
+    /* ── Eyedropper (EyeDropper API where supported) ── */
+    $(document).on('click.mcp', '#mcpEyedrop', function (e) {
+      e.stopPropagation();
+      if (!window.EyeDropper) { return; }
+      var eyedropper = new window.EyeDropper();
+      eyedropper.open().then(function (result) {
+        var rgb = hexToRgb(result.sRGBHex);
+        if (!rgb) return;
+        var hsv = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+        mcp.h = hsv[0]; mcp.s = hsv[1]; mcp.v = hsv[2];
+        $('#mcpHueSlider').val(mcp.h);
+        drawCanvas();
+        updatePointer();
+        updatePreview();
+        commitColor();
+      }).catch(function () { /* user cancelled */ });
+    });
+
+    /* ── Open / close ── */
+    function openChipColorPicker(dotEl, apiName) {
+      mcp.apiName = apiName;
+
+      var hex = chipColorFor(apiName);
+      var rgb = hexToRgb(hex) || [21, 101, 192];
+      var hsv = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+      mcp.h = hsv[0]; mcp.s = hsv[1]; mcp.v = hsv[2];
+
+      buildPresets();
+
+      var $panel = $('#mfChipColorPicker');
+      $panel.addClass('mcp-open');
+      mcp.open = true;
+
+      /* Reset to RGB mode */
+      $('#mcpR').closest('.mcp-rgb-row').show();
+      $('#mcpHexRow').hide();
+
+      setTimeout(function () {
+        drawCanvas();
+        updatePointer();
+        updatePreview();
+        positionMcpPanel(dotEl);
+      }, 10);
+    }
+
+    function closeChipColorPicker() {
+      $('#mfChipColorPicker').removeClass('mcp-open');
+      mcp.open = false;
+      mcp.apiName = null;
+    }
+
+    function positionMcpPanel(dotEl) {
+      var $panel = $('#mfChipColorPicker');
+      var $dot   = $(dotEl);
+      var off    = $dot.offset();
+      var dH     = $dot.outerHeight(true);
+      var pW     = $panel.outerWidth();
+      var pH     = $panel.outerHeight();
+      var vpW    = $(window).width();
+      var vpH    = $(window).height();
+      var left   = off.left;
+      var top    = off.top + dH + 4;
+      if (left + pW > vpW - 8) left = vpW - pW - 8;
+      if (left < 8) left = 8;
+      if (top + pH > vpH - 8) top = off.top - pH - 4;
+      $panel.css({ top: top, left: left });
+    }
+
+    /* ── Chip dot click → open picker ── */
+    $(document).on('click.mcp', '.mf-chip-dot', function (e) {
+      e.stopPropagation();
+      var id = $(this).data('uid');
+      if (mcp.open && mcp.apiName === id) {
+        closeChipColorPicker();
+      } else {
+        openChipColorPicker(this, id);
+      }
+    });
+
+    /* ── Close on outside click ── */
+    $(document).on('click.mcpOutside', function (e) {
+      if (mcp.open &&
+          !$(e.target).closest('#mfChipColorPicker').length &&
+          !$(e.target).hasClass('mf-chip-dot')) {
+        closeChipColorPicker();
+      }
+    });
+
+    /* ── Close on Escape ── */
+    $(document).on('keydown.mcpEsc', function (e) {
+      if (e.key === 'Escape' && mcp.open) { closeChipColorPicker(); }
+    });
+
+  } /* end initChipColorPicker */
 
   /* ──────────────────────────────────────────────────────────
      MEETINGS-FOR CRM FIELD SYNC
@@ -2166,9 +2545,13 @@ $(function () {
           o.display_value === chip.label || o.actual_value === chip.label
         );
 
-        return existing
+        const colourCode = chip.color || null;
+
+        const base = existing
           ? { id: existing.id, display_value: existing.display_value, actual_value: existing.actual_value }
           : { display_value: chip.label, actual_value: chip.label };
+
+        return colourCode ? { ...base, colour_code: colourCode } : base;
 
       });
 

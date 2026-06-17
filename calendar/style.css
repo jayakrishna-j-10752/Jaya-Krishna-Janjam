@@ -1446,8 +1446,8 @@ input, select, textarea {
 .mf-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px 3px 9px;
+  gap: 5px;
+  padding: 3px 6px 3px 6px;
   background: var(--z-blue-pale);
   color: var(--z-blue);
   border-radius: 12px;
@@ -2528,3 +2528,232 @@ input, select, textarea {
   color: var(--z-blue);
   background: var(--z-blue-pale);
 }
+
+/* ══════════════════════════════════════════════════════════
+   CHIP COLOR PICKER  (.mcp-*)
+══════════════════════════════════════════════════════════ */
+
+/* ── Colored dot on each chip ── */
+.mf-chip-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1.5px solid rgba(0,0,0,.18);
+  transition: transform .13s, box-shadow .13s;
+  order: -1; /* left of text */
+}
+.mf-chip-dot:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2px rgba(0,0,0,.12);
+}
+
+/* ── Floating picker panel ── */
+.mcp-panel {
+  position: fixed;
+  width: 288px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px) scale(.97);
+  transition: opacity .15s, transform .15s;
+  user-select: none;
+}
+.mcp-panel.mcp-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+
+/* ── Gradient canvas ── */
+.mcp-canvas-wrap {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+.mcp-canvas {
+  width: 100%;
+  height: 160px;
+  display: block;
+  cursor: crosshair;
+}
+.mcp-pointer {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(0,0,0,.5);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+}
+
+/* ── Controls row: eyedrop + preview + hue slider ── */
+.mcp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 4px;
+}
+.mcp-eyedrop {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+  padding: 0;
+}
+.mcp-eyedrop:hover { border-color: var(--z-blue); color: var(--z-blue); }
+.mcp-eyedrop svg { width: 14px; height: 14px; pointer-events: none; }
+
+.mcp-preview {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: #1565C0;
+}
+
+.mcp-hue-wrap { flex: 1; }
+.mcp-hue-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(to right,
+    #ff0000, #ff8000, #ffff00, #00ff00,
+    #00ffff, #0000ff, #8000ff, #ff0000);
+  outline: none;
+  cursor: pointer;
+}
+.mcp-hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,.4);
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  cursor: pointer;
+}
+.mcp-hue-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,.4);
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  cursor: pointer;
+}
+
+/* ── Preset swatches ── */
+.mcp-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 10px 6px;
+}
+.mcp-preset-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform .12s, box-shadow .12s;
+  flex-shrink: 0;
+}
+.mcp-preset-dot:hover { transform: scale(1.2); }
+.mcp-preset-dot.mcp-preset-active {
+  border-color: var(--surface);
+  box-shadow: 0 0 0 2.5px var(--z-blue);
+  transform: scale(1.15);
+}
+
+/* ── RGB / HEX inputs ── */
+.mcp-rgb-row, .mcp-hex-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 2px 10px 10px;
+}
+.mcp-rgb-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+.mcp-rgb-in {
+  width: 100%;
+  padding: 5px 4px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: var(--surface);
+  text-align: center;
+  outline: none;
+  transition: border-color .12s;
+  -moz-appearance: textfield;
+}
+.mcp-rgb-in::-webkit-inner-spin-button,
+.mcp-rgb-in::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.mcp-rgb-in:focus { border-color: var(--z-blue); }
+
+.mcp-hex-in {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-primary);
+  background: var(--surface);
+  outline: none;
+  transition: border-color .12s;
+}
+.mcp-hex-in:focus { border-color: var(--z-blue); }
+
+.mcp-rgb-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: .04em;
+}
+.mcp-mode-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color .12s, color .12s;
+  align-self: center;
+  margin-bottom: 14px;
+}
+.mcp-mode-btn:hover { border-color: var(--z-blue); color: var(--z-blue); }
+.mcp-mode-btn svg { width: 10px; height: 14px; pointer-events: none; }

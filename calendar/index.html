@@ -284,6 +284,61 @@
   </div>
 
 
+  <!-- ══════════════════════ CHIP COLOR PICKER ══════════════════════ -->
+  <div class="mcp-panel" id="mfChipColorPicker" role="dialog" aria-label="Choose chip color" aria-modal="true">
+    <div class="mcp-canvas-wrap">
+      <canvas class="mcp-canvas" id="mcpCanvas" width="260" height="160"></canvas>
+      <div class="mcp-pointer" id="mcpPointer"></div>
+    </div>
+    <div class="mcp-controls">
+      <button class="mcp-eyedrop" id="mcpEyedrop" title="Pick color from screen" aria-label="Eyedropper">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.5 2.5a2.121 2.121 0 0 1 3 3l-2 2-3-3 2-2z"/>
+          <path d="M5 14l-2 3 3-2 9-9-1-1-9 9z"/>
+          <line x1="11.5" y1="5.5" x2="14.5" y2="8.5"/>
+        </svg>
+      </button>
+      <div class="mcp-preview" id="mcpPreview"></div>
+      <div class="mcp-hue-wrap">
+        <input type="range" class="mcp-hue-slider" id="mcpHueSlider" min="0" max="360" value="0" aria-label="Hue" />
+      </div>
+    </div>
+    <div class="mcp-presets" id="mcpPresets"></div>
+    <div class="mcp-rgb-row">
+      <div class="mcp-rgb-field">
+        <input type="number" id="mcpR" min="0" max="255" class="mcp-rgb-in" aria-label="Red" />
+        <span class="mcp-rgb-lbl">R</span>
+      </div>
+      <div class="mcp-rgb-field">
+        <input type="number" id="mcpG" min="0" max="255" class="mcp-rgb-in" aria-label="Green" />
+        <span class="mcp-rgb-lbl">G</span>
+      </div>
+      <div class="mcp-rgb-field">
+        <input type="number" id="mcpB" min="0" max="255" class="mcp-rgb-in" aria-label="Blue" />
+        <span class="mcp-rgb-lbl">B</span>
+      </div>
+      <button class="mcp-mode-btn" id="mcpModeBtn" title="Switch to HEX" aria-label="Switch input mode">
+        <svg viewBox="0 0 10 14" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="2,5 5,2 8,5"/>
+          <polyline points="2,9 5,12 8,9"/>
+        </svg>
+      </button>
+    </div>
+    <div class="mcp-hex-row" id="mcpHexRow" style="display:none">
+      <input type="text" id="mcpHex" class="mcp-hex-in" maxlength="7" placeholder="#1565C0" aria-label="Hex color" />
+      <span class="mcp-rgb-lbl">HEX</span>
+      <button class="mcp-mode-btn" id="mcpModeBtnHex" title="Switch to RGB" aria-label="Switch input mode">
+        <svg viewBox="0 0 10 14" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="2,5 5,2 8,5"/>
+          <polyline points="2,9 5,12 8,9"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
   <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
   <script src="jquery.min.js"></script>
   <script src="calendar.js"></script>
