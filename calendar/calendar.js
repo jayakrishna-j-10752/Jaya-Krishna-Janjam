@@ -2244,7 +2244,7 @@ $(function () {
         mfColors[mcp.apiName] = hex;
         saveMfColors();
         var $chip = $('.mf-chip[data-uid="' + mcp.apiName + '"]');
-        $chip.attr('data-color', hex);
+        $chip.attr('data-color', hex).data('color', hex);
         /* Use native DOM to guarantee the inline background is refreshed —
            jQuery's .css('background', …) may normalise the shorthand in ways
            that browsers don't consistently reflect as a visual repaint. */
