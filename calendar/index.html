@@ -56,8 +56,8 @@
               </svg>
             </div>
             <div class="sye-head-text">
-              <h3 class="sye-head-title">Colour-code your events</h3>
-              <p class="sye-head-sub">Map any CRM picklist field to a colour slot — your calendar events are then styled automatically by that field's value.</p>
+              <h3 class="sye-head-title">Color-code your events</h3>
+              <p class="sye-head-sub">Map any CRM picklist field to a color slot — your calendar events are then styled automatically by that field's value.</p>
             </div>
           </div>
 
@@ -138,7 +138,9 @@
                   <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
                 </button>
 
-                <button class="sye-slot sye-slot--locked" data-slot="left-border" disabled aria-disabled="true">
+                <button class="sye-slot sye-slot--locked" data-slot="left-border"
+                        disabled aria-disabled="true"
+                        aria-describedby="sye-left-border-desc">
                   <span class="sye-slot-icon sye-icon-left" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Left border</span>
@@ -152,6 +154,9 @@
                     </span>
                   </span>
                 </button>
+                <span id="sye-left-border-desc" class="sye-visually-hidden">
+                  This slot is reserved for Approval status and cannot be changed.
+                </span>
 
               </div>
 
@@ -170,7 +175,7 @@
                 </div>
                 <div class="sye-prev-head-text">
                   <p class="sye-prev-title">Live preview</p>
-                  <p class="sye-prev-sub">See how your picks colour real calendar events.</p>
+                  <p class="sye-prev-sub">See how your picks color real calendar events.</p>
                 </div>
                 <span class="sye-prev-badge">TODAY</span>
               </div>
