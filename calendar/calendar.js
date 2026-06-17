@@ -3157,8 +3157,9 @@ $(function () {
 
   /* Escape key closes picker */
   $(document).on('keydown.sfp', function (e) {
-    if (e.key === 'Escape' && $('#sfpBackdrop').hasClass('sfp-open')) {
-      closeSyeFieldPicker();
+    if (e.key === 'Escape') {
+      if ($('#sfpBackdrop').hasClass('sfp-open')) { closeSyeFieldPicker(); }
+      if ($('#lockedInfoBackdrop').hasClass('sfp-open')) { $('#lockedInfoBackdrop').removeClass('sfp-open'); }
     }
   });
 
@@ -3167,6 +3168,21 @@ $(function () {
     var slot = $(this).data('slot');
     if (!slot) { return; }
     openSyeFieldPicker(slot);
+  });
+
+  /* Show info popup when a locked slot is clicked */
+  $(document).on('click', '.sye-slot--locked', function () {
+    $('#lockedInfoBackdrop').addClass('sfp-open');
+  });
+
+  $(document).on('click', '#lockedInfoClose', function () {
+    $('#lockedInfoBackdrop').removeClass('sfp-open');
+  });
+
+  $(document).on('click', '#lockedInfoBackdrop', function (e) {
+    if ($(e.target).is('#lockedInfoBackdrop')) {
+      $('#lockedInfoBackdrop').removeClass('sfp-open');
+    }
   });
 
   /* ──────────────────────────────────────────────────────────

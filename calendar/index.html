@@ -136,7 +136,7 @@
                 </button>
 
                 <button class="sye-slot sye-slot--locked" data-slot="left-border" data-preview="1"
-                        disabled aria-disabled="true"
+                        aria-disabled="true"
                         aria-describedby="sye-left-border-desc">
                   <span class="sye-slot-icon sye-icon-left" aria-hidden="true"></span>
                   <span class="sye-slot-info">
@@ -183,7 +183,7 @@
                   <span class="sye-prev-label">Drop · Pending</span>
                   <span class="sye-prev-dot" style="background:#FF8F00"></span>
                 </div>
-                <div class="sye-prev-evt sye-evt--focus" data-evt-index="1">
+                <div class="sye-prev-evt sye-evt--focus sye-evt--all-borders" data-evt-index="1">
                   <span class="sye-prev-time">11:30</span>
                   <span class="sye-prev-label">Sample drop with Raj...</span>
                   <span class="sye-prev-dot" style="background:#E91E63"></span>
@@ -526,6 +526,19 @@
       </div>
       <div class="sfp-body" id="sfpBody">
         <p class="sfp-loading" id="sfpLoading">Loading fields…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ LOCKED SLOT INFO POPUP ══════════════════════ -->
+  <div class="sfp-backdrop" id="lockedInfoBackdrop" role="dialog" aria-modal="true" aria-labelledby="lockedInfoTitle">
+    <div class="sfp-box sfp-box--info">
+      <div class="sfp-head">
+        <p class="sfp-title" id="lockedInfoTitle">Left Border</p>
+        <button class="sfp-close" id="lockedInfoClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="sfp-body">
+        <p class="sfp-locked-msg">Border Left is reserved for Approved, Rejected, or Pending status indicators.</p>
       </div>
     </div>
   </div>
