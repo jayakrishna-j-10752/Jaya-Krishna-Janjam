@@ -2062,6 +2062,30 @@ input, select, textarea {
   animation: sye-left-border-blink .65s ease-in-out infinite;
 }
 
+/* Respect reduced-motion preference – replace blink with a static highlight */
+@media (prefers-reduced-motion: reduce) {
+  .sye-prev-evt--bg-active {
+    animation: none;
+    background: var(--z-blue-pale);
+  }
+  .sye-prev-evt--top-active {
+    animation: none;
+    box-shadow: inset 0 3px 0 0 var(--z-blue);
+  }
+  .sye-prev-evt--bottom-active {
+    animation: none;
+    box-shadow: inset 0 -3px 0 0 var(--z-blue);
+  }
+  .sye-prev-evt--right-active {
+    animation: none;
+    box-shadow: inset -3px 0 0 0 var(--z-blue);
+  }
+  .sye-prev-evt--left-active {
+    animation: none;
+    border-left-color: var(--z-blue);
+  }
+}
+
 /* Preview event hover: pulse all four border sides */
 @keyframes sye-border-pulse {
   0%, 100% { outline-color: var(--z-blue); }
