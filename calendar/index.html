@@ -516,6 +516,21 @@
     </div>
   </div>
 
+  <!-- ══════════════════════ SYE FIELD PICKER POPUP ══════════════════════ -->
+  <div class="sfp-backdrop" id="sfpBackdrop" role="dialog" aria-modal="true" aria-labelledby="sfpTitle">
+    <div class="sfp-box">
+      <div class="sfp-head">
+        <p class="sfp-title" id="sfpTitle">Choose a picklist field</p>
+        <span class="sfp-slot-name" id="sfpSlotName"></span>
+        <button class="sfp-close" id="sfpClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="sfp-body" id="sfpBody">
+        <p class="sfp-loading" id="sfpLoading">Loading fields…</p>
+      </div>
+    </div>
+  </div>
+
+
   <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
   <script src="jquery.min.js"></script>
   <script src="calendar.js"></script>

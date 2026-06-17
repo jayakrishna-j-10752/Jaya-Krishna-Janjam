@@ -2968,27 +2968,37 @@ $(function () {
 
   /* ──────────────────────────────────────────────────────────
      STYLE-BAR SLOT ↔ PREVIEW HIGHLIGHT
-     When a user hovers a .sye-slot, highlight the corresponding
-     .sye-prev-evt so the relationship is immediately clear.
-     For the bg-colour slot the background blinks; for all other
-     slots the standard active outline is shown.
+     When a user hovers a .sye-slot, the corresponding style
+     property in .sye-prev-evt blinks indefinitely while the
+     cursor remains on that slot.
      Reverse: hovering a .sye-prev-evt highlights the related
      .sye-slot buttons and pulses the event's border sides.
   ────────────────────────────────────────────────────────── */
+
+  /* Map each slot name to the blink class it applies to .sye-prev-evt */
+  var SYE_SLOT_BLINK = {
+    'bg-colour':    'sye-prev-evt--bg-active',
+    'top-border':   'sye-prev-evt--top-active',
+    'bottom-border':'sye-prev-evt--bottom-active',
+    'right-border': 'sye-prev-evt--right-active',
+    'left-border':  'sye-prev-evt--left-active'
+  };
+  var SYE_ALL_BLINK = Object.values(SYE_SLOT_BLINK).join(' ');
+
   $(document).on('mouseenter', '.sye-slot', function () {
     var idx  = $(this).data('preview');
     var slot = $(this).data('slot');
     if (idx === undefined) { return; }
-    $('.sye-prev-evt').removeClass('sye-prev-evt--active sye-prev-evt--bg-active');
-    var $target = $('.sye-prev-evt[data-evt-index="' + idx + '"]');
-    if (slot === 'bg-colour') {
-      $target.addClass('sye-prev-evt--bg-active');
+    $('.sye-prev-evt').removeClass(SYE_ALL_BLINK + ' sye-prev-evt--active');
+    var blinkClass = SYE_SLOT_BLINK[slot];
+    if (blinkClass) {
+      $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass(blinkClass);
     } else {
-      $target.addClass('sye-prev-evt--active');
+      $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass('sye-prev-evt--active');
     }
   });
   $(document).on('mouseleave', '.sye-slot', function () {
-    $('.sye-prev-evt').removeClass('sye-prev-evt--active sye-prev-evt--bg-active');
+    $('.sye-prev-evt').removeClass(SYE_ALL_BLINK + ' sye-prev-evt--active');
   });
 
   /* Reverse highlight: hovering a preview event lights up its related slots */
@@ -2999,6 +3009,152 @@ $(function () {
   });
   $(document).on('mouseleave', '.sye-prev-evt', function () {
     $('.sye-slot').removeClass('sye-slot--preview-active');
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     SYE FIELD PICKER POPUP
+     Clicking an unlocked .sye-slot opens a popup that lists all
+     picklist fields from beatplanner__Daily_Beat_Plans.
+     Each field can only be assigned to one slot at a time.
+  ────────────────────────────────────────────────────────── */
+
+  /* { slotName: { api_name, field_label } } – persists for the session */
+  var syeSlotAssignments = {};
+  /* Cached picklist fields from the CRM (fetched once) */
+  var syePicklistFields  = null;
+  var syeActiveSlot      = null;   /* slot name currently open in the picker */
+
+  /* Human-readable slot labels for the popup header */
+  var SYE_SLOT_LABELS = {
+    'bg-colour':     'Background colour',
+    'top-border':    'Top border',
+    'bottom-border': 'Bottom border',
+    'right-border':  'Right border',
+    'status-dot':    'Status dot'
+  };
+
+  /* Picklist field icon SVG */
+  var SFP_FIELD_SVG =
+    '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="1" y="1" width="12" height="12" rx="2"/>' +
+    '<path d="M4 5h6M4 7h4M4 9h5"/>' +
+    '</svg>';
+
+  function openSyeFieldPicker(slotName) {
+    syeActiveSlot = slotName;
+    var label = SYE_SLOT_LABELS[slotName] || slotName;
+    $('#sfpSlotName').text(label);
+    $('#sfpBody').html('<p class="sfp-loading" id="sfpLoading">Loading fields\u2026</p>');
+    $('#sfpBackdrop').addClass('sfp-open');
+
+    if (syePicklistFields !== null) {
+      renderSyeFieldList();
+    } else {
+      fetchSyePicklistFields();
+    }
+  }
+
+  function closeSyeFieldPicker() {
+    $('#sfpBackdrop').removeClass('sfp-open');
+    syeActiveSlot = null;
+  }
+
+  async function fetchSyePicklistFields() {
+    try {
+      var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Daily_Beat_Plans&type=all');
+      var allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
+      syePicklistFields = allFields.filter(function (f) {
+        return f.data_type === 'picklist' || f.data_type === 'pick_list';
+      });
+    } catch (e) {
+      syePicklistFields = [];
+    }
+    renderSyeFieldList();
+  }
+
+  function renderSyeFieldList() {
+    var $body = $('#sfpBody');
+
+    if (!syePicklistFields || syePicklistFields.length === 0) {
+      $body.html('<p class="sfp-empty">No picklist fields found in <em>beatplanner__Daily_Beat_Plans</em>.</p>');
+      return;
+    }
+
+    /* Build a set of used api_names (excluding the slot currently being edited) */
+    var usedApiNames = {};
+    $.each(syeSlotAssignments, function (slot, assignment) {
+      if (slot !== syeActiveSlot) {
+        usedApiNames[assignment.api_name] = SYE_SLOT_LABELS[slot] || slot;
+      }
+    });
+
+    var currentAssignment = syeSlotAssignments[syeActiveSlot];
+
+    var html = '';
+    $.each(syePicklistFields, function (_, f) {
+      var apiName  = f.api_name    || '';
+      var label    = f.field_label || apiName;
+      var isUsed   = !!usedApiNames[apiName];
+      var isActive = currentAssignment && currentAssignment.api_name === apiName;
+
+      var itemClass = 'sfp-field-item';
+      if (isUsed)   { itemClass += ' sfp-field-item--used'; }
+      if (isActive) { itemClass += ' sfp-field-item--selected'; }
+
+      var badge = isUsed
+        ? '<span class="sfp-field-used-badge">Used: ' + escHtml(usedApiNames[apiName]) + '</span>'
+        : '';
+
+      html +=
+        '<div class="' + itemClass + '"' +
+        (!isUsed ? ' data-api="' + escHtml(apiName) + '" data-label="' + escHtml(label) + '"' : '') +
+        ' role="option" aria-selected="' + (isActive ? 'true' : 'false') + '">' +
+        '<span class="sfp-field-icon">' + SFP_FIELD_SVG + '</span>' +
+        '<span class="sfp-field-label">' + escHtml(label) + '</span>' +
+        '<span class="sfp-field-api">' + escHtml(apiName) + '</span>' +
+        badge +
+        '</div>';
+    });
+
+    $body.html('<div role="listbox" aria-label="Picklist fields">' + html + '</div>');
+  }
+
+  /* Select a field from the picker */
+  $(document).on('click', '.sfp-field-item:not(.sfp-field-item--used)', function () {
+    var apiName  = $(this).data('api');
+    var label    = $(this).data('label');
+    if (!syeActiveSlot || !apiName) { return; }
+
+    /* Persist assignment */
+    syeSlotAssignments[syeActiveSlot] = { api_name: apiName, field_label: label };
+
+    /* Update the slot button's field sub-label */
+    $('.sye-slot[data-slot="' + syeActiveSlot + '"] .sye-slot-field').text(label);
+
+    closeSyeFieldPicker();
+  });
+
+  /* Close button */
+  $(document).on('click', '#sfpClose', closeSyeFieldPicker);
+
+  /* Click on backdrop (outside the box) closes it */
+  $(document).on('click', '#sfpBackdrop', function (e) {
+    if ($(e.target).is('#sfpBackdrop')) { closeSyeFieldPicker(); }
+  });
+
+  /* Escape key closes picker */
+  $(document).on('keydown.sfp', function (e) {
+    if (e.key === 'Escape' && $('#sfpBackdrop').hasClass('sfp-open')) {
+      closeSyeFieldPicker();
+    }
+  });
+
+  /* Open picker on slot click (locked slots are disabled – no click fires) */
+  $(document).on('click', '.sye-slot:not(.sye-slot--locked)', function () {
+    var slot = $(this).data('slot');
+    if (!slot) { return; }
+    openSyeFieldPicker(slot);
   });
 
   /* ──────────────────────────────────────────────────────────

@@ -2018,15 +2018,48 @@ input, select, textarea {
   background: var(--z-blue-pale);
 }
 
-/* Background-colour slot hover: blink the event background */
+/* Background-colour slot hover: blink the event background indefinitely */
 @keyframes sye-bg-blink {
   0%, 100% { background: var(--z-blue-pale); }
   50%       { background: color-mix(in srgb, var(--z-blue) 35%, var(--surface-2)); }
 }
 .sye-prev-evt--bg-active {
-  animation: sye-bg-blink .65s ease-in-out 4;
-  box-shadow: 0 0 0 2px var(--z-blue), 0 3px 12px color-mix(in srgb, var(--z-blue) 20%, transparent);
-  transform: translateX(3px);
+  animation: sye-bg-blink .65s ease-in-out infinite;
+}
+
+/* Top-border slot hover: blink the top border indefinitely (inset shadow, no layout shift) */
+@keyframes sye-top-border-blink {
+  0%, 100% { box-shadow: inset 0 3px 0 0 var(--z-blue); }
+  50%       { box-shadow: inset 0 3px 0 0 transparent; }
+}
+.sye-prev-evt--top-active {
+  animation: sye-top-border-blink .65s ease-in-out infinite;
+}
+
+/* Bottom-border slot hover: blink the bottom border indefinitely */
+@keyframes sye-bottom-border-blink {
+  0%, 100% { box-shadow: inset 0 -3px 0 0 var(--z-blue); }
+  50%       { box-shadow: inset 0 -3px 0 0 transparent; }
+}
+.sye-prev-evt--bottom-active {
+  animation: sye-bottom-border-blink .65s ease-in-out infinite;
+}
+
+/* Right-border slot hover: blink the right border indefinitely */
+@keyframes sye-right-border-blink {
+  0%, 100% { box-shadow: inset -3px 0 0 0 var(--z-blue); }
+  50%       { box-shadow: inset -3px 0 0 0 transparent; }
+}
+.sye-prev-evt--right-active {
+  animation: sye-right-border-blink .65s ease-in-out infinite;
+}
+
+/* Left-border slot hover: blink the existing left border indefinitely */
+@keyframes sye-left-border-blink {
+  50% { border-left-color: transparent; }
+}
+.sye-prev-evt--left-active {
+  animation: sye-left-border-blink .65s ease-in-out infinite;
 }
 
 /* Preview event hover: pulse all four border sides */
@@ -2094,6 +2127,144 @@ input, select, textarea {
   background: var(--surface-2);
   border-radius: 6px;
   border-left: 2px solid var(--z-blue);
+}
+
+/* ── Field Picker Popup ── */
+.sfp-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .38);
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+}
+.sfp-backdrop.sfp-open {
+  display: flex;
+}
+.sfp-box {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, .22);
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 64px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sfp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sfp-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+.sfp-slot-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+.sfp-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: background .15s, color .15s;
+}
+.sfp-close:hover { background: var(--surface-2); color: var(--text-primary); }
+.sfp-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.sfp-loading,
+.sfp-empty {
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.sfp-field-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.sfp-field-item:hover:not(.sfp-field-item--used) {
+  background: var(--z-blue-pale);
+}
+.sfp-field-item--used {
+  cursor: default;
+  opacity: .5;
+}
+.sfp-field-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--z-blue) 12%, var(--surface-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--z-blue);
+}
+.sfp-field-icon svg { width: 14px; height: 14px; }
+.sfp-field-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sfp-field-api {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.sfp-field-used-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+.sfp-field-item--selected {
+  background: color-mix(in srgb, var(--z-blue) 8%, var(--surface));
+}
+.sfp-field-item--selected .sfp-field-label {
+  color: var(--z-blue);
+  font-weight: 700;
 }
 
 /* ── Footer ── */
