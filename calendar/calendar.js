@@ -3008,15 +3008,6 @@ $(function () {
     $('.sye-prev-dot').removeClass('sye-prev-dot--blink');
   });
 
-  /* Reverse highlight: hovering a preview event lights up its related slots */
-  $(document).on('mouseenter', '.sye-prev-evt', function () {
-    var evtIdx = $(this).data('evt-index');
-    if (evtIdx === undefined) { return; }
-    $('.sye-slot[data-preview="' + evtIdx + '"]').addClass('sye-slot--preview-active');
-  });
-  $(document).on('mouseleave', '.sye-prev-evt', function () {
-    $('.sye-slot').removeClass('sye-slot--preview-active');
-  });
 
   /* ──────────────────────────────────────────────────────────
      SYE FIELD PICKER POPUP
