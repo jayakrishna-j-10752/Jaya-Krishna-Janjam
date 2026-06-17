@@ -2938,27 +2938,30 @@ $(function () {
      BEAT PLAN / SETTINGS VIEW HELPERS
   ────────────────────────────────────────────────────────── */
   var $meetingsBar    = $('.meetings-bar');
+  var $styleBar       = $('#styleBar');
   var $otherContent   = $('.header-toolbar, .header-main, .cal-body');
   var $settingsBackBtn = $('#settingsBackBtn');
 
   function showMeetingsBarOnly() {
     $meetingsBar.show();
+    $styleBar.show();
     $otherContent.hide();
   }
 
   function showMainContent() {
     $meetingsBar.hide();
+    $styleBar.hide();
     $settingsBackBtn.hide();
     $otherContent.show();
   }
 
-  /* Settings icon → show meetings-bar + back button, hide rest */
+  /* Settings icon → show meetings-bar + styleBar + back button, hide rest */
   $('#settingsIconBtn').on('click', function () {
     showMeetingsBarOnly();
     $settingsBackBtn.show();
   });
 
-  /* Back button → hide meetings-bar + back button, show rest */
+  /* Back button → hide meetings-bar + styleBar + back button, show rest */
   $settingsBackBtn.on('click', function () {
     showMainContent();
   });
@@ -2967,15 +2970,35 @@ $(function () {
      STYLE-BAR SLOT ↔ PREVIEW HIGHLIGHT
      When a user hovers a .sye-slot, highlight the corresponding
      .sye-prev-evt so the relationship is immediately clear.
+     For the bg-colour slot the background blinks; for all other
+     slots the standard active outline is shown.
+     Reverse: hovering a .sye-prev-evt highlights the related
+     .sye-slot buttons and pulses the event's border sides.
   ────────────────────────────────────────────────────────── */
   $(document).on('mouseenter', '.sye-slot', function () {
-    var idx = $(this).data('preview');
+    var idx  = $(this).data('preview');
+    var slot = $(this).data('slot');
     if (idx === undefined) { return; }
-    $('.sye-prev-evt').removeClass('sye-prev-evt--active');
-    $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass('sye-prev-evt--active');
+    $('.sye-prev-evt').removeClass('sye-prev-evt--active sye-prev-evt--bg-active');
+    var $target = $('.sye-prev-evt[data-evt-index="' + idx + '"]');
+    if (slot === 'bg-colour') {
+      $target.addClass('sye-prev-evt--bg-active');
+    } else {
+      $target.addClass('sye-prev-evt--active');
+    }
   });
   $(document).on('mouseleave', '.sye-slot', function () {
-    $('.sye-prev-evt').removeClass('sye-prev-evt--active');
+    $('.sye-prev-evt').removeClass('sye-prev-evt--active sye-prev-evt--bg-active');
+  });
+
+  /* Reverse highlight: hovering a preview event lights up its related slots */
+  $(document).on('mouseenter', '.sye-prev-evt', function () {
+    var evtIdx = $(this).data('evt-index');
+    if (evtIdx === undefined) { return; }
+    $('.sye-slot[data-preview="' + evtIdx + '"]').addClass('sye-slot--preview-active');
+  });
+  $(document).on('mouseleave', '.sye-prev-evt', function () {
+    $('.sye-slot').removeClass('sye-slot--preview-active');
   });
 
   /* ──────────────────────────────────────────────────────────
@@ -2987,8 +3010,8 @@ $(function () {
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
 
-    /* ── Beat Plan Reference check ── */
-    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=id,Name,Owner');
+    /* ── Daily Beat Plans existence check ── */
+    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Daily_Beat_Plans?fields=id,Name,Owner');
     console.log('dailyBeatPlanPreferences', dailyBeatPlanPreferences);
     var hasRecords = dailyBeatPlanPreferences &&
                      dailyBeatPlanPreferences.data &&
