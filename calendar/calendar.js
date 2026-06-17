@@ -2521,21 +2521,46 @@ $(function () {
       let fields = fieldsResp?.data?.fields || [];
 
       // ======================================================
-      // 3. FIND PICKLIST FIELD
+      // 3. FIND OR CREATE PICKLIST FIELD
       // ======================================================
 
-      const picklistField = fields.find(f => {
+      const findPicklistField = (fieldList) => fieldList.find(f => {
         const labelMatch = (f.field_label || '').toLowerCase() === 'meetings for' ||
           (f.api_name  || '').toLowerCase().includes('meetings_for');
         const typeMatch  = f.data_type === 'picklist' || f.data_type === 'pick_list';
         return labelMatch && typeMatch;
       });
 
+      let picklistField = findPicklistField(fields);
+
       if (!picklistField) {
-        console.error('"Meetings For" picklist field not found. Available fields:',
-          fields.map(f => ({ field_label: f.field_label, api_name: f.api_name, data_type: f.data_type }))
+        // Field doesn't exist yet – create it with the current chip values as seed options
+        await zrc.post(
+          `/crm/v8/settings/fields?module=${moduleAPI}`,
+          {
+            fields: [
+              {
+                field_label: 'Meetings For',
+                data_type:   'picklist',
+                pick_list_values: selectedValues.map(chip => ({
+                  display_value: chip.label,
+                  actual_value:  chip.label
+                }))
+              }
+            ]
+          }
         );
-        throw new Error('"Meetings For" picklist field not found');
+
+        const refreshResp = await zrc.get(
+          `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
+        );
+        fields = refreshResp?.data?.fields || [];
+
+        picklistField = findPicklistField(fields);
+
+        if (!picklistField) {
+          throw new Error('"Meetings For" picklist field could not be created');
+        }
       }
 
       // ======================================================
