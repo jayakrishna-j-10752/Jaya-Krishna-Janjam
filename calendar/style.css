@@ -1676,6 +1676,353 @@ input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════════════════
+   STEP 2 – STYLE YOUR EVENT
+══════════════════════════════════════════════════════════ */
+
+/* ── Bar wrapper (mirrors .meetings-bar) ── */
+.style-bar {
+  padding: 10px 24px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ── Panel card ── */
+.sye-panel {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* ── Panel header ── */
+.sye-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.sye-head-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--z-blue-pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--z-blue);
+}
+.sye-head-icon svg { width: 20px; height: 20px; }
+
+.sye-head-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+.sye-head-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── 3-step process bar ── */
+.sye-process {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1.5px dashed var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.sye-proc-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.sye-proc-num {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--z-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sye-proc-text { font-size: 12px; color: var(--text-secondary); }
+.sye-proc-sep  { color: var(--text-muted); font-size: 16px; line-height: 1; flex-shrink: 0; }
+
+/* ── Body: two-column layout ── */
+.sye-body {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  background: var(--surface);
+}
+
+/* ── Left: slot groups ── */
+.sye-slots-col {
+  padding: 16px 20px;
+  border-right: 1px solid var(--border);
+}
+.sye-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  margin: 0 0 9px;
+}
+.sye-slot-grid + .sye-group-label { margin-top: 18px; }
+
+.sye-slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ── Individual slot button ── */
+.sye-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+  min-width: 0;
+}
+.sye-slot:hover {
+  border-color: var(--z-blue);
+  background: var(--z-blue-pale);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--z-blue) 8%, transparent);
+}
+.sye-slot--locked {
+  cursor: default;
+  opacity: .72;
+}
+.sye-slot--locked:hover {
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+/* ── Slot icon shapes ── */
+.sye-slot-icon {
+  flex-shrink: 0;
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+}
+.sye-icon-bg {
+  background: rgba(103, 80, 164, .18);
+  border: 1.5px dashed rgba(103, 80, 164, .48);
+}
+.sye-icon-dot {
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  margin: 3px;
+  background: #E91E63;
+}
+.sye-icon-top {
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-top: 3px solid #1565C0;
+}
+.sye-icon-bottom {
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-bottom: 3px solid #E65100;
+}
+.sye-icon-right {
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-right: 3px solid #7B1FA2;
+}
+.sye-icon-left {
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-left: 3px solid #2E7D32;
+}
+
+/* ── Slot text ── */
+.sye-slot-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sye-slot-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sye-slot-field {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sye-slot-reserved {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-secondary);
+}
+.sye-slot-reserved svg { flex-shrink: 0; }
+.sye-slot-chev {
+  flex-shrink: 0;
+  width: 7px;
+  height: 12px;
+  color: var(--text-muted);
+}
+.sye-slot:hover .sye-slot-chev { color: var(--z-blue); }
+
+/* ── Right: live preview column ── */
+.sye-preview-col {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 2px solid var(--z-blue);
+  border-radius: 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0;
+  background: var(--surface);
+  /* Overlap the panel's outer border so the blue border sits flush */
+  margin: -1px -1px -1px 0;
+}
+
+.sye-prev-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sye-prev-eye {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--z-blue-pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--z-blue);
+}
+.sye-prev-eye svg { width: 15px; height: 15px; }
+.sye-prev-head-text { flex: 1; min-width: 0; }
+.sye-prev-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+}
+.sye-prev-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.sye-prev-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--z-blue);
+  background: var(--z-blue-pale);
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+/* ── Preview event list ── */
+.sye-prev-events {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sye-prev-evt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #43A047;
+  background: var(--surface-2);
+}
+.sye-prev-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 28px;
+  flex-shrink: 0;
+}
+.sye-prev-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sye-prev-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Event variant styles */
+.sye-evt--amber {
+  background: color-mix(in srgb, #FF8F00 10%, var(--surface-2));
+  border-left-color: #FF8F00;
+}
+.sye-evt--focus {
+  background: color-mix(in srgb, #E91E63 7%, var(--surface-2));
+  border-left-color: #E91E63;
+  outline: 2px solid #1565C0;
+  outline-offset: -2px;
+}
+.sye-evt--green {
+  background: color-mix(in srgb, #43A047 10%, var(--surface-2));
+  border-left-color: #43A047;
+}
+
+.sye-prev-tip {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* ── Footer ── */
+.sye-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+/* ══════════════════════════════════════════════════════════
    RESPONSIVE TWEAKS
 ══════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
@@ -1694,7 +2041,20 @@ input, select, textarea {
   }
 
   .meetings-bar { padding: 6px 14px; }
+  .style-bar    { padding: 6px 14px 12px; }
   .mf-chip { max-width: 120px; }
+
+  .sye-body { grid-template-columns: 1fr; }
+  .sye-slots-col {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .sye-preview-col {
+    border-radius: 0 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px);
+    border-left: 2px solid var(--z-blue);
+    border-top: 1px solid var(--z-blue);
+    margin: 0 -1px -1px;
+  }
 
   .header-main {
     height: auto;
@@ -1814,7 +2174,10 @@ input, select, textarea {
   .toast { font-size: 12px; padding: 9px 18px; }
 
   .meetings-bar { padding: 6px 10px; }
+  .style-bar    { padding: 6px 10px 10px; }
   .mf-chip { max-width: 80px; font-size: 11px; }
+  .sye-slot-grid { grid-template-columns: 1fr; }
+  .sye-slot-name { font-size: 11px; }
 }
 
 /* ══════════════════════════════════════════════════════════
