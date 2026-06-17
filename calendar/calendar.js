@@ -2524,12 +2524,17 @@ $(function () {
       // 3. FIND PICKLIST FIELD
       // ======================================================
 
-      const picklistField = fields.find(f =>
-        f.field_label === 'Meetings For' &&
-        f.data_type  === 'picklist'
-      );
+      const picklistField = fields.find(f => {
+        const labelMatch = (f.field_label || '').toLowerCase() === 'meetings for' ||
+          (f.api_name  || '').toLowerCase().includes('meetings_for');
+        const typeMatch  = f.data_type === 'picklist' || f.data_type === 'pick_list';
+        return labelMatch && typeMatch;
+      });
 
       if (!picklistField) {
+        console.error('"Meetings For" picklist field not found. Available fields:',
+          fields.map(f => ({ field_label: f.field_label, api_name: f.api_name, data_type: f.data_type }))
+        );
         throw new Error('"Meetings For" picklist field not found');
       }
 
