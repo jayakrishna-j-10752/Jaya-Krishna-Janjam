@@ -2217,7 +2217,8 @@ $(function () {
                     field_label: chip.label,
                     data_type:   'lookup',
                     lookup: {
-                      display_label: chip.label,
+                      display_label:      chip.label,
+                      related_list_label: 'Daily Beat Plans',
                       module: {
                         api_name: chip.apiName
                       }
