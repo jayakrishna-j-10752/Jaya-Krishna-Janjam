@@ -2020,8 +2020,8 @@ input, select, textarea {
 
 /* Background-colour slot hover: blink the event background indefinitely */
 @keyframes sye-bg-blink {
-  0%, 100% { background: var(--z-blue-pale); }
-  50%       { background: color-mix(in srgb, var(--z-blue) 35%, var(--surface-2)); }
+  0%, 100% { background: rgba(103, 80, 164, .18); }
+  50%       { background: var(--surface-2); }
 }
 .sye-prev-evt--bg-active {
   animation: sye-bg-blink .65s ease-in-out infinite;
@@ -2029,7 +2029,7 @@ input, select, textarea {
 
 /* Top-border slot hover: blink the top border indefinitely (inset shadow, no layout shift) */
 @keyframes sye-top-border-blink {
-  0%, 100% { box-shadow: inset 0 3px 0 0 var(--z-blue); }
+  0%, 100% { box-shadow: inset 0 3px 0 0 #1565C0; }
   50%       { box-shadow: inset 0 3px 0 0 transparent; }
 }
 .sye-prev-evt--top-active {
@@ -2038,7 +2038,7 @@ input, select, textarea {
 
 /* Bottom-border slot hover: blink the bottom border indefinitely */
 @keyframes sye-bottom-border-blink {
-  0%, 100% { box-shadow: inset 0 -3px 0 0 var(--z-blue); }
+  0%, 100% { box-shadow: inset 0 -3px 0 0 #E65100; }
   50%       { box-shadow: inset 0 -3px 0 0 transparent; }
 }
 .sye-prev-evt--bottom-active {
@@ -2047,7 +2047,7 @@ input, select, textarea {
 
 /* Right-border slot hover: blink the right border indefinitely */
 @keyframes sye-right-border-blink {
-  0%, 100% { box-shadow: inset -3px 0 0 0 var(--z-blue); }
+  0%, 100% { box-shadow: inset -3px 0 0 0 #7B1FA2; }
   50%       { box-shadow: inset -3px 0 0 0 transparent; }
 }
 .sye-prev-evt--right-active {
@@ -2072,35 +2072,35 @@ input, select, textarea {
 }
 
 /* Persistent border indicators shown after a border slot is assigned */
-.sye-prev-evt--has-top    { box-shadow: inset 0  3px 0 0 var(--z-blue); }
-.sye-prev-evt--has-bottom { box-shadow: inset 0 -3px 0 0 var(--z-blue); }
-.sye-prev-evt--has-right  { box-shadow: inset -3px 0 0 0 var(--z-blue); }
+.sye-prev-evt--has-top    { box-shadow: inset 0  3px 0 0 #1565C0; }
+.sye-prev-evt--has-bottom { box-shadow: inset 0 -3px 0 0 #E65100; }
+.sye-prev-evt--has-right  { box-shadow: inset -3px 0 0 0 #7B1FA2; }
 
 /* Respect reduced-motion preference – replace blink with a static highlight */
 @media (prefers-reduced-motion: reduce) {
   .sye-prev-evt--bg-active {
     animation: none;
-    background: var(--z-blue-pale);
+    background: rgba(103, 80, 164, .18);
   }
   .sye-prev-evt--top-active {
     animation: none;
-    box-shadow: inset 0 3px 0 0 var(--z-blue);
+    box-shadow: inset 0 3px 0 0 #1565C0;
   }
   .sye-prev-evt--bottom-active {
     animation: none;
-    box-shadow: inset 0 -3px 0 0 var(--z-blue);
+    box-shadow: inset 0 -3px 0 0 #E65100;
   }
   .sye-prev-evt--right-active {
     animation: none;
-    box-shadow: inset -3px 0 0 0 var(--z-blue);
+    box-shadow: inset -3px 0 0 0 #7B1FA2;
   }
   .sye-prev-evt--left-active {
     animation: none;
-    border-left-color: var(--z-blue);
+    border-left-color: #2E7D32;
   }
   .sye-prev-dot--blink {
     animation: none;
-    box-shadow: 0 0 0 2px var(--z-blue);
+    box-shadow: 0 0 0 2px #E91E63;
   }
 }
 
@@ -2140,6 +2140,10 @@ input, select, textarea {
 .sye-evt--green {
   background: color-mix(in srgb, #43A047 10%, var(--surface-2));
   border-left-color: #43A047;
+}
+.sye-evt--rejected {
+  background: color-mix(in srgb, #C62828 10%, var(--surface-2));
+  border-left-color: #C62828;
 }
 
 /* All four borders visible – used on the second preview event to demonstrate fully configured slot */
