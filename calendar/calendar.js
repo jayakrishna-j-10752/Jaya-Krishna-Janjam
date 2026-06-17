@@ -2551,7 +2551,7 @@ $(function () {
           ? { id: existing.id, display_value: existing.display_value, actual_value: existing.actual_value }
           : { display_value: chip.label, actual_value: chip.label };
 
-        return colourCode ? { ...base, colour_code: colourCode } : base;
+        return (colourCode && picklistField.enable_colour_code) ? { ...base, colour_code: colourCode } : base;
 
       });
 
