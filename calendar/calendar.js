@@ -2529,32 +2529,51 @@ $(function () {
       // 3. FIND OR CREATE PICKLIST FIELD
       // ======================================================
 
-      const findPicklistField = (fieldList) => fieldList.find(f => {
-        const labelMatch = (f.field_label || '').toLowerCase() === 'meetings for' ||
-          (f.api_name  || '').toLowerCase().includes('meetings_for');
-        const typeMatch  = f.data_type === 'picklist' || f.data_type === 'pick_list';
-        return labelMatch && typeMatch;
-      });
+      const findPicklistField = (fieldList) => {
+        // Strict match: label + picklist data_type
+        const strict = fieldList.find(f => {
+          const labelMatch = (f.field_label || '').toLowerCase() === 'meetings for' ||
+            (f.api_name  || '').toLowerCase().includes('meetings_for');
+          const typeMatch  = f.data_type === 'picklist' || f.data_type === 'pick_list';
+          return labelMatch && typeMatch;
+        });
+        if (strict) return strict;
+        // Fallback: label only (handles unexpected data_type values returned by the CRM)
+        return fieldList.find(f =>
+          (f.field_label || '').toLowerCase() === 'meetings for' ||
+          (f.api_name  || '').toLowerCase().includes('meetings_for')
+        );
+      };
 
       let picklistField = findPicklistField(fields);
 
       if (!picklistField) {
         // Field doesn't exist yet – create it with the current chip values as seed options
-        await zrc.post(
-          `/crm/v8/settings/fields?module=${moduleAPI}`,
-          {
-            fields: [
-              {
-                field_label: 'Meetings For',
-                data_type:   'picklist',
-                pick_list_values: selectedValues.map(chip => ({
-                  display_value: chip.label,
-                  actual_value:  chip.label
-                }))
-              }
-            ]
-          }
-        );
+        try {
+          await zrc.post(
+            `/crm/v8/settings/fields?module=${moduleAPI}`,
+            {
+              fields: [
+                {
+                  field_label: 'Meetings For',
+                  data_type:   'picklist',
+                  pick_list_values: selectedValues.map(chip => ({
+                    display_value: chip.label,
+                    actual_value:  chip.label
+                  }))
+                }
+              ]
+            }
+          );
+        } catch (createErr) {
+          // If the field already exists on the server but wasn't found above (e.g. the
+          // CRM returned an unexpected data_type), treat DUPLICATE_DATA as a soft error
+          // and fall through to the refresh + locate step below.
+          const isDuplicate =
+            createErr?.response?.data?.fields?.[0]?.code === 'DUPLICATE_DATA' ||
+            String(createErr?.message || '').includes('DUPLICATE_DATA');
+          if (!isDuplicate) throw createErr;
+        }
 
         const refreshResp = await zrc.get(
           `/crm/v8/settings/fields?module=${moduleAPI}&type=all`
