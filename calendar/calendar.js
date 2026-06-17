@@ -2177,7 +2177,7 @@ $(function () {
       //    Priority: existing active match → reuse unused → create new
       // ======================================================
 
-      // Pool of available unused lookup fields (consumed one at a time)
+      // Pool of available unused lookup fields, keyed by their existing lookup module api_name
       const unusedLookupPool = fields.filter(f =>
         f.data_type === 'lookup' &&
         f.type      === 'unused'
@@ -2195,14 +2195,20 @@ $(function () {
 
         if (!lookupField) {
 
-          if (unusedLookupPool.length > 0) {
+          // 2) Reuse an unused field only if its lookup module already matches this chip
+          const unusedMatchIdx = unusedLookupPool.findIndex(f =>
+            (f.lookup?.module?.api_name || f.lookup?.module?.module || '') === chip.apiName
+          );
 
-            // 2) Reuse the next available unused lookup field
-            lookupField = unusedLookupPool.shift();
+          if (unusedMatchIdx !== -1) {
+
+            lookupField = unusedLookupPool.splice(unusedMatchIdx, 1)[0];
 
           } else {
 
-            // 3) No reusable field – create a new one
+            // 3) No matching reusable field – create a new one
+            const existingIds = new Set(fields.map(f => f.id));
+
             await zrc.post(
               `/crm/v8/settings/fields?module=${moduleAPI}`,
               {
@@ -2227,10 +2233,19 @@ $(function () {
 
             fields = refresh?.data?.fields || [];
 
+            // Find the newly created field by ID (most reliable – avoids label mismatch)
             lookupField = fields.find(f =>
-              f.field_label === chip.label &&
-              f.data_type   === 'lookup'
+              f.data_type === 'lookup' &&
+              !existingIds.has(f.id)
             );
+
+            // Fallback: match by label if ID diff yields nothing
+            if (!lookupField) {
+              lookupField = fields.find(f =>
+                f.field_label === chip.label &&
+                f.data_type   === 'lookup'
+              );
+            }
 
           }
 
