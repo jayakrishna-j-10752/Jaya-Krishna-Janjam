@@ -2245,7 +2245,12 @@ $(function () {
         saveMfColors();
         var $chip = $('.mf-chip[data-uid="' + mcp.apiName + '"]');
         $chip.attr('data-color', hex);
-        $chip.find('.mf-chip-dot').css('background', hex);
+        /* Use native DOM to guarantee the inline background is refreshed —
+           jQuery's .css('background', …) may normalise the shorthand in ways
+           that browsers don't consistently reflect as a visual repaint. */
+        $chip.find('.mf-chip-dot').each(function () {
+          this.style.background = hex;
+        });
       }
     }
 
@@ -2564,8 +2569,28 @@ $(function () {
       }
 
       // ======================================================
-      // 4. BUILD PICKLIST VALUES (preserve existing IDs)
+      // 4. ENABLE COLOUR CODING ON THE FIELD (if not already on)
+      //    then BUILD PICKLIST VALUES (preserve existing IDs)
       // ======================================================
+
+      // If colour coding is not yet enabled on the field, enable it now so
+      // that colour_code values sent in the layout PATCH are accepted by the API.
+      if (!picklistField.enable_colour_code) {
+        try {
+          await zrc.patch(
+            `/crm/v8/settings/fields?module=${moduleAPI}`,
+            {
+              fields: [{
+                id:                   picklistField.id,
+                enable_colour_code:   true
+              }]
+            }
+          );
+          picklistField = { ...picklistField, enable_colour_code: true };
+        } catch (e) {
+          console.warn('Could not enable colour coding on Meetings For field:', e);
+        }
+      }
 
       const existingOptions = picklistField.pick_list_values || [];
 
@@ -2581,7 +2606,9 @@ $(function () {
           ? { id: existing.id, display_value: existing.display_value, actual_value: existing.actual_value }
           : { display_value: chip.label, actual_value: chip.label };
 
-        return (colourCode && picklistField.enable_colour_code) ? { ...base, colour_code: colourCode } : base;
+        // Always include colour_code when available – the field now has
+        // enable_colour_code: true (either it already did, or we just enabled it above).
+        return colourCode ? { ...base, colour_code: colourCode } : base;
 
       });
 
