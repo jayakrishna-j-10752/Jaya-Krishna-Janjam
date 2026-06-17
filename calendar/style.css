@@ -2134,8 +2134,8 @@ input, select, textarea {
   border-left-color: #FF8F00;
 }
 .sye-evt--focus {
-  background: color-mix(in srgb, #E91E63 7%, var(--surface-2));
-  border-left-color: #E91E63;
+  background: rgba(103, 80, 164, .18);
+  border-left-color: #2E7D32;
 }
 .sye-evt--green {
   background: color-mix(in srgb, #43A047 10%, var(--surface-2));
@@ -2143,9 +2143,9 @@ input, select, textarea {
 }
 
 /* All four borders visible – used on the second preview event to demonstrate fully configured slot */
-/* Top: amber, Bottom: green, Right: blue; Left border comes from sye-evt--focus (pink) */
+/* Colors mirror the .sye-slot-icon indicators: top (#1565C0), bottom (#E65100), right (#7B1FA2), left via sye-evt--focus (#2E7D32) */
 .sye-evt--all-borders {
-  box-shadow: inset 0 3px 0 0 #FF8F00, inset 0 -3px 0 0 #43A047, inset -3px 0 0 0 var(--z-blue);
+  box-shadow: inset 0 3px 0 0 #1565C0, inset 0 -3px 0 0 #E65100, inset -3px 0 0 0 #7B1FA2;
 }
 
 .sye-prev-tip {
