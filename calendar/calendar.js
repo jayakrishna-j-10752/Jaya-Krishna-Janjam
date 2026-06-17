@@ -2964,6 +2964,21 @@ $(function () {
   });
 
   /* ──────────────────────────────────────────────────────────
+     STYLE-BAR SLOT ↔ PREVIEW HIGHLIGHT
+     When a user hovers a .sye-slot, highlight the corresponding
+     .sye-prev-evt so the relationship is immediately clear.
+  ────────────────────────────────────────────────────────── */
+  $(document).on('mouseenter', '.sye-slot', function () {
+    var idx = $(this).data('preview');
+    if (idx === undefined) { return; }
+    $('.sye-prev-evt').removeClass('sye-prev-evt--active');
+    $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass('sye-prev-evt--active');
+  });
+  $(document).on('mouseleave', '.sye-slot', function () {
+    $('.sye-prev-evt').removeClass('sye-prev-evt--active');
+  });
+
+  /* ──────────────────────────────────────────────────────────
      ZOHO EMBEDDED APP INTEGRATION
      Subscribe to PageLoad before calling embeddedApp.init().
      On PageLoad, fetch CRM modules to populate the

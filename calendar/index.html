@@ -38,9 +38,9 @@
         </div>
       </div>
 
-      <!-- ── STYLE YOUR EVENT (Step 2) ── -->
+      <!-- ── STYLE YOUR DAILY BEAT (Step 2) ── -->
       <div class="style-bar" id="styleBar">
-        <p class="mf-step-label">Step 2: Style Your Event</p>
+        <p class="mf-step-label">Step 2: Style Your Daily Beat</p>
         <div class="sye-panel">
 
           <!-- Panel header -->
@@ -48,16 +48,13 @@
             <div class="sye-head-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
                    stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.55 0 1-.45 1-1 0-.26-.1-.5-.26-.69a.99.99 0 0 1-.24-.66c0-.55.45-1 1-1h1.18c3.12 0 5.65-2.53 5.65-5.65C20.33 6.1 16.62 2 12 2z"/>
-                <circle cx="6.5"  cy="11.5" r="1.5" fill="currentColor" stroke="none"/>
-                <circle cx="9.5"  cy="7.5"  r="1.5" fill="currentColor" stroke="none"/>
-                <circle cx="14.5" cy="7.5"  r="1.5" fill="currentColor" stroke="none"/>
-                <circle cx="17.5" cy="11.5" r="1.5" fill="currentColor" stroke="none"/>
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
               </svg>
             </div>
             <div class="sye-head-text">
-              <h3 class="sye-head-title">Color-code your events</h3>
-              <p class="sye-head-sub">Map any CRM picklist field to a color slot — your calendar events are then styled automatically by that field's value.</p>
+              <h3 class="sye-head-title">Color-code your Daily Beat entries</h3>
+              <p class="sye-head-sub">Map any CRM picklist field to a color slot — your Daily Beat Plan entries are then styled automatically by that field's value.</p>
             </div>
           </div>
 
@@ -70,12 +67,12 @@
             <span class="sye-proc-sep" aria-hidden="true">›</span>
             <div class="sye-proc-step">
               <span class="sye-proc-num">2</span>
-              <span class="sye-proc-text">Map it to a CRM picklist field</span>
+              <span class="sye-proc-text">Map it to a beat plan field</span>
             </div>
             <span class="sye-proc-sep" aria-hidden="true">›</span>
             <div class="sye-proc-step">
               <span class="sye-proc-num">3</span>
-              <span class="sye-proc-text">Events colour themselves automatically</span>
+              <span class="sye-proc-text">Beat entries style themselves automatically</span>
             </div>
           </div>
 
@@ -88,7 +85,7 @@
               <p class="sye-group-label">Fill &amp; Marker</p>
               <div class="sye-slot-grid">
 
-                <button class="sye-slot" data-slot="bg-colour">
+                <button class="sye-slot" data-slot="bg-colour" data-preview="0">
                   <span class="sye-slot-icon sye-icon-bg" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Background colour</span>
@@ -97,7 +94,7 @@
                   <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
                 </button>
 
-                <button class="sye-slot" data-slot="status-dot">
+                <button class="sye-slot" data-slot="status-dot" data-preview="1">
                   <span class="sye-slot-icon sye-icon-dot" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Status dot</span>
@@ -111,7 +108,7 @@
               <p class="sye-group-label">Borders</p>
               <div class="sye-slot-grid">
 
-                <button class="sye-slot" data-slot="top-border">
+                <button class="sye-slot" data-slot="top-border" data-preview="0">
                   <span class="sye-slot-icon sye-icon-top" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Top border</span>
@@ -120,7 +117,7 @@
                   <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
                 </button>
 
-                <button class="sye-slot" data-slot="bottom-border">
+                <button class="sye-slot" data-slot="bottom-border" data-preview="2">
                   <span class="sye-slot-icon sye-icon-bottom" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Bottom border</span>
@@ -129,7 +126,7 @@
                   <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
                 </button>
 
-                <button class="sye-slot" data-slot="right-border">
+                <button class="sye-slot" data-slot="right-border" data-preview="3">
                   <span class="sye-slot-icon sye-icon-right" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Right border</span>
@@ -138,14 +135,14 @@
                   <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
                 </button>
 
-                <button class="sye-slot sye-slot--locked" data-slot="left-border"
+                <button class="sye-slot sye-slot--locked" data-slot="left-border" data-preview="1"
                         disabled aria-disabled="true"
                         aria-describedby="sye-left-border-desc">
                   <span class="sye-slot-icon sye-icon-left" aria-hidden="true"></span>
                   <span class="sye-slot-info">
                     <span class="sye-slot-name">Left border</span>
                     <span class="sye-slot-field sye-slot-reserved">
-                      <svg viewBox="0 0 12 14" fill="none" stroke="currentColor" stroke-width="1.5"
+                      <svg viewBox="0 0 12 14" width="12" height="14" fill="none" stroke="currentColor" stroke-width="1.5"
                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <rect x="2" y="5.5" width="8" height="7.5" rx="1.5"/>
                         <path d="M4 5.5V4a2 2 0 0 1 4 0v1.5"/>
@@ -174,36 +171,36 @@
                   </svg>
                 </div>
                 <div class="sye-prev-head-text">
-                  <p class="sye-prev-title">Live preview</p>
-                  <p class="sye-prev-sub">See how your picks color real calendar events.</p>
+                  <p class="sye-prev-title">Beat preview</p>
+                  <p class="sye-prev-sub">See how your picks style real beat entries.</p>
                 </div>
                 <span class="sye-prev-badge">TODAY</span>
               </div>
 
               <div class="sye-prev-events">
-                <div class="sye-prev-evt sye-evt--amber">
+                <div class="sye-prev-evt sye-evt--amber" data-evt-index="0">
                   <span class="sye-prev-time">9:00</span>
-                  <span class="sye-prev-label">Drop · Pending</span>
+                  <span class="sye-prev-label">Morning Visit · Pending</span>
                   <span class="sye-prev-dot" style="background:#FF8F00"></span>
                 </div>
-                <div class="sye-prev-evt sye-evt--focus">
+                <div class="sye-prev-evt sye-evt--focus" data-evt-index="1">
                   <span class="sye-prev-time">11:30</span>
-                  <span class="sye-prev-label">Sample drop with Raj…</span>
+                  <span class="sye-prev-label">Field Call · In Progress</span>
                   <span class="sye-prev-dot" style="background:#E91E63"></span>
                 </div>
-                <div class="sye-prev-evt sye-evt--green">
+                <div class="sye-prev-evt sye-evt--green" data-evt-index="2">
                   <span class="sye-prev-time">2:15</span>
-                  <span class="sye-prev-label">Visit · Approved</span>
+                  <span class="sye-prev-label">Route Check · Approved</span>
                   <span class="sye-prev-dot" style="background:#43A047"></span>
                 </div>
-                <div class="sye-prev-evt">
+                <div class="sye-prev-evt" data-evt-index="3">
                   <span class="sye-prev-time">4:00</span>
-                  <span class="sye-prev-label">Call · Completed</span>
+                  <span class="sye-prev-label">Beat Close · Completed</span>
                   <span class="sye-prev-dot" style="background:#1565C0"></span>
                 </div>
               </div>
 
-              <p class="sye-prev-tip">Tip: hover any slot to see which part of the event it controls.</p>
+              <p class="sye-prev-tip">Tip: hover a slot to highlight its corresponding beat entry.</p>
 
             </div><!-- /.sye-preview-col -->
 
