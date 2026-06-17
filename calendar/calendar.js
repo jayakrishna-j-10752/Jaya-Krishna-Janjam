@@ -2990,15 +2990,22 @@ $(function () {
     var slot = $(this).data('slot');
     if (idx === undefined) { return; }
     $('.sye-prev-evt').removeClass(SYE_ALL_BLINK + ' sye-prev-evt--active');
-    var blinkClass = SYE_SLOT_BLINK[slot];
-    if (blinkClass) {
-      $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass(blinkClass);
+    $('.sye-prev-dot').removeClass('sye-prev-dot--blink');
+    if (slot === 'status-dot') {
+      /* Blink only the dot indicator inside the matching preview event */
+      $('.sye-prev-evt[data-evt-index="' + idx + '"] .sye-prev-dot').addClass('sye-prev-dot--blink');
     } else {
-      $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass('sye-prev-evt--active');
+      var blinkClass = SYE_SLOT_BLINK[slot];
+      if (blinkClass) {
+        $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass(blinkClass);
+      } else {
+        $('.sye-prev-evt[data-evt-index="' + idx + '"]').addClass('sye-prev-evt--active');
+      }
     }
   });
   $(document).on('mouseleave', '.sye-slot', function () {
     $('.sye-prev-evt').removeClass(SYE_ALL_BLINK + ' sye-prev-evt--active');
+    $('.sye-prev-dot').removeClass('sye-prev-dot--blink');
   });
 
   /* Reverse highlight: hovering a preview event lights up its related slots */
@@ -3131,6 +3138,20 @@ $(function () {
 
     /* Update the slot button's field sub-label */
     $('.sye-slot[data-slot="' + syeActiveSlot + '"] .sye-slot-field').text(label);
+
+    /* Show the configured border on the preview event by default */
+    var SYE_BORDER_CLASS = {
+      'top-border':    'sye-prev-evt--has-top',
+      'bottom-border': 'sye-prev-evt--has-bottom',
+      'right-border':  'sye-prev-evt--has-right'
+    };
+    var persistClass = SYE_BORDER_CLASS[syeActiveSlot];
+    if (persistClass) {
+      var previewIdx = $('.sye-slot[data-slot="' + syeActiveSlot + '"]').data('preview');
+      if (previewIdx !== undefined) {
+        $('.sye-prev-evt[data-evt-index="' + previewIdx + '"]').addClass(persistClass);
+      }
+    }
 
     closeSyeFieldPicker();
   });
