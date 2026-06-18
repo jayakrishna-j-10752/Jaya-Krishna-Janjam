@@ -1707,9 +1707,9 @@ input, select, textarea {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.legend-bar-actions {
+.save-setup-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   margin-top: 12px;
 }
@@ -2440,11 +2440,11 @@ input, select, textarea {
   }
 
   /* Assign flex order so user-profile and nav-group sit on the first row,
-     while period-group and theme-toggle drop to a dedicated second row */
+     while period-group drops to a dedicated second row */
   .user-profile     { order: 1; }
   .nav-group        { order: 2; }
 
-  /* Invisible flex-break forces period-group and theme-toggle onto a new row */
+  /* Invisible flex-break forces period-group onto a new row */
   .header-left::before {
     content: '';
     flex: 0 0 100%;
@@ -2452,14 +2452,12 @@ input, select, textarea {
     height: 0;
   }
 
-  /* Period-group and theme-toggle share the second row */
+  /* Period-group takes the second row */
   .period-group {
     order: 4;
     flex: 1;
     min-width: 0;
   }
-
-  .theme-toggle-btn { order: 5; }
 
   .header-right {
     flex: 1 1 100%;

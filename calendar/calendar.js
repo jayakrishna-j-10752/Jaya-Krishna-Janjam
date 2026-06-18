@@ -3326,14 +3326,14 @@ $(function () {
     legSelected = [];
   });
 
-  /* legSave – confirm the current legend selection */
-  $(document).on('click', '#legSave', function () {
+  /* setupSave – confirm the current legend selection */
+  $(document).on('click', '#setupSave', function () {
     closeLegDropdown();
     $('#legendBar').hide();
   });
 
-  /* legCancel – discard the legend selection and hide the bar */
-  $(document).on('click', '#legCancel', function () {
+  /* setupCancel – discard the legend selection and hide the bar */
+  $(document).on('click', '#setupCancel', function () {
     legSelected = [];
     renderLegChips();
     closeLegDropdown();

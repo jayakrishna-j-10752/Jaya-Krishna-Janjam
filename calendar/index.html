@@ -229,9 +229,9 @@
             </svg>
           </span>
         </div>
-        <div class="legend-bar-actions">
-          <button class="btn-primary" id="legSave">Save</button>
-          <button class="btn-ghost"   id="legCancel">Cancel</button>
+        <div class="save-setup-actions">
+          <button class="btn-primary" id="setupSave">Save</button>
+          <button class="btn-ghost"   id="setupCancel">Cancel</button>
         </div>
       </div><!-- /.legend-bar -->
 
@@ -308,7 +308,10 @@
             <h2 class="period-label" id="periodLabel"></h2>
           </div>
 
-          <!-- Theme Toggle (placed here so it shares a row with period-label on mobile) -->
+        </div>
+
+        <div class="header-right">
+          <!-- Theme Toggle -->
           <button class="theme-toggle-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
             <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="4"/>
@@ -325,9 +328,6 @@
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
             </svg>
           </button>
-        </div>
-
-        <div class="header-right">
           <!-- View Switcher -->
           <div class="view-tabs" role="tablist" aria-label="Calendar views">
             <button class="view-tab active" data-view="month" role="tab" aria-selected="true">Month</button>
