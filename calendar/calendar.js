@@ -3263,7 +3263,7 @@ $(function () {
         '<div class="leg-option' + (isSelected ? ' leg-option--selected' : '') + '" ' +
         'data-key="' + escHtml(slotKey) + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
           '<span class="leg-option-check">' + (isSelected ? checkSvg : '') + '</span>' +
-          '<span class="leg-option-label">' + escHtml(slotLabel) + '</span>' +
+          '<span class="leg-option-label">' + escHtml(fieldText) + '</span>' +
         '</div>';
       $list.append(html);
     });
