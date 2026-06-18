@@ -3228,14 +3228,37 @@ $(function () {
     var $list = $('#legList');
     $list.empty();
     var hasOptions = false;
-    $.each(SYE_SLOT_LABELS, function (slotKey, slotLabel) {
-      if (!syeSlotAssignments[slotKey]) { return; }
+
+    /* Build the full set of used api_names from all slot assignments.
+       This mirrors the sfp-field-item--used state when no slot is active. */
+    var usedApiNames = {};
+    $.each(syeSlotAssignments, function (slot, asgn) {
+      usedApiNames[asgn.api_name] = true;
+    });
+
+    var checkSvg =
+      '<svg viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="10">' +
+      '<polyline points="1 5 4.5 8.5 11 1"/></svg>';
+
+    /* Iterate .sye-slot elements: include only those where .sye-slot-field has a
+       selected value AND whose assigned field has sfp-field-item--used status */
+    $('.sye-slot[data-slot]').each(function () {
+      var $slot     = $(this);
+      var slotKey   = $slot.data('slot');
+      var slotLabel = SYE_SLOT_LABELS[slotKey];
+      if (!slotLabel) { return; }
+
+      /* Skip slots where no field has been chosen (placeholder text) */
+      var fieldText = $slot.find('.sye-slot-field').text().trim();
+      if (!fieldText || fieldText === 'Choose field\u2026') { return; }
+
+      /* Only include if the assigned field is marked sfp-field-item--used */
+      var assignment = syeSlotAssignments[slotKey];
+      if (!assignment || !usedApiNames[assignment.api_name]) { return; }
+
       hasOptions = true;
       var isSelected = legSelected.indexOf(slotKey) !== -1;
-      var checkSvg =
-        '<svg viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="10">' +
-        '<polyline points="1 5 4.5 8.5 11 1"/></svg>';
       var html =
         '<div class="leg-option' + (isSelected ? ' leg-option--selected' : '') + '" ' +
         'data-key="' + escHtml(slotKey) + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
@@ -3244,6 +3267,7 @@ $(function () {
         '</div>';
       $list.append(html);
     });
+
     if (!hasOptions) {
       $list.html('<p class="mf-empty">No fields assigned yet.</p>');
     }
