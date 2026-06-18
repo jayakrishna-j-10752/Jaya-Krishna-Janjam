@@ -2086,6 +2086,8 @@ $(function () {
         console.error('Failed to sync Meetings For field:', err);
       }
 
+      $styleBar.show();
+
     });
 
     /* Cancel – discard pending changes and close */
@@ -2944,7 +2946,6 @@ $(function () {
 
   function showMeetingsBarOnly() {
     $meetingsBar.show();
-    $styleBar.show();
     $otherContent.hide();
   }
 
@@ -3090,9 +3091,13 @@ $(function () {
     var currentAssignment = syeSlotAssignments[syeActiveSlot];
 
     var html = '';
+    var HIDDEN_FIELD_LABELS = ['record status', 'currency', 'unsubscribed mode'];
     $.each(syePicklistFields, function (_, f) {
       var apiName  = f.api_name    || '';
       var label    = f.field_label || apiName;
+
+      if (HIDDEN_FIELD_LABELS.indexOf(label.toLowerCase()) !== -1) { return; }
+
       var isUsed   = !!usedApiNames[apiName];
       var isActive = currentAssignment && currentAssignment.api_name === apiName;
 
@@ -3194,8 +3199,8 @@ $(function () {
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
 
-    /* ── Daily Beat Plans existence check ── */
-    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Daily_Beat_Plans?fields=id,Name,Owner');
+    /* ── Beat Plan References existence check ── */
+    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=id,Name,Owner');
     console.log('dailyBeatPlanPreferences', dailyBeatPlanPreferences);
     var hasRecords = dailyBeatPlanPreferences &&
                      dailyBeatPlanPreferences.data &&

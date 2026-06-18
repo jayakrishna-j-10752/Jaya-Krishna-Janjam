@@ -1694,6 +1694,7 @@ input, select, textarea {
 
 /* ── Bar wrapper (mirrors .meetings-bar) ── */
 .style-bar {
+  display: none; /* hidden by default; revealed programmatically after #mfDone is clicked */
   padding: 10px 24px 18px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
@@ -2027,36 +2028,40 @@ input, select, textarea {
   animation: sye-bg-blink .65s ease-in-out infinite;
 }
 
-/* Top-border slot hover: blink the top border indefinitely (inset shadow, no layout shift) */
+/* Top-border slot hover: blink only the top border; hide bottom, right, and left borders */
 @keyframes sye-top-border-blink {
-  0%, 100% { box-shadow: inset 0 3px 0 0 #1565C0; }
-  50%       { box-shadow: inset 0 3px 0 0 transparent; }
+  0%, 100% { box-shadow: inset 0 3px 0 0 #1565C0; border-left-color: transparent; }
+  50%       { box-shadow: inset 0 3px 0 0 transparent; border-left-color: transparent; }
 }
 .sye-prev-evt--top-active {
   animation: sye-top-border-blink .65s ease-in-out infinite;
+  border-left-color: transparent;
 }
 
-/* Bottom-border slot hover: blink the bottom border indefinitely */
+/* Bottom-border slot hover: blink only the bottom border; hide top, right, and left borders */
 @keyframes sye-bottom-border-blink {
-  0%, 100% { box-shadow: inset 0 -3px 0 0 #E65100; }
-  50%       { box-shadow: inset 0 -3px 0 0 transparent; }
+  0%, 100% { box-shadow: inset 0 -3px 0 0 #E65100; border-left-color: transparent; }
+  50%       { box-shadow: inset 0 -3px 0 0 transparent; border-left-color: transparent; }
 }
 .sye-prev-evt--bottom-active {
   animation: sye-bottom-border-blink .65s ease-in-out infinite;
+  border-left-color: transparent;
 }
 
-/* Right-border slot hover: blink the right border indefinitely */
+/* Right-border slot hover: blink only the right border; hide top, bottom, and left borders */
 @keyframes sye-right-border-blink {
-  0%, 100% { box-shadow: inset -3px 0 0 0 #7B1FA2; }
-  50%       { box-shadow: inset -3px 0 0 0 transparent; }
+  0%, 100% { box-shadow: inset -3px 0 0 0 #7B1FA2; border-left-color: transparent; }
+  50%       { box-shadow: inset -3px 0 0 0 transparent; border-left-color: transparent; }
 }
 .sye-prev-evt--right-active {
   animation: sye-right-border-blink .65s ease-in-out infinite;
+  border-left-color: transparent;
 }
 
-/* Left-border slot hover: blink the existing left border indefinitely */
+/* Left-border slot hover: blink only the left border; hide top, bottom, and right borders */
 @keyframes sye-left-border-blink {
-  50% { border-left-color: transparent; }
+  0%, 100% { box-shadow: none; }
+  50%       { border-left-color: transparent; box-shadow: none; }
 }
 .sye-prev-evt--left-active {
   animation: sye-left-border-blink .65s ease-in-out infinite;
@@ -2085,18 +2090,22 @@ input, select, textarea {
   .sye-prev-evt--top-active {
     animation: none;
     box-shadow: inset 0 3px 0 0 #1565C0;
+    border-left-color: transparent;
   }
   .sye-prev-evt--bottom-active {
     animation: none;
     box-shadow: inset 0 -3px 0 0 #E65100;
+    border-left-color: transparent;
   }
   .sye-prev-evt--right-active {
     animation: none;
     box-shadow: inset -3px 0 0 0 #7B1FA2;
+    border-left-color: transparent;
   }
   .sye-prev-evt--left-active {
     animation: none;
     border-left-color: #2E7D32;
+    box-shadow: none;
   }
   .sye-prev-dot--blink {
     animation: none;
@@ -2275,6 +2284,7 @@ input, select, textarea {
   text-overflow: ellipsis;
 }
 .sfp-field-api {
+  display: none; /* intentionally hidden to declutter the field picker UI */
   font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
