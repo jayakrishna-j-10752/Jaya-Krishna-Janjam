@@ -1707,6 +1707,12 @@ input, select, textarea {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
+.legend-bar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
 
 /* Legend option rows inside the dropdown list */
 .leg-option {

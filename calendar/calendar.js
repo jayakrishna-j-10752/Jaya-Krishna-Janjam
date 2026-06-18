@@ -3204,12 +3204,14 @@ $(function () {
   function renderLegChips() {
     var $wrap = $('#legChipsWrap');
     $wrap.empty();
-    legSelected.forEach(function (apiName) {
-      var assignment = syeSlotAssignments[apiName];
+    legSelected.forEach(function (slotKey) {
+      var assignment = syeSlotAssignments[slotKey];
       if (!assignment) { return; }
-      var label = SYE_SLOT_LABELS[apiName] || apiName;
+      /* Use the field label shown in .sye-slot-field (e.g. "Leave Type") */
+      var fieldText = $('.sye-slot[data-slot="' + slotKey + '"] .sye-slot-field').text().trim();
+      var label = (fieldText && fieldText !== 'Choose field\u2026') ? fieldText : (SYE_SLOT_LABELS[slotKey] || slotKey);
       var chip =
-        '<span class="mf-chip" data-key="' + escHtml(apiName) + '">' +
+        '<span class="mf-chip" data-key="' + escHtml(slotKey) + '" data-api="' + escHtml(assignment.api_name) + '">' +
           '<span class="mf-chip-text">' + escHtml(label) + '</span>' +
           '<span class="mf-chip-remove" aria-label="Remove ' + escHtml(label) + '">&times;</span>' +
         '</span>';
@@ -3261,7 +3263,7 @@ $(function () {
       var isSelected = legSelected.indexOf(slotKey) !== -1;
       var html =
         '<div class="leg-option' + (isSelected ? ' leg-option--selected' : '') + '" ' +
-        'data-key="' + escHtml(slotKey) + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
+        'data-key="' + escHtml(slotKey) + '" data-api="' + escHtml(assignment.api_name) + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
           '<span class="leg-option-check">' + (isSelected ? checkSvg : '') + '</span>' +
           '<span class="leg-option-label">' + escHtml(fieldText) + '</span>' +
         '</div>';
@@ -3322,6 +3324,20 @@ $(function () {
   $(document).on('click', '#syeCancel', function () {
     $('#legendBar').hide();
     legSelected = [];
+  });
+
+  /* legSave – confirm the current legend selection */
+  $(document).on('click', '#legSave', function () {
+    closeLegDropdown();
+    $('#legendBar').hide();
+  });
+
+  /* legCancel – discard the legend selection and hide the bar */
+  $(document).on('click', '#legCancel', function () {
+    legSelected = [];
+    renderLegChips();
+    closeLegDropdown();
+    $('#legendBar').hide();
   });
 
   /* Toggle dropdown on select click */
