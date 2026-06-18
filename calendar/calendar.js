@@ -2941,6 +2941,7 @@ $(function () {
   ────────────────────────────────────────────────────────── */
   var $meetingsBar    = $('.meetings-bar');
   var $styleBar       = $('#styleBar');
+  var $legendBar      = $('#legendBar');
   var $otherContent   = $('.header-toolbar, .header-main, .cal-body');
   var $settingsBackBtn = $('#settingsBackBtn');
 
@@ -2952,6 +2953,7 @@ $(function () {
   function showMainContent() {
     $meetingsBar.hide();
     $styleBar.hide();
+    $legendBar.hide();
     $settingsBackBtn.hide();
     $otherContent.show();
   }
@@ -3188,6 +3190,161 @@ $(function () {
     if ($(e.target).is('#lockedInfoBackdrop')) {
       $('#lockedInfoBackdrop').removeClass('sfp-open');
     }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     SELECT LEGENDS (Step 3)
+     Shown after the user clicks #syeDone.
+     Options are populated from the current syeSlotAssignments.
+  ────────────────────────────────────────────────────────── */
+
+  var legSelected = []; /* api_names of currently selected legend items */
+
+  /* Render chips inside #legSelect from legSelected */
+  function renderLegChips() {
+    var $wrap = $('#legChipsWrap');
+    $wrap.empty();
+    legSelected.forEach(function (apiName) {
+      var assignment = syeSlotAssignments[apiName];
+      if (!assignment) { return; }
+      var label = SYE_SLOT_LABELS[apiName] || apiName;
+      var chip =
+        '<span class="mf-chip" data-key="' + escHtml(apiName) + '">' +
+          '<span class="mf-chip-text">' + escHtml(label) + '</span>' +
+          '<span class="mf-chip-remove" aria-label="Remove ' + escHtml(label) + '">&times;</span>' +
+        '</span>';
+      $wrap.append(chip);
+    });
+    var $sel = $('#legSelect');
+    if (legSelected.length > 0 || $sel.hasClass('mf-open')) {
+      $sel.addClass('mf-active');
+    } else {
+      $sel.removeClass('mf-active');
+    }
+  }
+
+  /* Render option rows inside #legDropdown from syeSlotAssignments */
+  function renderLegList() {
+    var $list = $('#legList');
+    $list.empty();
+    var hasOptions = false;
+    $.each(SYE_SLOT_LABELS, function (slotKey, slotLabel) {
+      if (!syeSlotAssignments[slotKey]) { return; }
+      hasOptions = true;
+      var isSelected = legSelected.indexOf(slotKey) !== -1;
+      var checkSvg =
+        '<svg viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="10">' +
+        '<polyline points="1 5 4.5 8.5 11 1"/></svg>';
+      var html =
+        '<div class="leg-option' + (isSelected ? ' leg-option--selected' : '') + '" ' +
+        'data-key="' + escHtml(slotKey) + '" role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
+          '<span class="leg-option-check">' + (isSelected ? checkSvg : '') + '</span>' +
+          '<span class="leg-option-label">' + escHtml(slotLabel) + '</span>' +
+        '</div>';
+      $list.append(html);
+    });
+    if (!hasOptions) {
+      $list.html('<p class="mf-empty">No fields assigned yet.</p>');
+    }
+  }
+
+  /* Position the legends dropdown below #legSelect */
+  function positionLegDropdown() {
+    var $sel = $('#legSelect');
+    var $dd  = $('#legDropdown');
+    var rect = $sel[0].getBoundingClientRect();
+    var spaceBelow = window.innerHeight - rect.bottom - 8;
+    var spaceAbove = rect.top - 8;
+    var ddH = $dd.outerHeight();
+    var topPos, openUpward;
+    if (spaceBelow >= ddH || spaceBelow >= spaceAbove) {
+      topPos = rect.bottom + 4;
+      openUpward = false;
+    } else {
+      topPos = rect.top - ddH - 4;
+      openUpward = true;
+    }
+    $dd.css({
+      top:   Math.max(8, topPos) + 'px',
+      left:  Math.max(8, rect.left) + 'px',
+      width: rect.width + 'px'
+    });
+    $dd.toggleClass('mf-dd-above', openUpward);
+  }
+
+  function openLegDropdown() {
+    renderLegList();
+    positionLegDropdown();
+    $('#legDropdown').addClass('mf-dd-open');
+    $('#legSelect').addClass('mf-open mf-active').attr('aria-expanded', 'true');
+  }
+
+  function closeLegDropdown() {
+    $('#legDropdown').removeClass('mf-dd-open');
+    var $sel = $('#legSelect');
+    $sel.removeClass('mf-open').attr('aria-expanded', 'false');
+    if (legSelected.length === 0) { $sel.removeClass('mf-active'); }
+  }
+
+  /* Populate legends dropdown options from current slot assignments and show Step 3 */
+  $(document).on('click', '#syeDone', function () {
+    legSelected = [];
+    renderLegChips();
+    $('#legendBar').show();
+  });
+
+  /* syeCancel – hide the legend bar and reset */
+  $(document).on('click', '#syeCancel', function () {
+    $('#legendBar').hide();
+    legSelected = [];
+  });
+
+  /* Toggle dropdown on select click */
+  $(document).on('click', '#legSelect', function (e) {
+    if ($(e.target).closest('.mf-chip-remove').length) { return; }
+    if ($('#legSelect').hasClass('mf-open')) { closeLegDropdown(); } else { openLegDropdown(); }
+  });
+
+  /* Keyboard support for legSelect */
+  $(document).on('keydown', '#legSelect', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if ($(this).hasClass('mf-open')) { closeLegDropdown(); } else { openLegDropdown(); }
+    }
+    if (e.key === 'Escape') { closeLegDropdown(); }
+  });
+
+  /* Remove chip */
+  $(document).on('click', '#legChipsWrap .mf-chip-remove', function (e) {
+    e.stopPropagation();
+    var key = $(this).closest('.mf-chip').data('key');
+    legSelected = legSelected.filter(function (k) { return k !== key; });
+    renderLegChips();
+    if ($('#legSelect').hasClass('mf-open')) { renderLegList(); }
+  });
+
+  /* Toggle option in dropdown */
+  $(document).on('click', '.leg-option', function (e) {
+    e.stopPropagation();
+    var key = $(this).data('key');
+    var idx = legSelected.indexOf(key);
+    if (idx === -1) { legSelected.push(key); } else { legSelected.splice(idx, 1); }
+    renderLegChips();
+    renderLegList();
+  });
+
+  /* Close when clicking outside */
+  $(document).on('click.leg', function (e) {
+    if (!$(e.target).closest('#legDropdown').length &&
+        !$(e.target).closest('#legSelect').length) {
+      closeLegDropdown();
+    }
+  });
+
+  /* Reposition on resize */
+  $(window).on('resize.leg', function () {
+    if ($('#legSelect').hasClass('mf-open')) { positionLegDropdown(); }
   });
 
   /* ──────────────────────────────────────────────────────────
