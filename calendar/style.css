@@ -2148,6 +2148,20 @@ input, select, textarea {
   animation: sye-dot-blink .65s ease-in-out infinite;
 }
 
+/* Marker hover: hide all border indicators on the active event */
+.sye-prev-evt:has(.sye-prev-dot--blink) {
+  border-left-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Border-slot hover: hide the dot indicator on the active event */
+.sye-prev-evt--top-active .sye-prev-dot,
+.sye-prev-evt--bottom-active .sye-prev-dot,
+.sye-prev-evt--right-active .sye-prev-dot,
+.sye-prev-evt--left-active .sye-prev-dot {
+  visibility: hidden;
+}
+
 /* Persistent border indicators shown after a border slot is assigned */
 .sye-prev-evt--has-top    { box-shadow: inset 0  3px 0 0 #1565C0; }
 .sye-prev-evt--has-bottom { box-shadow: inset 0 -3px 0 0 #E65100; }

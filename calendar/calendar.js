@@ -1962,7 +1962,6 @@ $(function () {
                      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<polyline points="1,4 4,7 9,1"/>' +
                 '</svg></span>' +
-                '<span class="mf-item-avatar">' + escHtml(m.name.charAt(0).toUpperCase()) + '</span>' +
                 '<span class="mf-item-text">' +
                 '<span class="mf-item-name">' + escHtml(m.name) + '</span>' +
                 '</span></div>';
@@ -2090,11 +2089,16 @@ $(function () {
 
     });
 
-    /* Cancel – discard pending changes and close */
+    /* Cancel – remove only the most recently added chip and close */
     $(document).on('click', '#mfCancel', function (e) {
       e.stopPropagation();
-      mfSelected = mfSnapshot.slice();
-      renderMfChips();
+      var $lastChip = $('#mfChipsWrap .mf-chip').last();
+      if ($lastChip.length) {
+        var removedUid = $lastChip.data('uid');
+        mfSelected = mfSelected.filter(function (id) { return id !== removedUid; });
+        renderMfChips();
+        renderMfList();
+      }
       closeMf();
     });
 
@@ -2112,6 +2116,13 @@ $(function () {
       if (!$(e.target).closest('#mfDropdown').length &&
           !$(e.target).closest('#mfSelect').length &&
           !$(e.target).closest('#mfChipColorPicker').length) {
+        var $lastChip = $('#mfChipsWrap .mf-chip').last();
+        if ($lastChip.length) {
+          var removedUid = $lastChip.data('uid');
+          mfSelected = mfSelected.filter(function (id) { return id !== removedUid; });
+          renderMfChips();
+          renderMfList();
+        }
         closeMf();
       }
     });
@@ -3031,7 +3042,7 @@ $(function () {
     'top-border':    'Top border',
     'bottom-border': 'Bottom border',
     'right-border':  'Right border',
-    'status-dot':    'Status dot'
+    'status-dot':    'Marker'
   };
 
   /* Picklist field icon SVG */
@@ -3172,8 +3183,6 @@ $(function () {
 
   /* Open picker on slot click (locked slots are disabled – no click fires) */
   $(document).on('click', '.sye-slot:not(.sye-slot--locked)', function (e) {
-    /* Ignore clicks that originated from the action button inside the slot name */
-    if ($(e.target).closest('.sye-slot-name-action').length) { return; }
     var slot = $(this).data('slot');
     if (!slot) { return; }
     openSyeFieldPicker(slot);
@@ -3187,28 +3196,6 @@ $(function () {
     }
   });
 
-  /* Action button inside .sye-slot-name for the status-dot slot:
-     1. Remove all .mf-item-avatar elements from the module list
-     2. Remove the most recently selected .mf-chip from the chips wrap
-     3. Rename the slot label from "Status dot" to "Marker"                */
-  $(document).on('click', '.sye-slot-name-action', function (e) {
-    e.stopPropagation();
-
-    /* 1. Remove avatar circles from the module list items */
-    $('.mf-item-avatar').remove();
-
-    /* 2. Remove the most recently added chip and sync mfSelected state */
-    var $lastChip = $('#mfChipsWrap .mf-chip').last();
-    if ($lastChip.length) {
-      var removedUid = $lastChip.data('uid');
-      mfSelected = mfSelected.filter(function (id) { return id !== removedUid; });
-      $lastChip.remove();
-      renderMfList();
-    }
-
-    /* 3. Rename the slot label to "Marker" */
-    $(this).closest('.sye-slot-name').find('.sye-slot-name-text').text('Marker');
-  });
 
 
   /* Show info popup when a locked slot is clicked */
