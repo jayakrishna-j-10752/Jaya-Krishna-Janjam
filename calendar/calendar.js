@@ -3005,7 +3005,7 @@ $(function () {
     if (idx === undefined) { return; }
     $('.sye-prev-evt').removeClass(SYE_ALL_BLINK + ' sye-prev-evt--active');
     $('.sye-prev-dot').removeClass('sye-prev-dot--blink');
-    if (slot === 'status-dot') {
+    if (slot === 'marker') {
       /* Blink only the dot indicator inside the matching preview event */
       $('.sye-prev-evt[data-evt-index="' + idx + '"] .sye-prev-dot').addClass('sye-prev-dot--blink');
     } else {
@@ -3042,7 +3042,7 @@ $(function () {
     'top-border':    'Top border',
     'bottom-border': 'Bottom border',
     'right-border':  'Right border',
-    'status-dot':    'Marker'
+    'marker':        'Marker'
   };
 
   /* Picklist field icon SVG */
