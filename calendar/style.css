@@ -1962,12 +1962,26 @@ input, select, textarea {
   gap: 2px;
 }
 .sye-slot-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
+}
+.sye-slot-name-text {
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sye-slot-name-action {
+  flex-shrink: 0;
+  padding: 0 5px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 50%;
 }
 .sye-slot-field {
   font-size: 11px;
@@ -2193,6 +2207,15 @@ input, select, textarea {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  cursor: pointer;
+}
+/* Hover over the Marker dot: blink the dot and hide all parent event borders */
+.sye-prev-dot:hover {
+  animation: sye-dot-blink .65s ease-in-out infinite;
+}
+.sye-prev-evt:has(.sye-prev-dot:hover) {
+  border-left-color: transparent;
+  box-shadow: none;
 }
 
 /* Event variant styles */

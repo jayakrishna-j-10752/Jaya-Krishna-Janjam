@@ -3171,11 +3171,45 @@ $(function () {
   });
 
   /* Open picker on slot click (locked slots are disabled – no click fires) */
-  $(document).on('click', '.sye-slot:not(.sye-slot--locked)', function () {
+  $(document).on('click', '.sye-slot:not(.sye-slot--locked)', function (e) {
+    /* Ignore clicks that originated from the action button inside the slot name */
+    if ($(e.target).closest('.sye-slot-name-action').length) { return; }
     var slot = $(this).data('slot');
     if (!slot) { return; }
     openSyeFieldPicker(slot);
   });
+
+  /* Keyboard activation for div-based sye-slots (Enter / Space) */
+  $(document).on('keydown', '.sye-slot:not(.sye-slot--locked)', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  /* Action button inside .sye-slot-name for the status-dot slot:
+     1. Remove all .mf-item-avatar elements from the module list
+     2. Remove the most recently selected .mf-chip from the chips wrap
+     3. Rename the slot label from "Status dot" to "Marker"                */
+  $(document).on('click', '.sye-slot-name-action', function (e) {
+    e.stopPropagation();
+
+    /* 1. Remove avatar circles from the module list items */
+    $('.mf-item-avatar').remove();
+
+    /* 2. Remove the most recently added chip and sync mfSelected state */
+    var $lastChip = $('#mfChipsWrap .mf-chip').last();
+    if ($lastChip.length) {
+      var removedUid = $lastChip.data('uid');
+      mfSelected = mfSelected.filter(function (id) { return id !== removedUid; });
+      $lastChip.remove();
+      renderMfList();
+    }
+
+    /* 3. Rename the slot label to "Marker" */
+    $(this).closest('.sye-slot-name').find('.sye-slot-name-text').text('Marker');
+  });
+
 
   /* Show info popup when a locked slot is clicked */
   $(document).on('click', '.sye-slot--locked', function () {
