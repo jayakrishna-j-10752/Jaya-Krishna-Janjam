@@ -2089,16 +2089,12 @@ $(function () {
 
     });
 
-    /* Cancel – remove only the most recently added chip and close */
+    /* Cancel – restore selections to the state captured when the dropdown was opened */
     $(document).on('click', '#mfCancel', function (e) {
       e.stopPropagation();
-      var $lastChip = $('#mfChipsWrap .mf-chip').last();
-      if ($lastChip.length) {
-        var removedUid = $lastChip.data('uid');
-        mfSelected = mfSelected.filter(function (id) { return id !== removedUid; });
-        renderMfChips();
-        renderMfList();
-      }
+      mfSelected = mfSnapshot.slice();
+      renderMfChips();
+      renderMfList();
       closeMf();
     });
 
@@ -2116,13 +2112,6 @@ $(function () {
       if (!$(e.target).closest('#mfDropdown').length &&
           !$(e.target).closest('#mfSelect').length &&
           !$(e.target).closest('#mfChipColorPicker').length) {
-        var $lastChip = $('#mfChipsWrap .mf-chip').last();
-        if ($lastChip.length) {
-          var removedUid = $lastChip.data('uid');
-          mfSelected = mfSelected.filter(function (id) { return id !== removedUid; });
-          renderMfChips();
-          renderMfList();
-        }
         closeMf();
       }
     });
