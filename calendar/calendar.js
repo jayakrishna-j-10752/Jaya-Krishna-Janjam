@@ -2009,7 +2009,11 @@ $(function () {
       if ($(e.target).closest('.mf-chip-remove').length) return;
       if ($(e.target).closest('.mf-chip-dot').length) return;
       e.stopPropagation();
-      if ($(this).hasClass('mf-open')) { closeMf(); } else { openMf(); }
+      if ($(this).hasClass('mf-open')) { closeMf(); } else {
+        $('#styleBar').hide();
+        $('#legendBar').hide();
+        openMf();
+      }
     });
 
     /* Keyboard: Enter / Space open|close; Escape closes */
