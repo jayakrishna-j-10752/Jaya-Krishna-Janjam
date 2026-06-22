@@ -3338,6 +3338,13 @@ input, select, textarea {
   background: var(--z-blue-pale);
 }
 
+/* Invisible placeholder that reserves the expand-button column for leaf rows,
+   ensuring all rows have the same right-side alignment. */
+.ud-item-expand-gap {
+  width: 26px;
+  flex-shrink: 0;
+}
+
 /* ══════════════════════════════════════════════════════════
    CHIP COLOR PICKER  (.mcp-*)
 ══════════════════════════════════════════════════════════ */

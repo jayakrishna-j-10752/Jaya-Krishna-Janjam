@@ -1706,18 +1706,26 @@ $(function () {
     }
     /* Map all possible ZOHO CRM profile picture field names to profile_pic */
     if (!u.profile_pic) {
-      u.profile_pic = u.image_link || u.image || u.photo_url || u.pic_url || '';
+      u.profile_pic = u.image_link || u.image || u.photo_url || u.pic_url ||
+                      u.Profile_Pic || u.profile_photo || u.avatar_url || '';
     }
     return u;
   }
 
   /** Populate userMap and childrenMap from allUsers using the Reporting_To field */
   function buildUserMaps() {
-    userMap       = {};
+    /* Do NOT reset userMap here – preserve any profile_pic already stored (e.g.
+       from getCurrentUser) so that images are not lost when the users list is loaded. */
     childrenMap   = {};
     expandedNodes = {};
     allUsers.forEach(function (u) {
-      userMap[u.id] = normalizeUser(u);
+      var existing = userMap[u.id];
+      var norm     = normalizeUser(u);
+      /* If an earlier fetch already stored a profile picture, keep it. */
+      if (existing && existing.profile_pic && !norm.profile_pic) {
+        norm.profile_pic = existing.profile_pic;
+      }
+      userMap[u.id] = norm;
       var managerId = u.Reporting_To && u.Reporting_To.id;
       if (managerId) {
         if (!childrenMap[managerId]) childrenMap[managerId] = [];
@@ -1756,13 +1764,18 @@ $(function () {
     var isActive    = user.id === activeUserId;
     var hasChildren = !!(childrenMap[user.id] && childrenMap[user.id].length);
     var isExpanded  = !!expandedNodes[user.id];
-    var indent      = 16 + depth * 20;
+    var avatarMargin = depth * 20;
     var roleName    = (user.role && user.role.name) ? user.role.name : '';
 
+    /* .ud-item uses consistent padding (no inline padding-left).
+       The avatar is indented via margin-left so that the expand button
+       always aligns at the same right-hand position regardless of depth. */
     var html =
       '<div class="ud-item' + (isActive ? ' ud-item-active' : '') +
-      '" data-uid="' + escHtml(user.id) + '" style="padding-left:' + indent + 'px">' +
-      '<div class="ud-item-avatar">' + buildAvatarInnerHtml(user) + '</div>' +
+      '" data-uid="' + escHtml(user.id) + '">' +
+      '<div class="ud-item-avatar"' +
+      (avatarMargin > 0 ? ' style="margin-left:' + avatarMargin + 'px"' : '') +
+      '>' + buildAvatarInnerHtml(user) + '</div>' +
       '<div class="ud-item-info">' +
       '<div class="ud-item-name">'  + escHtml(user.full_name) + '</div>' +
       '<div class="ud-item-email">' + escHtml(user.email)     + '</div>' +
@@ -1777,6 +1790,9 @@ $(function () {
         '<svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" ' +
         'stroke-linecap="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>' +
         '</button>';
+    } else {
+      /* Placeholder keeps the expand-button column reserved so all rows align */
+      html += '<div class="ud-item-expand-gap"></div>';
     }
     html += '</div>';
     return html;
@@ -1788,9 +1804,8 @@ $(function () {
     if (!user) return '';
     var html     = buildUserRowHtml(user, depth);
     var children = childrenMap[nodeId] || [];
-    /* Depth 0 = root: always show direct children.
-       Depth ≥ 1: show children only when the parent node is expanded. */
-    if (children.length && (depth === 0 || expandedNodes[nodeId])) {
+    /* Children are rendered only when the node has been explicitly expanded. */
+    if (children.length && expandedNodes[nodeId]) {
       children.forEach(function (childId) {
         html += buildNodeHtml(childId, depth + 1);
       });
@@ -1815,8 +1830,10 @@ $(function () {
       subtree[loggedInUserId] = true;
       var matches = allUsers.filter(function (u) {
         if (!subtree[u.id]) return false;
+        var role = (u.role && u.role.name) ? u.role.name.toLowerCase() : '';
         return u.full_name.toLowerCase().indexOf(q) !== -1 ||
-               u.email.toLowerCase().indexOf(q)     !== -1;
+               u.email.toLowerCase().indexOf(q)     !== -1 ||
+               role.indexOf(q)                      !== -1;
       });
 
       if (matches.length === 0) {
@@ -1836,6 +1853,36 @@ $(function () {
       return;
     }
     $list.html(buildNodeHtml(loggedInUserId, 0));
+  }
+
+  /**
+   * Background task: for each user in the logged-in user's hierarchy who has no
+   * profile picture yet, fetch their individual record from the CRM and update
+   * their profile_pic.  Re-renders the open dropdown whenever a new image arrives.
+   */
+  async function fetchHierarchyUserPhotos() {
+    if (!loggedInUserId) return;
+    var subtree = getSubtreeIds(loggedInUserId);
+    subtree[loggedInUserId] = true;
+    var needPhoto = Object.keys(subtree).filter(function (id) {
+      return userMap[id] && !userMap[id].profile_pic;
+    });
+    for (var i = 0; i < needPhoto.length; i++) {
+      var uid = needPhoto[i];
+      try {
+        var resp = await zrc.get('/crm/v8/users/' + uid);
+        if (resp && resp.data && resp.data.users && resp.data.users[0]) {
+          var fresh = normalizeUser(resp.data.users[0]);
+          if (fresh.profile_pic) {
+            userMap[uid].profile_pic = fresh.profile_pic;
+            /* Re-render the open dropdown so the new image appears immediately */
+            if ($('#userDropdown').hasClass('ud-open')) {
+              renderUserTree($('#udSearch').val());
+            }
+          }
+        }
+      } catch (e) { /* ignore per-user failures */ }
+    }
   }
 
   function openUserDropdown() {
@@ -1892,8 +1939,10 @@ $(function () {
       if (!user) return;
       activeUserId = userId;
       $('.user-name').text(user.full_name);
-      /* Sync .user-avatar with the content shown in the selected .ud-item-avatar */
-      $('.user-avatar').html(buildAvatarInnerHtml(user));
+      /* Copy the exact avatar content from the selected .ud-item-avatar so the
+         header always reflects what is shown in the list (image or initials). */
+      var avatarHtml = $(this).find('.ud-item-avatar').html();
+      $('.user-avatar').html(avatarHtml || buildAvatarInnerHtml(user));
       closeUserDropdown();
     });
 
@@ -3703,13 +3752,12 @@ $(function () {
 
     /* ── Step 3: childrenMap is already built from Reporting_To in buildUserMaps() ── */
 
-    /* Auto-expand every node that has children so all subordinates are visible */
-    Object.keys(childrenMap).forEach(function (id) {
-      expandedNodes[id] = true;
-    });
-
-    /* ── Step 4: Render the hierarchy (removes loading placeholder) ── */
+    /* ── Step 4: Render the hierarchy (removes loading placeholder).
+       All nodes start collapsed; users expand branches manually. ── */
     renderUserTree('');
+
+    /* ── Step 5: Fetch missing profile pictures in the background ── */
+    fetchHierarchyUserPhotos().catch(function () {});
 
     /* ── Fetch Beat Plan References with all preference fields ── */
     var prefFields = [
