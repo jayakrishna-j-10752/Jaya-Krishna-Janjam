@@ -1695,7 +1695,6 @@ $(function () {
   var loggedInUserId = null; /* id of the logged-in user (root of hierarchy) */
   var expandedNodes  = {};   /* id → boolean (true = expanded) */
   var activeUserId   = null; /* currently selected user id */
-  var isAdminUser    = false; /* true when the logged-in user's profile is Administrator */
 
   /**
    * Normalize a user object so that full_name and profile_pic are always set,
@@ -1705,8 +1704,9 @@ $(function () {
     if (!u.full_name && (u.first_name || u.last_name)) {
       u.full_name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
     }
-    if (!u.profile_pic && u.image_link) {
-      u.profile_pic = u.image_link;
+    /* Map all possible ZOHO CRM profile picture field names to profile_pic */
+    if (!u.profile_pic) {
+      u.profile_pic = u.image_link || u.image || u.photo_url || u.pic_url || '';
     }
     return u;
   }
@@ -1738,12 +1738,17 @@ $(function () {
     return ids;
   }
 
-  /** Return the inner HTML for an avatar: profile image if available, else initial letter */
+  /** Return the inner HTML for an avatar: profile image if available, else initials */
   function buildAvatarInnerHtml(user) {
     if (user.profile_pic) {
-      return '<img src="' + escHtml(user.profile_pic) + '" alt="' + escHtml(user.full_name) + '">';
+      return '<img src="' + escHtml(user.profile_pic) + '" alt="' + escHtml(user.full_name || '') + '">';
     }
-    return escHtml(user.full_name.charAt(0).toUpperCase());
+    var name  = (user.full_name || user.email || '?').trim();
+    var parts = name.split(/\s+/);
+    var initials = parts.length >= 2
+      ? (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+      : name.charAt(0).toUpperCase();
+    return escHtml(initials || '?');
   }
 
   /** Build the HTML string for a single user row */
@@ -1805,24 +1810,14 @@ $(function () {
     var q = (filter || '').toLowerCase().trim();
 
     if (q) {
-      /* Flat filtered view */
-      var matches;
-      if (isAdminUser) {
-        /* Admin: search across all users */
-        matches = allUsers.filter(function (u) {
-          return u.full_name.toLowerCase().indexOf(q) !== -1 ||
-                 u.email.toLowerCase().indexOf(q)     !== -1;
-        });
-      } else {
-        /* Non-admin: only users within their own subtree */
-        var subtree = getSubtreeIds(loggedInUserId);
-        subtree[loggedInUserId] = true;
-        matches = allUsers.filter(function (u) {
-          if (!subtree[u.id]) return false;
-          return u.full_name.toLowerCase().indexOf(q) !== -1 ||
-                 u.email.toLowerCase().indexOf(q)     !== -1;
-        });
-      }
+      /* Flat filtered view: only users within the logged-in user's subtree */
+      var subtree = getSubtreeIds(loggedInUserId);
+      subtree[loggedInUserId] = true;
+      var matches = allUsers.filter(function (u) {
+        if (!subtree[u.id]) return false;
+        return u.full_name.toLowerCase().indexOf(q) !== -1 ||
+               u.email.toLowerCase().indexOf(q)     !== -1;
+      });
 
       if (matches.length === 0) {
         $list.html('<div class="ud-empty">No users found.</div>');
@@ -1835,28 +1830,12 @@ $(function () {
       return;
     }
 
-    /* Tree view */
-    if (isAdminUser) {
-      /* Admin: show full org tree — all top-level users and their subtrees */
-      var allChildIds = {};
-      Object.keys(childrenMap).forEach(function (id) {
-        childrenMap[id].forEach(function (cid) { allChildIds[cid] = true; });
-      });
-      var treeHtml = '';
-      allUsers.forEach(function (u) {
-        if (!allChildIds[u.id]) {
-          treeHtml += buildNodeHtml(u.id, 0);
-        }
-      });
-      $list.html(treeHtml || '<div class="ud-empty">No users found.</div>');
-    } else {
-      /* Non-admin: tree rooted at the logged-in user */
-      if (!userMap[loggedInUserId]) {
-        $list.html('<div class="ud-empty">User not found.</div>');
-        return;
-      }
-      $list.html(buildNodeHtml(loggedInUserId, 0));
+    /* Tree view: always rooted at the logged-in user based on reporting structure */
+    if (!userMap[loggedInUserId]) {
+      $list.html('<div class="ud-empty">User not found.</div>');
+      return;
     }
+    $list.html(buildNodeHtml(loggedInUserId, 0));
   }
 
   function openUserDropdown() {
@@ -1872,7 +1851,16 @@ $(function () {
 
     $dd.addClass('ud-open');
     $btn.attr('aria-expanded', 'true');
-    setTimeout(function () { $('#udSearch').focus(); }, 60);
+    setTimeout(function () {
+      $('#udSearch').focus();
+      /* Scroll the active item into view */
+      var $active = $('#udList .ud-item-active');
+      if ($active.length) {
+        var list = document.getElementById('udList');
+        var itemTop = $active[0].offsetTop;
+        list.scrollTop = Math.max(0, itemTop - 60);
+      }
+    }, 60);
   }
 
   function closeUserDropdown() {
@@ -3679,8 +3667,6 @@ $(function () {
       loggedInUserId = cuNorm.id || null;
       activeUserId   = loggedInUserId;
       userMap[cuNorm.id] = cuNorm;
-      isAdminUser = !!(cuData.profile && cuData.profile.name === 'Administrator');
-      console.log('isAdminUser', isAdminUser, cuData.profile);
       $('.user-name').text(cuNorm.full_name || cuNorm.email || '');
       $('.user-avatar').html(buildAvatarInnerHtml(cuNorm));
     }
