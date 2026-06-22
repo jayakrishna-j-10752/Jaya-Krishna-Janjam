@@ -3201,6 +3201,19 @@ input, select, textarea {
 }
 .ud-search-input::placeholder { color: var(--text-muted); }
 
+.ud-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color .12s;
+}
+.ud-clear-btn:hover { color: var(--text-primary); }
+
 /* User list */
 .ud-list {
   overflow-y: auto;

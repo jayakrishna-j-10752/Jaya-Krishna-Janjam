@@ -1782,18 +1782,16 @@ $(function () {
     var isActive    = user.id === activeUserId;
     var hasChildren = !!(childrenMap[user.id] && childrenMap[user.id].length);
     var isExpanded  = !!expandedNodes[user.id];
-    var infoIndent  = depth * 20;
     var roleName    = (user.role && user.role.name) ? user.role.name : '';
 
-    /* Avatar stays in a fixed left column; hierarchy indent is applied to
-       the info block so all avatars remain vertically aligned. */
+    /* Indent the entire row (avatar + info) so all items maintain consistent
+       internal spacing at every depth level — no zig-zag. */
+    var rowIndent = depth > 0 ? ' style="padding-left:' + (14 + depth * 20) + 'px"' : '';
     var html =
       '<div class="ud-item' + (isActive ? ' ud-item-active' : '') +
-      '" data-uid="' + escHtml(user.id) + '">' +
+      '" data-uid="' + escHtml(user.id) + '"' + rowIndent + '>' +
       '<div class="ud-item-avatar">' + buildAvatarInnerHtml(user) + '</div>' +
-      '<div class="ud-item-info"' +
-      (infoIndent > 0 ? ' style="margin-left:' + infoIndent + 'px"' : '') +
-      '>' +
+      '<div class="ud-item-info">' +
       '<div class="ud-item-name">'  + highlightText(user.full_name, q) + '</div>' +
       '<div class="ud-item-email">' + highlightText(user.email, q)     + '</div>' +
       (roleName ? '<div class="ud-item-role">' + highlightText(roleName, q) + '</div>' : '') +
@@ -1907,6 +1905,7 @@ $(function () {
     var $dd  = $('#userDropdown');
     renderUserTree('');
     $('#udSearch').val('');
+    $('#udClearBtn').hide();
 
     /* Position below the button */
     var off  = $btn.offset();
@@ -1943,9 +1942,19 @@ $(function () {
       }
     });
 
-    /* Live search */
+    /* Live search + clear-button visibility */
     $(document).on('input', '#udSearch', function () {
-      renderUserTree($(this).val());
+      var q = $(this).val();
+      $('#udClearBtn').toggle(q.length > 0);
+      renderUserTree(q);
+    });
+
+    /* Clear-button click */
+    $(document).on('click', '#udClearBtn', function (e) {
+      e.stopPropagation();
+      $('#udSearch').val('');
+      $(this).hide();
+      renderUserTree('');
     });
 
     /* Select a user */
