@@ -3683,19 +3683,18 @@ $(function () {
 
     /* ── Step 3: Fetch reportees for every user via COQL (all in parallel) ── */
     var coqlPromises = allUsers.map(function (u) {
-      return zrc.post('/crm/v8/coql', {
-        data: [{
-          /* Only select fields that are valid in the users COQL module.
-             image_link, role, and Reporting_To are NOT selectable in COQL
-             and cause 400 Bad Request errors. */
-          select_query:
-            "select id, first_name, last_name, email " +
-            "from users " +
-            "where Reporting_To.id = '" + u.id + "' " +
-            "limit 200"
-        }]
-      }).then(function (resp) {
-        var reportees = resp && resp.data && resp.data.data;
+      var config = {
+        /* Only select fields that are valid in the users COQL module.
+           image_link, role, and Reporting_To are NOT selectable in COQL
+           and cause 400 Bad Request errors. */
+        select_query:
+          "select id, first_name, last_name, email " +
+          "from users " +
+          "where Reporting_To.id = '" + u.id + "' " +
+          "limit 200"
+      };
+      return ZOHO.CRM.API.coql(config).then(function (resp) {
+        var reportees = resp && resp.data;
         if (reportees && reportees.length) {
           /* ── Step 4: Build manager → reportees mapping ── */
           if (!childrenMap[u.id]) childrenMap[u.id] = [];
