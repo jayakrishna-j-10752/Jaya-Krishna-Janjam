@@ -3626,29 +3626,20 @@ $(function () {
     if (usersResp && usersResp.data && usersResp.data.users) {
       allUsers = usersResp.data.users;
     }
+    buildUserMaps();
 
-    /* ── Identify the logged-in user from PageLoad data ── */
-    var currentUser = data && data.CurrentUser;
-    if (currentUser) {
-      loggedInUserId = currentUser.id || null;
-      /* Fallback: match by email when the id is absent or format differs */
-      if (!loggedInUserId) {
-        var emailToMatch = currentUser.Email || currentUser.email;
+    /* ── Identify the logged-in user via ZOHO.CRM.CONFIG.getCurrentUser() ── */
+    var currentUserResp = await ZOHO.CRM.CONFIG.getCurrentUser();
+    var cuData = currentUserResp && currentUserResp.users && currentUserResp.users[0];
+    if (cuData) {
+      loggedInUserId = cuData.id || null;
+      /* Fallback: match by email when the id doesn't align with the users list */
+      if (!loggedInUserId || !userMap[loggedInUserId]) {
+        var emailToMatch = cuData.email;
         if (emailToMatch) {
           var emailMatch = allUsers.find(function (u) { return u.email === emailToMatch; });
           if (emailMatch) loggedInUserId = emailMatch.id;
         }
-      }
-    }
-
-    buildUserMaps();
-
-    /* ── Re-try email fallback if the ID was set but is not found in the user map ── */
-    if (currentUser && loggedInUserId && !userMap[loggedInUserId]) {
-      var retryEmail = currentUser.Email || currentUser.email;
-      if (retryEmail) {
-        var retryUser = allUsers.find(function (u) { return u.email === retryEmail; });
-        if (retryUser) loggedInUserId = retryUser.id;
       }
     }
 
