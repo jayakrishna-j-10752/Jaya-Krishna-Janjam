@@ -3631,14 +3631,26 @@ $(function () {
     var currentUser = data && data.CurrentUser;
     if (currentUser) {
       loggedInUserId = currentUser.id || null;
-      /* Fallback: match by email when the id format differs */
-      if (!loggedInUserId && currentUser.Email) {
-        var emailMatch = allUsers.find(function (u) { return u.email === currentUser.Email; });
-        if (emailMatch) loggedInUserId = emailMatch.id;
+      /* Fallback: match by email when the id is absent or format differs */
+      if (!loggedInUserId) {
+        var emailToMatch = currentUser.Email || currentUser.email;
+        if (emailToMatch) {
+          var emailMatch = allUsers.find(function (u) { return u.email === emailToMatch; });
+          if (emailMatch) loggedInUserId = emailMatch.id;
+        }
       }
     }
 
     buildUserMaps();
+
+    /* ── Re-try email fallback if the ID was set but is not found in the user map ── */
+    if (currentUser && loggedInUserId && !userMap[loggedInUserId]) {
+      var retryEmail = currentUser.Email || currentUser.email;
+      if (retryEmail) {
+        var retryUser = allUsers.find(function (u) { return u.email === retryEmail; });
+        if (retryUser) loggedInUserId = retryUser.id;
+      }
+    }
 
     /* ── Default selection: logged-in user is the root and selected user ── */
     if (loggedInUserId && userMap[loggedInUserId]) {
