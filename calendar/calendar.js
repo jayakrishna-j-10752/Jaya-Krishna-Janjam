@@ -3418,6 +3418,9 @@ $(function () {
     } catch (err) {
       console.error('Failed to save Beat Plan Reference:', err);
     }
+
+    /* ── Transition to main calendar view ── */
+    showMainContent();
   });
 
   /* setupCancel – discard the legend selection and hide the bar */
@@ -3501,17 +3504,23 @@ $(function () {
       }
     });
 
-    /* ── Legends: map saved api_names back to slot keys ── */
-    var legApiList = (rec['beatplanner__Legends_Field_Api_Name'] || '').split(',').filter(Boolean);
-    legSelected = [];
-    legApiList.forEach(function (api) {
-      $.each(syeSlotAssignments, function (slotKey, asgn) {
-        if (asgn.api_name === api && legSelected.indexOf(slotKey) === -1) {
-          legSelected.push(slotKey);
-        }
-      });
+    /* ── Legends: recreate chips directly from saved label / api data ── */
+    var legApiList   = (rec['beatplanner__Legends_Field_Api_Name']   || '').split(',').filter(Boolean);
+    var legLabelList = (rec['beatplanner__Legends_Field_Label_Name'] || '').split(',').filter(Boolean);
+    var $legWrap = $('#legChipsWrap');
+    $legWrap.empty();
+    legApiList.forEach(function (api, i) {
+      var label = legLabelList[i] || api;
+      $legWrap.append(
+        '<span class="mf-chip" data-api="' + escHtml(api) + '">' +
+          '<span class="mf-chip-text">' + escHtml(label) + '</span>' +
+          '<span class="mf-chip-remove" aria-label="Remove ' + escHtml(label) + '">&times;</span>' +
+        '</span>'
+      );
     });
-    renderLegChips();
+    if (legApiList.length > 0) {
+      $('#legSelect').addClass('mf-active');
+    }
   }
 
   /* ──────────────────────────────────────────────────────────
