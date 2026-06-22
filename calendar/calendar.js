@@ -3340,10 +3340,67 @@ $(function () {
     legSelected = [];
   });
 
-  /* setupSave – confirm the current legend selection */
-  $(document).on('click', '#setupSave', function () {
+  /* setupSave – confirm the current legend selection and persist to CRM */
+  $(document).on('click', '#setupSave', async function () {
     closeLegDropdown();
     $('#legendBar').hide();
+
+    /* ── Collect Meetings For chips ── */
+    var mfModules = [];
+    var mfApis    = [];
+    $('#mfChipsWrap .mf-chip').each(function () {
+      mfModules.push($(this).find('.mf-chip-text').text().trim());
+      mfApis.push($(this).data('uid') || '');
+    });
+
+    /* ── Collect slot assignments ── */
+    var SLOT_FIELDS = {
+      'bg-colour':     { label: 'beatplanner__Background_Colour_Field_Label_Name', api: 'beatplanner__Background_Colour_Field_Api_Name' },
+      'marker':        { label: 'beatplanner__Marker_Field_Name',                  api: 'beatplanner__Marker_Field_API_Name' },
+      'top-border':    { label: 'beatplanner__Top_Border_Field_Name',              api: 'beatplanner__Top_Border_Field_Api_Name' },
+      'bottom-border': { label: 'beatplanner__Bottom_Border_Field_Name',           api: 'beatplanner__BottomBorder_Field_Api_Name' },
+      'left-border':   { label: 'beatplanner__Left_Border_Field_Name',             api: 'beatplanner__Left_Border_Field_Api_Name' },
+      'right-border':  { label: 'beatplanner__Right_Border_Field_Name',            api: 'beatplanner__Right_Border_Field_Api_Name' }
+    };
+
+    var recordData = {
+      beatplanner__Meetings_For_Modules: mfModules.join(','),
+      beatplanner__Meetings_For_Apis:    mfApis.join(',')
+    };
+
+    $.each(SLOT_FIELDS, function (slotKey, crmFields) {
+      var assignment = syeSlotAssignments[slotKey];
+      recordData[crmFields.label] = assignment ? assignment.field_label : '';
+      recordData[crmFields.api]   = assignment ? assignment.api_name    : '';
+    });
+
+    try {
+      /* ── Check for existing records ── */
+      var existingResp = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=id');
+      var existingRecords = existingResp &&
+                            existingResp.data &&
+                            existingResp.data.data &&
+                            existingResp.data.data.length > 0
+                              ? existingResp.data.data
+                              : null;
+
+      if (existingRecords) {
+        /* Update the first record */
+        var firstId = existingRecords[0].id;
+        await zrc.patch(
+          '/crm/v8/beatplanner__Beat_Plan_References/' + firstId,
+          { data: [recordData] }
+        );
+      } else {
+        /* Create a new record */
+        await zrc.post(
+          '/crm/v8/beatplanner__Beat_Plan_References',
+          { data: [recordData] }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to save Beat Plan Reference:', err);
+    }
   });
 
   /* setupCancel – discard the legend selection and hide the bar */
