@@ -2563,9 +2563,10 @@ $(function () {
                 {
                   field_label: 'Meetings For',
                   data_type:   'picklist',
-                  pick_list_values: selectedValues.map(chip => ({
-                    display_value: chip.label,
-                    actual_value:  chip.label
+                  pick_list_values: selectedValues.map((chip, idx) => ({
+                    display_value:   chip.label,
+                    actual_value:    chip.label,
+                    sequence_number: idx + 1
                   }))
                 }
               ]
@@ -2619,7 +2620,7 @@ $(function () {
 
       const existingOptions = picklistField.pick_list_values || [];
 
-      const pickListValues = selectedValues.map(chip => {
+      const pickListValues = selectedValues.map((chip, idx) => {
 
         const existing = existingOptions.find(o =>
           o.display_value === chip.label || o.actual_value === chip.label
@@ -2628,8 +2629,8 @@ $(function () {
         const colourCode = chip.color || null;
 
         const base = existing
-          ? { id: existing.id, display_value: existing.display_value, actual_value: existing.actual_value }
-          : { display_value: chip.label, actual_value: chip.label };
+          ? { id: existing.id, display_value: existing.display_value, actual_value: existing.actual_value, sequence_number: existing.sequence_number ?? idx + 1 }
+          : { display_value: chip.label, actual_value: chip.label, sequence_number: idx + 1 };
 
         // Always include colour_code when available – the field now has
         // enable_colour_code: true (either it already did, or we just enabled it above).
