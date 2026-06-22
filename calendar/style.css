@@ -3285,6 +3285,10 @@ input, select, textarea {
   width: 10px;
   height: 10px;
   pointer-events: none;
+  transition: transform .15s ease;
+}
+.ud-expand-btn.ud-expanded svg {
+  transform: rotate(180deg);
 }
 .ud-expand-btn:hover {
   border-color: var(--z-blue);

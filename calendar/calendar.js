@@ -1686,56 +1686,136 @@ $(function () {
   }
 
   /* ──────────────────────────────────────────────────────────
-     USER PROFILE DROPDOWN
+     USER PROFILE DROPDOWN  (hierarchy-based)
   ────────────────────────────────────────────────────────── */
 
-  var USERS = [
-    { id: 'u1', name: 'Jaya Krishna Janjam',  email: 'jayakrishna.j@zohotest.com',          role: 'Administrator',  expand: false },
-    { id: 'u2', name: 'Siva Pavan Duvvuru',   email: 'jayakrishnajanjam1997+1@gmail.com',   role: 'Managers Head',  expand: false },
-    { id: 'u3', name: 'Uday Kumar Janjam',    email: 'jayakrishnajanjam1997+2@gmail.com',   role: 'Director',       expand: true  },
-    { id: 'u4', name: 'Sindhu Priya SA',      email: 'jayakrishnajanjam1997+4@gmail.com',   role: 'Director',       expand: true  },
-    { id: 'u5', name: 'Athith Santosh',       email: 'jayakrishnajanjam1997+3@gmail.com',   role: 'Standard',       expand: false }
-  ];
+  var allUsers       = [];   /* fetched from /crm/v8/users?type=ActiveConfirmedUsers */
+  var userMap        = {};   /* id → user object */
+  var childrenMap    = {};   /* id → [childId, …] */
+  var loggedInUserId = null; /* id of the logged-in user (root of hierarchy) */
+  var expandedNodes  = {};   /* id → boolean (true = expanded) */
+  var activeUserId   = null; /* currently selected user id */
 
-  var activeUserId = 'u1';
-
-  function renderUserList(filter) {
-    var $list  = $('#udList');
-    var q      = (filter || '').toLowerCase().trim();
-    var items  = USERS.filter(function (u) {
-      return !q ||
-        u.name.toLowerCase().indexOf(q)  !== -1 ||
-        u.email.toLowerCase().indexOf(q) !== -1 ||
-        u.role.toLowerCase().indexOf(q)  !== -1;
+  /** Populate userMap and childrenMap from allUsers */
+  function buildUserMaps() {
+    userMap     = {};
+    childrenMap = {};
+    allUsers.forEach(function (u) {
+      userMap[u.id] = u;
     });
-    if (items.length === 0) {
-      $list.html('<div class="ud-empty">No users found.</div>');
+    allUsers.forEach(function (u) {
+      var pid = u.reporting_to && u.reporting_to.id;
+      if (pid) {
+        if (!childrenMap[pid]) childrenMap[pid] = [];
+        childrenMap[pid].push(u.id);
+      }
+    });
+  }
+
+  /** Return a set (plain object) of all descendant ids under rootId */
+  function getSubtreeIds(rootId) {
+    var ids   = {};
+    var queue = (childrenMap[rootId] || []).slice();
+    while (queue.length) {
+      var cur = queue.shift();
+      ids[cur] = true;
+      (childrenMap[cur] || []).forEach(function (c) { queue.push(c); });
+    }
+    return ids;
+  }
+
+  /** Build the HTML string for a single user row */
+  function buildUserRowHtml(user, depth) {
+    var isActive    = user.id === activeUserId;
+    var hasChildren = !!(childrenMap[user.id] && childrenMap[user.id].length);
+    var isExpanded  = !!expandedNodes[user.id];
+    var indent      = 16 + depth * 20;
+    var roleName    = (user.role && user.role.name) ? user.role.name : '';
+
+    var html =
+      '<div class="ud-item' + (isActive ? ' ud-item-active' : '') +
+      '" data-uid="' + escHtml(user.id) + '" style="padding-left:' + indent + 'px">' +
+      '<div class="ud-item-avatar">' + escHtml(user.full_name.charAt(0).toUpperCase()) + '</div>' +
+      '<div class="ud-item-info">' +
+      '<div class="ud-item-name">'  + escHtml(user.full_name) + '</div>' +
+      '<div class="ud-item-email">' + escHtml(user.email)     + '</div>' +
+      (roleName ? '<div class="ud-item-role">' + escHtml(roleName) + '</div>' : '') +
+      '</div>';
+
+    if (hasChildren) {
+      html +=
+        '<button class="ud-expand-btn' + (isExpanded ? ' ud-expanded' : '') +
+        '" data-expand-uid="' + escHtml(user.id) +
+        '" title="' + (isExpanded ? 'Collapse' : 'Expand') + '">' +
+        '<svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+        'stroke-linecap="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>' +
+        '</button>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  /** Recursively build HTML for a node and its visible descendants */
+  function buildNodeHtml(nodeId, depth) {
+    var user = userMap[nodeId];
+    if (!user) return '';
+    var html     = buildUserRowHtml(user, depth);
+    var children = childrenMap[nodeId] || [];
+    /* Depth 0 = root: always show direct children.
+       Depth ≥ 1: show children only when the parent node is expanded. */
+    if (children.length && (depth === 0 || expandedNodes[nodeId])) {
+      children.forEach(function (childId) {
+        html += buildNodeHtml(childId, depth + 1);
+      });
+    }
+    return html;
+  }
+
+  /** Render the user dropdown list, optionally filtered by a search query */
+  function renderUserTree(filter) {
+    var $list = $('#udList');
+
+    if (!loggedInUserId || allUsers.length === 0) {
+      $list.html('<div class="ud-empty">Loading users\u2026</div>');
       return;
     }
-    var html = '';
-    items.forEach(function (u) {
-      var isActive = u.id === activeUserId;
-      html += '<div class="ud-item' + (isActive ? ' ud-item-active' : '') + '" data-uid="' + u.id + '">' +
-              '  <div class="ud-item-avatar">' + escHtml(u.name.charAt(0).toUpperCase()) + '</div>' +
-              '  <div class="ud-item-info">' +
-              '    <div class="ud-item-name">' + escHtml(u.name) + '</div>' +
-              '    <div class="ud-item-email">' + escHtml(u.email) + '</div>' +
-              '    <div class="ud-item-role">' + escHtml(u.role) + '</div>' +
-              '  </div>';
-      if (u.expand) {
-        html += '  <button class="ud-expand-btn" title="View sub-calendars">' +
-                '    <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>' +
-                '  </button>';
+
+    var q = (filter || '').toLowerCase().trim();
+
+    if (q) {
+      /* Flat filtered view – only users within the logged-in user's subtree */
+      var subtree = getSubtreeIds(loggedInUserId);
+      subtree[loggedInUserId] = true;
+
+      var matches = allUsers.filter(function (u) {
+        if (!subtree[u.id]) return false;
+        return u.full_name.toLowerCase().indexOf(q) !== -1 ||
+               u.email.toLowerCase().indexOf(q)     !== -1;
+      });
+
+      if (matches.length === 0) {
+        $list.html('<div class="ud-empty">No users found.</div>');
+        return;
       }
-      html += '</div>';
-    });
-    $list.html(html);
+
+      var flatHtml = '';
+      matches.forEach(function (u) { flatHtml += buildUserRowHtml(u, 0); });
+      $list.html(flatHtml);
+      return;
+    }
+
+    /* Tree view rooted at the logged-in user */
+    if (!userMap[loggedInUserId]) {
+      $list.html('<div class="ud-empty">User not found.</div>');
+      return;
+    }
+    $list.html(buildNodeHtml(loggedInUserId, 0));
   }
 
   function openUserDropdown() {
     var $btn = $('#userProfile');
     var $dd  = $('#userDropdown');
-    renderUserList('');
+    renderUserTree('');
     $('#udSearch').val('');
 
     /* Position below the button */
@@ -1766,18 +1846,26 @@ $(function () {
 
     /* Live search */
     $(document).on('input', '#udSearch', function () {
-      renderUserList($(this).val());
+      renderUserTree($(this).val());
     });
 
     /* Select a user */
     $(document).on('click', '.ud-item', function (e) {
       if ($(e.target).closest('.ud-expand-btn').length) return;
-      var uid = $(this).data('uid');
-      var user = USERS.find(function (u) { return u.id === uid; });
+      var userId = $(this).data('uid');
+      var user   = userMap[userId];
       if (!user) return;
-      activeUserId = uid;
-      $('.user-name').text(user.name);
+      activeUserId = userId;
+      $('.user-name').text(user.full_name);
       closeUserDropdown();
+    });
+
+    /* Toggle node expand / collapse */
+    $(document).on('click', '.ud-expand-btn', function (e) {
+      e.stopPropagation();
+      var nodeId = $(this).data('expand-uid');
+      expandedNodes[nodeId] = !expandedNodes[nodeId];
+      renderUserTree($('#udSearch').val());
     });
 
     /* Close when clicking outside */
@@ -3532,6 +3620,31 @@ $(function () {
   ────────────────────────────────────────────────────────── */
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
+
+    /* ── Fetch all active users and build the reporting hierarchy ── */
+    var usersResp = await zrc.get('/crm/v8/users?type=ActiveConfirmedUsers');
+    if (usersResp && usersResp.data && usersResp.data.users) {
+      allUsers = usersResp.data.users;
+    }
+
+    /* ── Identify the logged-in user from PageLoad data ── */
+    var currentUser = data && data.CurrentUser;
+    if (currentUser) {
+      loggedInUserId = currentUser.id || null;
+      /* Fallback: match by email when the id format differs */
+      if (!loggedInUserId && currentUser.Email) {
+        var emailMatch = allUsers.find(function (u) { return u.email === currentUser.Email; });
+        if (emailMatch) loggedInUserId = emailMatch.id;
+      }
+    }
+
+    buildUserMaps();
+
+    /* ── Default selection: logged-in user is the root and selected user ── */
+    if (loggedInUserId && userMap[loggedInUserId]) {
+      activeUserId = loggedInUserId;
+      $('.user-name').text(userMap[loggedInUserId].full_name);
+    }
 
     /* ── Fetch Beat Plan References with all preference fields ── */
     var prefFields = [
