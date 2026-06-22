@@ -3685,8 +3685,11 @@ $(function () {
     var coqlPromises = allUsers.map(function (u) {
       return zrc.post('/crm/v8/coql', {
         data: [{
+          /* Only select fields that are valid in the users COQL module.
+             image_link, role, and Reporting_To are NOT selectable in COQL
+             and cause 400 Bad Request errors. */
           select_query:
-            "select id, Reporting_To, image_link, role, first_name, last_name, email " +
+            "select id, first_name, last_name, email " +
             "from users " +
             "where Reporting_To.id = '" + u.id + "' " +
             "limit 200"
@@ -3698,12 +3701,9 @@ $(function () {
           if (!childrenMap[u.id]) childrenMap[u.id] = [];
           reportees.forEach(function (r) {
             childrenMap[u.id].push(r.id);
-            /* Enrich userMap entry with image_link from COQL when available */
-            if (userMap[r.id]) {
-              if (!userMap[r.id].profile_pic && r.image_link) {
-                userMap[r.id].profile_pic = r.image_link;
-              }
-            } else {
+            /* The userMap entry already contains full details from ActiveConfirmedUsers;
+               add any reportee that is missing (e.g. deactivated / cross-org) */
+            if (!userMap[r.id]) {
               userMap[r.id] = normalizeUser(r);
             }
           });
