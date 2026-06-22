@@ -1698,8 +1698,9 @@ $(function () {
 
   /** Populate userMap and childrenMap from allUsers */
   function buildUserMaps() {
-    userMap     = {};
-    childrenMap = {};
+    userMap       = {};
+    childrenMap   = {};
+    expandedNodes = {};
     allUsers.forEach(function (u) {
       userMap[u.id] = u;
     });
@@ -1709,6 +1710,10 @@ $(function () {
         if (!childrenMap[pid]) childrenMap[pid] = [];
         childrenMap[pid].push(u.id);
       }
+    });
+    /* Auto-expand every node that has children so all subordinates are visible */
+    Object.keys(childrenMap).forEach(function (id) {
+      expandedNodes[id] = true;
     });
   }
 
@@ -1724,6 +1729,14 @@ $(function () {
     return ids;
   }
 
+  /** Return the inner HTML for an avatar: profile image if available, else initial letter */
+  function buildAvatarInnerHtml(user) {
+    if (user.profile_pic) {
+      return '<img src="' + escHtml(user.profile_pic) + '" alt="' + escHtml(user.full_name) + '">';
+    }
+    return escHtml(user.full_name.charAt(0).toUpperCase());
+  }
+
   /** Build the HTML string for a single user row */
   function buildUserRowHtml(user, depth) {
     var isActive    = user.id === activeUserId;
@@ -1735,7 +1748,7 @@ $(function () {
     var html =
       '<div class="ud-item' + (isActive ? ' ud-item-active' : '') +
       '" data-uid="' + escHtml(user.id) + '" style="padding-left:' + indent + 'px">' +
-      '<div class="ud-item-avatar">' + escHtml(user.full_name.charAt(0).toUpperCase()) + '</div>' +
+      '<div class="ud-item-avatar">' + buildAvatarInnerHtml(user) + '</div>' +
       '<div class="ud-item-info">' +
       '<div class="ud-item-name">'  + escHtml(user.full_name) + '</div>' +
       '<div class="ud-item-email">' + escHtml(user.email)     + '</div>' +
@@ -1857,6 +1870,8 @@ $(function () {
       if (!user) return;
       activeUserId = userId;
       $('.user-name').text(user.full_name);
+      /* Sync .user-avatar with the content shown in the selected .ud-item-avatar */
+      $('.user-avatar').html(buildAvatarInnerHtml(user));
       closeUserDropdown();
     });
 
@@ -3646,7 +3661,9 @@ $(function () {
     /* ── Default selection: logged-in user is the root and selected user ── */
     if (loggedInUserId && userMap[loggedInUserId]) {
       activeUserId = loggedInUserId;
-      $('.user-name').text(userMap[loggedInUserId].full_name);
+      var loggedUser = userMap[loggedInUserId];
+      $('.user-name').text(loggedUser.full_name);
+      $('.user-avatar').html(buildAvatarInnerHtml(loggedUser));
     }
 
     /* ── Fetch Beat Plan References with all preference fields ── */
