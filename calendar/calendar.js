@@ -3353,6 +3353,14 @@ $(function () {
       mfApis.push($(this).data('uid') || '');
     });
 
+    /* ── Collect Legend chips ── */
+    var legApiNames = [];
+    var legLabels   = [];
+    $('#legChipsWrap .mf-chip').each(function () {
+      legApiNames.push($(this).data('api') || '');
+      legLabels.push($(this).find('.mf-chip-text').text().trim());
+    });
+
     /* ── Collect slot assignments ── */
     var SLOT_FIELDS = {
       'bg-colour':     { label: 'beatplanner__Background_Colour_Field_Label_Name', api: 'beatplanner__Background_Colour_Field_Api_Name' },
@@ -3364,8 +3372,10 @@ $(function () {
     };
 
     var recordData = {
-      beatplanner__Meetings_For_Modules: mfModules.join(','),
-      beatplanner__Meetings_For_Apis:    mfApis.join(',')
+      beatplanner__Meetings_For_Modules:   mfModules.join(','),
+      beatplanner__Meetings_For_Apis:      mfApis.join(','),
+      beatplanner__Legends_Field_Api_Name: legApiNames.join(','),
+      beatplanner__Legends_Field_Label_Name: legLabels.join(',')
     };
 
     $.each(SLOT_FIELDS, function (slotKey, crmFields) {
@@ -3395,7 +3405,7 @@ $(function () {
         /* Create a new record */
         await zrc.post(
           '/crm/v8/beatplanner__Beat_Plan_References',
-          { data: [recordData] }
+          { data: [Object.assign({ Name: 'Beat Plan Preferences' }, recordData)] }
         );
       }
     } catch (err) {
