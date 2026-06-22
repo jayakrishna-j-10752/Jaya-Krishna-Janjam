@@ -2072,7 +2072,7 @@ $(function () {
 
       closeMf();
 
-      const selectedValues = $('.mf-chip')
+      const selectedValues = $('#mfChipsWrap .mf-chip')
         .map(function () {
           return {
             label:   $(this).find('.mf-chip-text').text().trim(),
@@ -2081,7 +2081,7 @@ $(function () {
           };
         })
         .get()
-        .filter(function (v) { return v.label; });
+        .filter(function (v) { return v.label && v.apiName; });
 
       try {
         await syncMeetingsFor(selectedValues);
