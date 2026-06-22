@@ -1887,9 +1887,9 @@ $(function () {
     for (var i = 0; i < needPhoto.length; i++) {
       var uid = needPhoto[i];
       try {
-        var resp = await zrc.get('/crm/v8/users/' + uid);
-        if (resp && resp.data && resp.data.users && resp.data.users[0]) {
-          var fresh = normalizeUser(resp.data.users[0]);
+        var resp = await ZOHO.CRM.API.getUser({ ID: uid });
+        if (resp && resp.users && resp.users[0]) {
+          var fresh = normalizeUser(resp.users[0]);
           if (fresh.profile_pic) {
             userMap[uid].profile_pic = fresh.profile_pic;
             /* Re-render the open dropdown so the new image appears immediately */
