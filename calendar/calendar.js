@@ -1695,6 +1695,7 @@ $(function () {
   var loggedInUserId = null; /* id of the logged-in user (root of hierarchy) */
   var expandedNodes  = {};   /* id → boolean (true = expanded) */
   var activeUserId   = null; /* currently selected user id */
+  var isAdminUser    = false; /* true when the logged-in user's profile is Administrator */
 
   /**
    * Normalize a user object so that full_name and profile_pic are always set,
@@ -1710,13 +1711,18 @@ $(function () {
     return u;
   }
 
-  /** Populate userMap from allUsers (childrenMap is built later via COQL) */
+  /** Populate userMap and childrenMap from allUsers using the Reporting_To field */
   function buildUserMaps() {
     userMap       = {};
     childrenMap   = {};
     expandedNodes = {};
     allUsers.forEach(function (u) {
       userMap[u.id] = normalizeUser(u);
+      var managerId = u.Reporting_To && u.Reporting_To.id;
+      if (managerId) {
+        if (!childrenMap[managerId]) childrenMap[managerId] = [];
+        childrenMap[managerId].push(u.id);
+      }
     });
   }
 
@@ -1799,15 +1805,24 @@ $(function () {
     var q = (filter || '').toLowerCase().trim();
 
     if (q) {
-      /* Flat filtered view – only users within the logged-in user's subtree */
-      var subtree = getSubtreeIds(loggedInUserId);
-      subtree[loggedInUserId] = true;
-
-      var matches = allUsers.filter(function (u) {
-        if (!subtree[u.id]) return false;
-        return u.full_name.toLowerCase().indexOf(q) !== -1 ||
-               u.email.toLowerCase().indexOf(q)     !== -1;
-      });
+      /* Flat filtered view */
+      var matches;
+      if (isAdminUser) {
+        /* Admin: search across all users */
+        matches = allUsers.filter(function (u) {
+          return u.full_name.toLowerCase().indexOf(q) !== -1 ||
+                 u.email.toLowerCase().indexOf(q)     !== -1;
+        });
+      } else {
+        /* Non-admin: only users within their own subtree */
+        var subtree = getSubtreeIds(loggedInUserId);
+        subtree[loggedInUserId] = true;
+        matches = allUsers.filter(function (u) {
+          if (!subtree[u.id]) return false;
+          return u.full_name.toLowerCase().indexOf(q) !== -1 ||
+                 u.email.toLowerCase().indexOf(q)     !== -1;
+        });
+      }
 
       if (matches.length === 0) {
         $list.html('<div class="ud-empty">No users found.</div>');
@@ -1820,12 +1835,28 @@ $(function () {
       return;
     }
 
-    /* Tree view rooted at the logged-in user */
-    if (!userMap[loggedInUserId]) {
-      $list.html('<div class="ud-empty">User not found.</div>');
-      return;
+    /* Tree view */
+    if (isAdminUser) {
+      /* Admin: show full org tree — all top-level users and their subtrees */
+      var allChildIds = {};
+      Object.keys(childrenMap).forEach(function (id) {
+        childrenMap[id].forEach(function (cid) { allChildIds[cid] = true; });
+      });
+      var treeHtml = '';
+      allUsers.forEach(function (u) {
+        if (!allChildIds[u.id]) {
+          treeHtml += buildNodeHtml(u.id, 0);
+        }
+      });
+      $list.html(treeHtml || '<div class="ud-empty">No users found.</div>');
+    } else {
+      /* Non-admin: tree rooted at the logged-in user */
+      if (!userMap[loggedInUserId]) {
+        $list.html('<div class="ud-empty">User not found.</div>');
+        return;
+      }
+      $list.html(buildNodeHtml(loggedInUserId, 0));
     }
-    $list.html(buildNodeHtml(loggedInUserId, 0));
   }
 
   function openUserDropdown() {
@@ -3641,12 +3672,15 @@ $(function () {
 
     /* ── Step 1: Get the logged-in user and populate #userProfile immediately ── */
     var currentUserResp = await ZOHO.CRM.CONFIG.getCurrentUser();
+    console.log('Current user response', currentUserResp);
     var cuData = currentUserResp && currentUserResp.users && currentUserResp.users[0];
     if (cuData) {
       var cuNorm = normalizeUser(cuData);
       loggedInUserId = cuNorm.id || null;
       activeUserId   = loggedInUserId;
       userMap[cuNorm.id] = cuNorm;
+      isAdminUser = !!(cuData.profile && cuData.profile.name === 'Administrator');
+      console.log('isAdminUser', isAdminUser, cuData.profile);
       $('.user-name').text(cuNorm.full_name || cuNorm.email || '');
       $('.user-avatar').html(buildAvatarInnerHtml(cuNorm));
     }
@@ -3659,7 +3693,7 @@ $(function () {
     if (usersResp && usersResp.data && usersResp.data.users) {
       allUsers = usersResp.data.users;
     }
-    buildUserMaps(); /* builds userMap from allUsers; childrenMap stays empty for now */
+    buildUserMaps(); /* builds userMap and childrenMap from allUsers using Reporting_To */
 
     /* Fallback: if the logged-in user id was not found in the users list, match by email */
     if (cuData && loggedInUserId && !userMap[loggedInUserId]) {
@@ -3681,42 +3715,14 @@ $(function () {
       $('.user-avatar').html(buildAvatarInnerHtml(loggedUser));
     }
 
-    /* ── Step 3: Fetch reportees for every user via COQL (all in parallel) ── */
-    var coqlPromises = allUsers.map(function (u) {
-      var config = {
-        /* Only select fields that are valid in the users COQL module.
-           image_link, role, and Reporting_To are NOT selectable in COQL
-           and cause 400 Bad Request errors. */
-        select_query:
-          "select id, first_name, last_name, email " +
-          "from users " +
-          "where Reporting_To.id = '" + u.id + "' " +
-          "limit 200"
-      };
-      return ZOHO.CRM.API.coql(config).then(function (resp) {
-        var reportees = resp && resp.data;
-        if (reportees && reportees.length) {
-          /* ── Step 4: Build manager → reportees mapping ── */
-          if (!childrenMap[u.id]) childrenMap[u.id] = [];
-          reportees.forEach(function (r) {
-            childrenMap[u.id].push(r.id);
-            /* The userMap entry already contains full details from ActiveConfirmedUsers;
-               add any reportee that is missing (e.g. deactivated / cross-org) */
-            if (!userMap[r.id]) {
-              userMap[r.id] = normalizeUser(r);
-            }
-          });
-        }
-      }).catch(function () { /* ignore per-user COQL failures silently */ });
-    });
-    await Promise.all(coqlPromises);
+    /* ── Step 3: childrenMap is already built from Reporting_To in buildUserMaps() ── */
 
     /* Auto-expand every node that has children so all subordinates are visible */
     Object.keys(childrenMap).forEach(function (id) {
       expandedNodes[id] = true;
     });
 
-    /* ── Step 5: Render the hierarchy (removes loading placeholder) ── */
+    /* ── Step 4: Render the hierarchy (removes loading placeholder) ── */
     renderUserTree('');
 
     /* ── Fetch Beat Plan References with all preference fields ── */
