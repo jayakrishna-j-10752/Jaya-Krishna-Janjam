@@ -1696,24 +1696,27 @@ $(function () {
   var expandedNodes  = {};   /* id → boolean (true = expanded) */
   var activeUserId   = null; /* currently selected user id */
 
-  /** Populate userMap and childrenMap from allUsers */
+  /**
+   * Normalize a user object so that full_name and profile_pic are always set,
+   * regardless of which API response (ActiveConfirmedUsers vs COQL) it came from.
+   */
+  function normalizeUser(u) {
+    if (!u.full_name && (u.first_name || u.last_name)) {
+      u.full_name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
+    }
+    if (!u.profile_pic && u.image_link) {
+      u.profile_pic = u.image_link;
+    }
+    return u;
+  }
+
+  /** Populate userMap from allUsers (childrenMap is built later via COQL) */
   function buildUserMaps() {
     userMap       = {};
     childrenMap   = {};
     expandedNodes = {};
     allUsers.forEach(function (u) {
-      userMap[u.id] = u;
-    });
-    allUsers.forEach(function (u) {
-      var pid = u.reporting_to && u.reporting_to.id;
-      if (pid) {
-        if (!childrenMap[pid]) childrenMap[pid] = [];
-        childrenMap[pid].push(u.id);
-      }
-    });
-    /* Auto-expand every node that has children so all subordinates are visible */
-    Object.keys(childrenMap).forEach(function (id) {
-      expandedNodes[id] = true;
+      userMap[u.id] = normalizeUser(u);
     });
   }
 
@@ -3636,35 +3639,86 @@ $(function () {
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
 
-    /* ── Fetch all active users and build the reporting hierarchy ── */
+    /* ── Step 1: Get the logged-in user and populate #userProfile immediately ── */
+    var currentUserResp = await ZOHO.CRM.CONFIG.getCurrentUser();
+    var cuData = currentUserResp && currentUserResp.users && currentUserResp.users[0];
+    if (cuData) {
+      var cuNorm = normalizeUser(cuData);
+      loggedInUserId = cuNorm.id || null;
+      activeUserId   = loggedInUserId;
+      userMap[cuNorm.id] = cuNorm;
+      $('.user-name').text(cuNorm.full_name || cuNorm.email || '');
+      $('.user-avatar').html(buildAvatarInnerHtml(cuNorm));
+    }
+
+    /* ── Show loading state while the full hierarchy is being fetched ── */
+    $('#udList').html('<div class="ud-empty">Loading users\u2026</div>');
+
+    /* ── Step 2: Fetch all active users ── */
     var usersResp = await zrc.get('/crm/v8/users?type=ActiveConfirmedUsers');
     if (usersResp && usersResp.data && usersResp.data.users) {
       allUsers = usersResp.data.users;
     }
-    buildUserMaps();
+    buildUserMaps(); /* builds userMap from allUsers; childrenMap stays empty for now */
 
-    /* ── Identify the logged-in user via ZOHO.CRM.CONFIG.getCurrentUser() ── */
-    var currentUserResp = await ZOHO.CRM.CONFIG.getCurrentUser();
-    var cuData = currentUserResp && currentUserResp.users && currentUserResp.users[0];
-    if (cuData) {
-      loggedInUserId = cuData.id || null;
-      /* Fallback: match by email when the id doesn't align with the users list */
-      if (!loggedInUserId || !userMap[loggedInUserId]) {
-        var emailToMatch = cuData.email;
-        if (emailToMatch) {
-          var emailMatch = allUsers.find(function (u) { return u.email === emailToMatch; });
-          if (emailMatch) loggedInUserId = emailMatch.id;
+    /* Fallback: if the logged-in user id was not found in the users list, match by email */
+    if (cuData && loggedInUserId && !userMap[loggedInUserId]) {
+      var emailToMatch = cuData.email;
+      if (emailToMatch) {
+        var emailMatch = allUsers.find(function (u) { return u.email === emailToMatch; });
+        if (emailMatch) {
+          loggedInUserId = emailMatch.id;
+          activeUserId   = loggedInUserId;
         }
       }
     }
 
-    /* ── Default selection: logged-in user is the root and selected user ── */
+    /* Refresh the header profile now that userMap has the full ActiveConfirmedUsers data */
     if (loggedInUserId && userMap[loggedInUserId]) {
-      activeUserId = loggedInUserId;
       var loggedUser = userMap[loggedInUserId];
+      activeUserId = loggedInUserId;
       $('.user-name').text(loggedUser.full_name);
       $('.user-avatar').html(buildAvatarInnerHtml(loggedUser));
     }
+
+    /* ── Step 3: Fetch reportees for every user via COQL (all in parallel) ── */
+    var coqlPromises = allUsers.map(function (u) {
+      return zrc.post('/crm/v8/coql', {
+        data: [{
+          select_query:
+            "select id, Reporting_To, image_link, role, first_name, last_name, email " +
+            "from users " +
+            "where Reporting_To.id = '" + u.id + "' " +
+            "limit 200"
+        }]
+      }).then(function (resp) {
+        var reportees = resp && resp.data && resp.data.data;
+        if (reportees && reportees.length) {
+          /* ── Step 4: Build manager → reportees mapping ── */
+          if (!childrenMap[u.id]) childrenMap[u.id] = [];
+          reportees.forEach(function (r) {
+            childrenMap[u.id].push(r.id);
+            /* Enrich userMap entry with image_link from COQL when available */
+            if (userMap[r.id]) {
+              if (!userMap[r.id].profile_pic && r.image_link) {
+                userMap[r.id].profile_pic = r.image_link;
+              }
+            } else {
+              userMap[r.id] = normalizeUser(r);
+            }
+          });
+        }
+      }).catch(function () { /* ignore per-user COQL failures silently */ });
+    });
+    await Promise.all(coqlPromises);
+
+    /* Auto-expand every node that has children so all subordinates are visible */
+    Object.keys(childrenMap).forEach(function (id) {
+      expandedNodes[id] = true;
+    });
+
+    /* ── Step 5: Render the hierarchy (removes loading placeholder) ── */
+    renderUserTree('');
 
     /* ── Fetch Beat Plan References with all preference fields ── */
     var prefFields = [
