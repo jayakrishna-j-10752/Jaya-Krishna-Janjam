@@ -3322,7 +3322,7 @@ input, select, textarea {
   width: 9px;
   height: 9px;
   pointer-events: none;
-  transition: transform .2s ease;
+  transition: transform 0.2s ease;
 }
 .ud-expand-btn.ud-expanded svg {
   transform: rotate(180deg);
