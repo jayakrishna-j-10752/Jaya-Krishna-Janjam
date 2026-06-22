@@ -3023,8 +3023,11 @@ $(function () {
      Each field can only be assigned to one slot at a time.
   ────────────────────────────────────────────────────────── */
 
-  /* { slotName: { api_name, field_label } } – persists for the session */
-  var syeSlotAssignments = {};
+  /* { slotName: { api_name, field_label } } – persists for the session.
+     'left-border' is fixed and always pre-populated. */
+  var syeSlotAssignments = {
+    'left-border': { api_name: 'beatplanner__Managers_Approval', field_label: 'Managers Approval' }
+  };
   /* Cached picklist fields from the CRM (fetched once) */
   var syePicklistFields  = null;
   var syeActiveSlot      = null;   /* slot name currently open in the picker */
@@ -3384,6 +3387,10 @@ $(function () {
       recordData[crmFields.api]   = assignment ? assignment.api_name    : '';
     });
 
+    /* ── Fixed left border (always override regardless of slot assignment) ── */
+    recordData['beatplanner__Left_Border_Field_Name']    = 'Managers Approval';
+    recordData['beatplanner__Left_Border_Field_Api_Name'] = 'beatplanner__Managers_Approval';
+
     try {
       /* ── Check for existing records ── */
       var existingResp = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=id');
@@ -3469,6 +3476,45 @@ $(function () {
   });
 
   /* ──────────────────────────────────────────────────────────
+     RESTORE PREFERENCES FROM CRM RECORD
+     Populates syeSlotAssignments, slot DOM labels, and
+     legSelected from a saved beatplanner__Beat_Plan_References
+     record.  Call after MF_MODULES is populated so that
+     renderLegChips can resolve slot keys correctly.
+  ────────────────────────────────────────────────────────── */
+  function restorePreferences(rec) {
+    /* ── Slot assignments (left-border is always fixed) ── */
+    var SLOT_RESTORE = {
+      'bg-colour':     { labelField: 'beatplanner__Background_Colour_Field_Label_Name', apiField: 'beatplanner__Background_Colour_Field_Api_Name' },
+      'marker':        { labelField: 'beatplanner__Marker_Field_Name',                  apiField: 'beatplanner__Marker_Field_API_Name' },
+      'top-border':    { labelField: 'beatplanner__Top_Border_Field_Name',              apiField: 'beatplanner__Top_Border_Field_Api_Name' },
+      'bottom-border': { labelField: 'beatplanner__Bottom_Border_Field_Name',           apiField: 'beatplanner__BottomBorder_Field_Api_Name' },
+      'right-border':  { labelField: 'beatplanner__Right_Border_Field_Name',            apiField: 'beatplanner__Right_Border_Field_Api_Name' }
+    };
+
+    $.each(SLOT_RESTORE, function (slotKey, fields) {
+      var api   = rec[fields.apiField]   || '';
+      var label = rec[fields.labelField] || api;
+      if (api) {
+        syeSlotAssignments[slotKey] = { api_name: api, field_label: label };
+        $('.sye-slot[data-slot="' + slotKey + '"] .sye-slot-field').text(label);
+      }
+    });
+
+    /* ── Legends: map saved api_names back to slot keys ── */
+    var legApiList = (rec['beatplanner__Legends_Field_Api_Name'] || '').split(',').filter(Boolean);
+    legSelected = [];
+    legApiList.forEach(function (api) {
+      $.each(syeSlotAssignments, function (slotKey, asgn) {
+        if (asgn.api_name === api && legSelected.indexOf(slotKey) === -1) {
+          legSelected.push(slotKey);
+        }
+      });
+    });
+    renderLegChips();
+  }
+
+  /* ──────────────────────────────────────────────────────────
      ZOHO EMBEDDED APP INTEGRATION
      Subscribe to PageLoad before calling embeddedApp.init().
      On PageLoad, fetch CRM modules to populate the
@@ -3477,13 +3523,28 @@ $(function () {
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
 
-    /* ── Beat Plan References existence check ── */
-    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=id,Name,Owner');
+    /* ── Fetch Beat Plan References with all preference fields ── */
+    var prefFields = [
+      'id',
+      'beatplanner__Background_Colour_Field_Label_Name', 'beatplanner__Background_Colour_Field_Api_Name',
+      'beatplanner__Marker_Field_Name',                  'beatplanner__Marker_Field_API_Name',
+      'beatplanner__Top_Border_Field_Name',              'beatplanner__Top_Border_Field_Api_Name',
+      'beatplanner__Bottom_Border_Field_Name',           'beatplanner__BottomBorder_Field_Api_Name',
+      'beatplanner__Left_Border_Field_Name',             'beatplanner__Left_Border_Field_Api_Name',
+      'beatplanner__Right_Border_Field_Name',            'beatplanner__Right_Border_Field_Api_Name',
+      'beatplanner__Meetings_For_Modules',               'beatplanner__Meetings_For_Apis',
+      'beatplanner__Legends_Field_Api_Name',             'beatplanner__Legends_Field_Label_Name'
+    ].join(',');
+
+    var dailyBeatPlanPreferences = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=' + prefFields);
     console.log('dailyBeatPlanPreferences', dailyBeatPlanPreferences);
+
     var hasRecords = dailyBeatPlanPreferences &&
                      dailyBeatPlanPreferences.data &&
                      dailyBeatPlanPreferences.data.data &&
                      dailyBeatPlanPreferences.data.data.length > 0;
+
+    var savedRec = hasRecords ? dailyBeatPlanPreferences.data.data[0] : null;
 
     if (!hasRecords) {
       showMeetingsBarOnly();
@@ -3491,9 +3552,19 @@ $(function () {
       showMainContent();
     }
 
+    /* ── Pre-set mfSelected so renderMfChips inside populateMfModules is correct ── */
+    if (savedRec) {
+      mfSelected = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
+    }
+
     var response = await zrc.get('/crm/v8/settings/modules');
     console.log(response);
     populateMfModules(response);
+
+    /* ── Restore remaining preferences (slots + legends) ── */
+    if (savedRec) {
+      restorePreferences(savedRec);
+    }
   });
   ZOHO.embeddedApp.init();
 
