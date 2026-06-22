@@ -1706,7 +1706,7 @@ $(function () {
     }
     /* Map all possible ZOHO CRM profile picture field names to profile_pic */
     if (!u.profile_pic) {
-      u.profile_pic = u.image_link || u.image || u.photo_url || u.pic_url ||
+      u.profile_pic = u.image_link || u.image_url || u.image || u.photo_url || u.pic_url ||
                       u.Profile_Pic || u.profile_photo || u.avatar_url || '';
     }
     return u;
@@ -1759,27 +1759,44 @@ $(function () {
     return escHtml(initials || '?');
   }
 
-  /** Build the HTML string for a single user row */
-  function buildUserRowHtml(user, depth) {
+  /**
+   * Wrap matching portion of text in a highlight span.
+   * q must be a lowercase string; matching is case-insensitive but the
+   * original casing of text is preserved inside the span.
+   */
+  function highlightText(text, q) {
+    if (!q) return escHtml(text);
+    var lText = text.toLowerCase();
+    var idx   = lText.indexOf(q);
+    if (idx === -1) return escHtml(text);
+    return escHtml(text.slice(0, idx)) +
+           '<span class="ud-search-highlight">' + escHtml(text.slice(idx, idx + q.length)) + '</span>' +
+           escHtml(text.slice(idx + q.length));
+  }
+
+  /** Build the HTML string for a single user row.
+   *  depth  – nesting level (0 = root); controls content indentation.
+   *  q      – optional lowercase search query for result highlighting.
+   */
+  function buildUserRowHtml(user, depth, q) {
     var isActive    = user.id === activeUserId;
     var hasChildren = !!(childrenMap[user.id] && childrenMap[user.id].length);
     var isExpanded  = !!expandedNodes[user.id];
-    var avatarMargin = depth * 20;
+    var infoIndent  = depth * 20;
     var roleName    = (user.role && user.role.name) ? user.role.name : '';
 
-    /* .ud-item uses consistent padding (no inline padding-left).
-       The avatar is indented via margin-left so that the expand button
-       always aligns at the same right-hand position regardless of depth. */
+    /* Avatar stays in a fixed left column; hierarchy indent is applied to
+       the info block so all avatars remain vertically aligned. */
     var html =
       '<div class="ud-item' + (isActive ? ' ud-item-active' : '') +
       '" data-uid="' + escHtml(user.id) + '">' +
-      '<div class="ud-item-avatar"' +
-      (avatarMargin > 0 ? ' style="margin-left:' + avatarMargin + 'px"' : '') +
-      '>' + buildAvatarInnerHtml(user) + '</div>' +
-      '<div class="ud-item-info">' +
-      '<div class="ud-item-name">'  + escHtml(user.full_name) + '</div>' +
-      '<div class="ud-item-email">' + escHtml(user.email)     + '</div>' +
-      (roleName ? '<div class="ud-item-role">' + escHtml(roleName) + '</div>' : '') +
+      '<div class="ud-item-avatar">' + buildAvatarInnerHtml(user) + '</div>' +
+      '<div class="ud-item-info"' +
+      (infoIndent > 0 ? ' style="margin-left:' + infoIndent + 'px"' : '') +
+      '>' +
+      '<div class="ud-item-name">'  + highlightText(user.full_name, q) + '</div>' +
+      '<div class="ud-item-email">' + highlightText(user.email, q)     + '</div>' +
+      (roleName ? '<div class="ud-item-role">' + highlightText(roleName, q) + '</div>' : '') +
       '</div>';
 
     if (hasChildren) {
@@ -1842,7 +1859,7 @@ $(function () {
       }
 
       var flatHtml = '';
-      matches.forEach(function (u) { flatHtml += buildUserRowHtml(u, 0); });
+      matches.forEach(function (u) { flatHtml += buildUserRowHtml(u, 0, q); });
       $list.html(flatHtml);
       return;
     }

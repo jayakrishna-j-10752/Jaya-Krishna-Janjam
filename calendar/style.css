@@ -3303,6 +3303,15 @@ input, select, textarea {
   line-height: 1.3;
 }
 
+/* Search result highlight */
+.ud-search-highlight {
+  background: color-mix(in srgb, var(--z-blue) 20%, transparent);
+  color: var(--z-blue);
+  border-radius: 2px;
+  font-weight: 700;
+  padding: 0 1px;
+}
+
 /* Expand (sub-calendar) button */
 .ud-expand-btn {
   width: 26px;
