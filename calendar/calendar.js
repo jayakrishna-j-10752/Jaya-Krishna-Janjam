@@ -1359,12 +1359,14 @@ $(function () {
   function closeSlotPicker() {
     closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
-    dom.modal.find('.modal-box').removeClass('modal-box--wide');
-    /* Reset to form phase for next open */
-    dom.slotPickerSection.hide();
-    dom.eventFormSection.show();
-    dom.slotPickerFoot.hide();
-    dom.eventFormFoot.show();
+    /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
+    setTimeout(function () {
+      dom.modal.find('.modal-box').removeClass('modal-box--wide');
+      dom.slotPickerSection.hide();
+      dom.eventFormSection.show();
+      dom.slotPickerFoot.hide();
+      dom.eventFormFoot.show();
+    }, 250);
   }
 
   function showDayEventsPopup(ds, mouseEvt) {
@@ -1448,11 +1450,13 @@ $(function () {
     closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
     state.editId = null;
-    /* Always reset to form phase so next open is clean */
-    dom.slotPickerSection.hide();
-    dom.eventFormSection.show();
-    dom.slotPickerFoot.hide();
-    dom.eventFormFoot.show();
+    /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
+    setTimeout(function () {
+      dom.slotPickerSection.hide();
+      dom.eventFormSection.show();
+      dom.slotPickerFoot.hide();
+      dom.eventFormFoot.show();
+    }, 250);
   }
 
   function saveModal() {
