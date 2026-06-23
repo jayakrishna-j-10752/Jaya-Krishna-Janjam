@@ -3922,12 +3922,14 @@ $(function () {
     /* ── Fetch records for each module listed in beatplanner__Meetings_For_Apis ── */
     if (hasRecords && savedRec) {
       var meetingsForApis = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
-      for (var i = 0; i < meetingsForApis.length; i++) {
-        var moduleName = meetingsForApis[i].trim();
-        if (!moduleName) { continue; }
-        var moduleResp = await zrc.get('/crm/v8/' + moduleName);
-        console.log(moduleName + ' records:', moduleResp);
-      }
+      meetingsForApis.forEach(function (moduleName) {
+        moduleName = moduleName.trim();
+        if (!moduleName) { return; }
+        ZOHO.CRM.API.getAllRecords({ Entity: moduleName, sort_order: 'asc', per_page: 200, page: 1 })
+          .then(function (data) {
+            console.log(data);
+          });
+      });
     }
   });
   ZOHO.embeddedApp.init();
