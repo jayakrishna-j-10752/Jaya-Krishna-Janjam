@@ -3919,13 +3919,17 @@ $(function () {
       restorePreferences(savedRec);
     }
 
-    /* ── Fetch records for each module listed in beatplanner__Meetings_For_Apis ── */
+    /* ── Fetch records and field metadata for each module listed in beatplanner__Meetings_For_Apis ── */
     if (hasRecords && savedRec) {
       var meetingsForApis = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
       meetingsForApis.forEach(function (moduleName) {
         moduleName = moduleName.trim();
         if (!moduleName) { return; }
         ZOHO.CRM.API.getAllRecords({ Entity: moduleName, sort_order: 'asc', per_page: 200, page: 1 })
+          .then(function (data) {
+            console.log(data);
+          });
+        ZOHO.CRM.META.getFields({ Entity: moduleName })
           .then(function (data) {
             console.log(data);
           });
