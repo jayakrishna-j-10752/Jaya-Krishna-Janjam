@@ -3918,6 +3918,17 @@ $(function () {
     if (savedRec) {
       restorePreferences(savedRec);
     }
+
+    /* ── Fetch records for each module listed in beatplanner__Meetings_For_Apis ── */
+    if (hasRecords && savedRec) {
+      var meetingsForApis = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
+      for (var i = 0; i < meetingsForApis.length; i++) {
+        var moduleName = meetingsForApis[i].trim();
+        if (!moduleName) { continue; }
+        var moduleResp = await zrc.get('/crm/v8/' + moduleName);
+        console.log(moduleName + ' records:', moduleResp);
+      }
+    }
   });
   ZOHO.embeddedApp.init();
 
