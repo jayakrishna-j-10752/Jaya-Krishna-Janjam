@@ -1427,7 +1427,7 @@ input, select, textarea {
   gap: 2px;
   padding: 10px 6px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--surface);
   cursor: pointer;
   font-size: 12px;
