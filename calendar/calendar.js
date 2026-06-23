@@ -3513,7 +3513,8 @@ $(function () {
         ZOHO.CRM.API.getFile({ id: photoId })
           .then(function (resp) {
             if (resp && resp.data) {
-              var url = URL.createObjectURL(resp.data);
+              var imgBlob = new Blob([resp.data], { type: 'image/jpeg' });
+              var url = URL.createObjectURL(imgBlob);
               $avatar.html('<img src="' + url + '" alt="' + escHtml(label) + '">')
                      .attr('data-img-src', url);
             }
