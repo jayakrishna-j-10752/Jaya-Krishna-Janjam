@@ -358,50 +358,63 @@
       </div>
 
       <div class="modal-body">
-        <div class="field-group">
-          <label for="fTitle">Event Title <span class="req">*</span></label>
-          <input type="text" id="fTitle" class="field-input" placeholder="Add a title" autocomplete="off" />
-          <span class="field-error" id="fTitleErr">Title is required</span>
+
+        <!-- ── TIME SLOT PICKER (phase 1) ── -->
+        <div id="slotPickerSection" style="display:none">
+          <div class="time-slot-grid" id="slotPickerGrid"></div>
         </div>
 
-        <div class="field-group">
-          <label for="fDate">Date</label>
-          <input type="date" id="fDate" class="field-input" />
-        </div>
-
-        <div class="field-row">
+        <!-- ── EVENT FORM (phase 2 / edit) ── -->
+        <div id="eventFormSection">
           <div class="field-group">
-            <label for="fStart">Start Time</label>
-            <input type="time" id="fStart" class="field-input" value="09:00" />
+            <label for="fTitle">Event Title <span class="req">*</span></label>
+            <input type="text" id="fTitle" class="field-input" placeholder="Add a title" autocomplete="off" />
+            <span class="field-error" id="fTitleErr">Title is required</span>
           </div>
+
           <div class="field-group">
-            <label for="fEnd">End Time</label>
-            <input type="time" id="fEnd" class="field-input" value="10:00" />
+            <label for="fDate">Date</label>
+            <input type="date" id="fDate" class="field-input" />
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label for="fStart">Start Time</label>
+              <input type="time" id="fStart" class="field-input" value="09:00" />
+            </div>
+            <div class="field-group">
+              <label for="fEnd">End Time</label>
+              <input type="time" id="fEnd" class="field-input" value="10:00" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="fDesc">Description</label>
+            <textarea id="fDesc" class="field-input field-textarea" rows="3" placeholder="Add description (optional)"></textarea>
+          </div>
+
+          <div class="field-group">
+            <label>Color</label>
+            <div class="color-row" id="colorRow">
+              <span class="color-dot active" data-color="#1565C0" style="background:#1565C0" title="Blue"></span>
+              <span class="color-dot" data-color="#2E7D32" style="background:#2E7D32" title="Green"></span>
+              <span class="color-dot" data-color="#E65100" style="background:#E65100" title="Orange"></span>
+              <span class="color-dot" data-color="#C62828" style="background:#C62828" title="Red"></span>
+              <span class="color-dot" data-color="#6A1B9A" style="background:#6A1B9A" title="Purple"></span>
+              <span class="color-dot" data-color="#00838F" style="background:#00838F" title="Teal"></span>
+              <span class="color-dot" data-color="#F57F17" style="background:#F57F17" title="Amber"></span>
+            </div>
           </div>
         </div>
 
-        <div class="field-group">
-          <label for="fDesc">Description</label>
-          <textarea id="fDesc" class="field-input field-textarea" rows="3" placeholder="Add description (optional)"></textarea>
-        </div>
-
-        <div class="field-group">
-          <label>Color</label>
-          <div class="color-row" id="colorRow">
-            <span class="color-dot active" data-color="#1565C0" style="background:#1565C0" title="Blue"></span>
-            <span class="color-dot" data-color="#2E7D32" style="background:#2E7D32" title="Green"></span>
-            <span class="color-dot" data-color="#E65100" style="background:#E65100" title="Orange"></span>
-            <span class="color-dot" data-color="#C62828" style="background:#C62828" title="Red"></span>
-            <span class="color-dot" data-color="#6A1B9A" style="background:#6A1B9A" title="Purple"></span>
-            <span class="color-dot" data-color="#00838F" style="background:#00838F" title="Teal"></span>
-            <span class="color-dot" data-color="#F57F17" style="background:#F57F17" title="Amber"></span>
-          </div>
-        </div>
       </div>
 
-      <div class="modal-foot">
+      <div class="modal-foot" id="eventFormFoot">
         <button class="btn-ghost" id="modalCancel">Cancel</button>
         <button class="btn-primary" id="modalSave">Save Event</button>
+      </div>
+      <div class="modal-foot" id="slotPickerFoot" style="display:none">
+        <button class="btn-ghost" id="slotPickerCancel">Cancel</button>
       </div>
 
     </div>

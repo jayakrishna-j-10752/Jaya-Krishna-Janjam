@@ -134,6 +134,12 @@ $(function () {
     modalClose:   $('#modalClose'),
     modalCancel:  $('#modalCancel'),
     modalSave:    $('#modalSave'),
+    eventFormFoot:     $('#eventFormFoot'),
+    slotPickerSection: $('#slotPickerSection'),
+    slotPickerGrid:    $('#slotPickerGrid'),
+    slotPickerFoot:    $('#slotPickerFoot'),
+    slotPickerCancel:  $('#slotPickerCancel'),
+    eventFormSection:  $('#eventFormSection'),
     fTitle:       $('#fTitle'),
     fTitleErr:    $('#fTitleErr'),
     fDate:        $('#fDate'),
@@ -162,9 +168,6 @@ $(function () {
     depList:        $('#depList'),
     depClose:       $('#depClose')
   };
-
-  /* Tracks the date for the currently open slot-picker menu */
-  var slotMenuDate = null;
 
   /* ──────────────────────────────────────────────────────────
      TOAST
@@ -292,7 +295,7 @@ $(function () {
     updatePeriodLabel();
     updateTodayBtn();
     closePopup();
-    closeSlotMenu();
+    closeSlotPicker();
     closeDayEventsPopup();
 
     if (state.view === 'month') {
@@ -781,7 +784,7 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      showSlotMenu(date, this);
+      openSlotPicker(date);
     });
     dom.canvas.on('click.calview', '.cell-paste-btn', function (e) {
       e.stopPropagation();
@@ -840,7 +843,7 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      showSlotMenu(date, this);
+      openSlotPicker(date);
     });
     dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
       e.stopPropagation();
@@ -908,7 +911,7 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      showSlotMenu(date, this);
+      openSlotPicker(date);
     });
 
     /* Mobile toolbar – Copy all events */
@@ -995,7 +998,7 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      showSlotMenu(date, this);
+      openSlotPicker(date);
     });
   }
 
@@ -1141,49 +1144,55 @@ $(function () {
   }
 
   /* ──────────────────────────────────────────────────────────
-     TIME SLOT PICKER MENU
+     TIME SLOT PICKER (inside modal)
   ────────────────────────────────────────────────────────── */
 
   /**
-   * Show a dropdown of hourly time slots next to `anchorEl` for `date`.
-   * Slots that already have an event are disabled.
+   * Open the modal in "slot picker" phase for the given date.
+   * Renders all 24 hourly slots as a grid inside the modal body.
+   * Taken slots are shown but disabled.
    */
-  function showSlotMenu(date, anchorEl) {
-    slotMenuDate = date;
+  function openSlotPicker(date) {
+    /* Format heading: e.g. "Monday, June 23, 2026" */
+    var parts = date.split('-');
+    var d     = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    var heading = WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    dom.modalHeading.text(heading);
 
-    /* Build slot list */
-    var html = '<div class="slot-menu-header">Pick a time slot</div>';
+    /* Build slot grid: 1-hour intervals, 00:00 – 23:00 */
+    var html = '';
     for (var h = 0; h < 24; h++) {
-      var taken = !!eventAtHour(date, h);
-      var label = fmtTime(hourToTime(h));
-      if (taken) {
-        html += '<button class="slot-menu-item" data-hour="' + h + '" disabled>' +
-                label +
-                '<span class="slot-menu-taken-label">taken</span>' +
-                '</button>';
-      } else {
-        html += '<button class="slot-menu-item" data-hour="' + h + '">' +
-                label +
-                '</button>';
-      }
+      var taken     = !!eventAtHour(date, h);
+      var startLbl  = fmtTime(hourToTime(h));
+      var endLbl    = fmtTime(hourToTime(h + 1));
+      var takenAttr = taken ? ' disabled aria-disabled="true"' : '';
+      var takenCls  = taken ? ' time-slot-item--taken' : '';
+      html += '<button class="time-slot-item' + takenCls + '" data-date="' + date +
+              '" data-hour="' + h + '"' + takenAttr + '>' +
+              '<span class="tsi-start">' + startLbl + '</span>' +
+              '<span class="tsi-sep">–</span>' +
+              '<span class="tsi-end">' + endLbl + '</span>' +
+              (taken ? '<span class="tsi-taken-badge">taken</span>' : '') +
+              '</button>';
     }
-    dom.slotMenu.html(html);
+    dom.slotPickerGrid.html(html);
 
-    /* Position near the anchor button, keeping inside viewport */
-    var rect = anchorEl.getBoundingClientRect();
-    var mw   = 180;
-    var x    = rect.left;
-    var y    = rect.bottom + 4;
-    if (x + mw > window.innerWidth  - 8) x = window.innerWidth  - mw - 8;
-    if (y + 300 > window.innerHeight - 8) y = rect.top - 300 - 4;
-    x = Math.max(4, x);
-    y = Math.max(4, y);
-    dom.slotMenu.css({ left: x + 'px', top: y + 'px' }).addClass('slot-menu-open');
+    /* Show slot picker phase; hide form phase */
+    dom.slotPickerSection.show();
+    dom.eventFormSection.hide();
+    dom.slotPickerFoot.show();
+    dom.eventFormFoot.hide();
+
+    dom.modal.addClass('modal-open');
   }
 
-  function closeSlotMenu() {
-    slotMenuDate = null;
-    dom.slotMenu.removeClass('slot-menu-open');
+  function closeSlotPicker() {
+    dom.modal.removeClass('modal-open');
+    /* Reset to form phase for next open */
+    dom.slotPickerSection.hide();
+    dom.eventFormSection.show();
+    dom.slotPickerFoot.hide();
+    dom.eventFormFoot.show();
   }
 
   function showDayEventsPopup(ds, mouseEvt) {
@@ -1266,6 +1275,11 @@ $(function () {
   function closeModal() {
     dom.modal.removeClass('modal-open');
     state.editId = null;
+    /* Always reset to form phase so next open is clean */
+    dom.slotPickerSection.hide();
+    dom.eventFormSection.show();
+    dom.slotPickerFoot.hide();
+    dom.eventFormFoot.show();
   }
 
   function saveModal() {
@@ -3155,26 +3169,31 @@ $(function () {
       if (evid && window.confirm('Delete this event?')) { deleteEvent(evid); }
     });
 
-    /* Slot menu – item click */
-    $(document).on('click', '#slotMenu .slot-menu-item', function (e) {
+    /* Time slot picker – item click inside modal */
+    $(document).on('click', '#slotPickerGrid .time-slot-item', function (e) {
       e.stopPropagation();
-      var h = parseInt($(this).data('hour'), 10);
-      var date = slotMenuDate;
-      closeSlotMenu();
-      if (date) openModal(date, hourToTime(h), hourToTime(h + 1));
+      var h    = parseInt($(this).data('hour'), 10);
+      var date = $(this).data('date');
+      /* Switch from slot-picker phase to form phase */
+      dom.slotPickerSection.hide();
+      dom.eventFormSection.show();
+      dom.slotPickerFoot.hide();
+      dom.eventFormFoot.show();
+      /* Pre-fill the form for the selected slot */
+      openModal(date, hourToTime(h), hourToTime(h + 1));
     });
 
-    /* Close popup and slot menu when clicking outside */
+    /* Slot picker cancel button */
+    dom.slotPickerCancel.on('click', function () {
+      closeSlotPicker();
+    });
+
+    /* Close popup when clicking outside */
     $(document).on('click', function (e) {
       if (!$(e.target).closest('#evtPopup').length &&
           !$(e.target).closest('.evt-chip').length &&
           !$(e.target).closest('.time-event').length) {
         closePopup();
-      }
-      if (!$(e.target).closest('#slotMenu').length &&
-          !$(e.target).closest('.cell-add-btn').length &&
-          !$(e.target).closest('.dh-add-btn').length) {
-        closeSlotMenu();
       }
       if (!$(e.target).closest('#dayEventsPopup').length &&
           !$(e.target).closest('.m-cell').length &&
@@ -3187,7 +3206,7 @@ $(function () {
     $(document).on('keydown', function (e) {
       if (dom.modal.hasClass('modal-open')) return; /* modal captures input */
       switch (e.key) {
-        case 'Escape':     closePopup(); closeSlotMenu(); break;
+        case 'Escape':     closePopup(); closeSlotPicker(); break;
         case 'ArrowLeft':  navigate(-1); break;
         case 'ArrowRight': navigate(1);  break;
         case 't':          goToday();    break;
