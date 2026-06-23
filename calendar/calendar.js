@@ -3478,7 +3478,8 @@ $(function () {
         mwOpts = '';
         records.forEach(function (rec) {
           mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
-                    '" data-label="' + escHtml(rec.name) + '">' + escHtml(rec.name) + '</li>';
+                    '" data-label="' + escHtml(rec.name) +
+                    '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' + escHtml(rec.name) + '</li>';
         });
       }
       $mwWrap.find('.bp-mw-list').html(mwOpts);
@@ -3490,11 +3491,11 @@ $(function () {
     /* "Meeting With" option selected → show initials avatar; try to load actual photo */
     $(document).on('click', '#slotPickerGrid [data-field="meeting-with"] .bp-dd-opt', function (e) {
       e.stopPropagation();
-      var $opt   = $(this);
-      var $wrap  = $opt.closest('.bp-dd-wrap');
-      var $row   = $opt.closest('.bp-slot-row');
-      var label  = $opt.data('label') || '';
-      var id     = $opt.data('id')    || '';
+      var $opt    = $(this);
+      var $wrap   = $opt.closest('.bp-dd-wrap');
+      var label   = $opt.data('label')    || '';
+      var id      = $opt.data('id')       || '';
+      var photoId = $opt.data('photo-id') || '';
 
       $wrap.find('.bp-dd-val').text(label).attr('data-selected-id', id);
 
@@ -3508,9 +3509,8 @@ $(function () {
       closeBpDropdown($wrap);
 
       /* Attempt to load the actual record photo */
-      var mfApi = $row.find('[data-field="meetings-for"] .bp-dd-val').attr('data-selected-api') || '';
-      if (mfApi && id) {
-        ZOHO.CRM.API.getPhoto({ Entity: mfApi, RecordID: id })
+      if (photoId) {
+        ZOHO.CRM.API.getFile({ id: photoId })
           .then(function (resp) {
             if (resp && resp.data) {
               var url = URL.createObjectURL(resp.data);
@@ -4376,7 +4376,11 @@ $(function () {
             console.log(data);
             if (data && data.data) {
               moduleRecordsMap[moduleName] = data.data.map(function (rec) {
-                return { id: rec.id, name: recordDisplayName(rec) };
+                return {
+                  id:       rec.id,
+                  name:     recordDisplayName(rec),
+                  photo_id: rec.Record_Image || rec['$photo_id'] || ''
+                };
               });
             }
           });
