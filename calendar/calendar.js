@@ -1407,7 +1407,7 @@ $(function () {
     setTimeout(function () { $('#imgPreviewImg').attr('src', ''); }, 50);
   }
 
-
+  function closeSlotPicker() {
     closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
     /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
@@ -3805,6 +3805,7 @@ $(function () {
   }
 
 
+  function renderSyeFieldList() {
     var $body = $('#sfpBody');
 
     if (!syePicklistFields || syePicklistFields.length === 0) {
