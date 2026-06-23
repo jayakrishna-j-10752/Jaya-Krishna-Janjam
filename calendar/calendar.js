@@ -1159,23 +1159,28 @@ $(function () {
     var heading = WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
     dom.modalHeading.text(heading);
 
-    /* Build slot grid: 1-hour intervals, 00:00 – 23:00 */
-    var html = '';
-    for (var h = 0; h < 24; h++) {
-      var taken     = !!eventAtHour(date, h);
-      var startLbl  = fmtTime(hourToTime(h));
-      var endLbl    = fmtTime(hourToTime(h + 1));
-      var takenAttr = taken ? ' disabled aria-disabled="true"' : '';
-      var takenCls  = taken ? ' time-slot-item--taken' : '';
-      html += '<button class="time-slot-item' + takenCls + '" data-date="' + date +
-              '" data-hour="' + h + '"' + takenAttr + '>' +
-              '<span class="tsi-start">' + startLbl + '</span>' +
-              '<span class="tsi-sep">–</span>' +
-              '<span class="tsi-end">' + endLbl + '</span>' +
-              (taken ? '<span class="tsi-taken-badge">taken</span>' : '') +
-              '</button>';
+    if (beatPlanHasRefs) {
+      /* Beat plan mode: table with all slots + Meetings For + Meeting With dropdowns */
+      dom.slotPickerGrid.html(buildBeatPlanTable(date));
+    } else {
+      /* Standard mode: clickable slot buttons, 1-hour intervals 00:00 – 23:00 */
+      var html = '';
+      for (var h = 0; h < 24; h++) {
+        var taken     = !!eventAtHour(date, h);
+        var startLbl  = fmtTime(hourToTime(h));
+        var endLbl    = fmtTime(hourToTime(h + 1));
+        var takenAttr = taken ? ' disabled aria-disabled="true"' : '';
+        var takenCls  = taken ? ' time-slot-item--taken' : '';
+        html += '<button class="time-slot-item' + takenCls + '" data-date="' + date +
+                '" data-hour="' + h + '"' + takenAttr + '>' +
+                '<span class="tsi-start">' + startLbl + '</span>' +
+                '<span class="tsi-sep">–</span>' +
+                '<span class="tsi-end">' + endLbl + '</span>' +
+                (taken ? '<span class="tsi-taken-badge">taken</span>' : '') +
+                '</button>';
+      }
+      dom.slotPickerGrid.html(html);
     }
-    dom.slotPickerGrid.html(html);
 
     /* Show slot picker phase; hide form phase */
     dom.slotPickerSection.show();
@@ -1184,6 +1189,85 @@ $(function () {
     dom.eventFormFoot.hide();
 
     dom.modal.addClass('modal-open');
+  }
+
+  /**
+   * Build the beat-plan slot table HTML for the given date.
+   * Renders 24 rows (one per hour) with auto-filled Start/End times and
+   * custom searchable dropdowns for "Meetings For" and "Meeting With".
+   */
+  function buildBeatPlanTable(date) {
+    var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
+                  ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+
+    /* "Meetings For" options list (same for every row) */
+    var mfOptions = '';
+    beatPlanModulesList.forEach(function (mod) {
+      mfOptions += '<li class="bp-dd-opt" data-api="' + escHtml(mod.api) +
+                   '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
+    });
+
+    var html = '<div class="bp-slots-wrap">';
+    html += '<table class="bp-slots-table">';
+    html += '<thead><tr>';
+    html += '<th class="bp-th">Start Time</th>';
+    html += '<th class="bp-th">End Time</th>';
+    html += '<th class="bp-th">Meetings For</th>';
+    html += '<th class="bp-th">Meeting With</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+
+    for (var h = 0; h < 24; h++) {
+      var startLbl = fmtTime(hourToTime(h));
+      var endLbl   = fmtTime(hourToTime(h + 1));
+
+      html += '<tr class="bp-slot-row" data-date="' + date + '" data-hour="' + h + '">';
+      html += '<td class="bp-time-cell">' + startLbl + '</td>';
+      html += '<td class="bp-time-cell">' + endLbl + '</td>';
+
+      /* ── Meetings For dropdown ── */
+      html += '<td class="bp-dd-cell">';
+      html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meetings-for">';
+      html += '<div class="bp-dd-trigger" tabindex="0">';
+      html += '<span class="bp-dd-val">Select module…</span>';
+      html += chevSvg;
+      html += '</div>';
+      html += '<div class="bp-dd-panel">';
+      html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
+      html += '<ul class="bp-dd-list">' + mfOptions + '</ul>';
+      html += '</div>';
+      html += '</div>';
+      html += '</td>';
+
+      /* ── Meeting With dropdown ── */
+      html += '<td class="bp-dd-cell">';
+      html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meeting-with">';
+      html += '<div class="bp-dd-trigger" tabindex="0">';
+      html += '<span class="bp-dd-val">Select…</span>';
+      html += chevSvg;
+      html += '</div>';
+      html += '<div class="bp-dd-panel">';
+      html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
+      html += '<ul class="bp-dd-list bp-mw-list"></ul>';
+      html += '</div>';
+      html += '</div>';
+      html += '</td>';
+
+      html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  /**
+   * Return the best display name for a CRM record (works across Leads,
+   * Contacts, Accounts and other common modules).
+   */
+  function recordDisplayName(rec) {
+    return rec.Full_Name || rec.Account_Name || rec.Name ||
+           rec.Last_Name  || rec.Subject      || rec.id  || '';
   }
 
   function closeSlotPicker() {
@@ -2077,6 +2161,11 @@ $(function () {
   var MF_MODULES  = [];
   var mfSelected  = []; /* api_names of currently confirmed selections */
   var mfSnapshot  = []; /* snapshot of mfSelected taken when dropdown opens (used by Cancel) */
+
+  /* ── Beat Plan References state ── */
+  var beatPlanHasRefs     = false;  /* true when beatplanner__Beat_Plan_References has data */
+  var beatPlanModulesList = [];     /* [{label: 'Leads', api: 'Leads'}, …] */
+  var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
 
   /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
   var mfColors = (function () {
@@ -3188,6 +3277,83 @@ $(function () {
       closeSlotPicker();
     });
 
+    /* ── Beat plan table: custom searchable dropdown handlers ── */
+
+    /* Toggle open / close a dropdown trigger */
+    $(document).on('click', '#slotPickerGrid .bp-dd-trigger', function (e) {
+      e.stopPropagation();
+      var $wrap  = $(this).closest('.bp-dd-wrap');
+      var isOpen = $wrap.hasClass('bp-dd-open');
+      /* Close any other open dropdown first */
+      $('#slotPickerGrid .bp-dd-wrap.bp-dd-open').removeClass('bp-dd-open');
+      if (!isOpen) {
+        $wrap.addClass('bp-dd-open');
+        $wrap.find('.bp-dd-search').val('').focus();
+        /* Show all options */
+        $wrap.find('.bp-dd-opt').show();
+      }
+    });
+
+    /* Prevent search input click from bubbling and closing the panel */
+    $(document).on('click', '#slotPickerGrid .bp-dd-search', function (e) {
+      e.stopPropagation();
+    });
+
+    /* Live-filter dropdown options as the user types */
+    $(document).on('input', '#slotPickerGrid .bp-dd-search', function () {
+      var q    = $(this).val().toLowerCase();
+      var $ul  = $(this).closest('.bp-dd-panel').find('.bp-dd-opt');
+      $ul.each(function () {
+        var label = ($(this).data('label') || $(this).text()).toLowerCase();
+        $(this).toggle(label.indexOf(q) !== -1);
+      });
+    });
+
+    /* "Meetings For" option selected → set value + populate Meeting With */
+    $(document).on('click', '#slotPickerGrid [data-field="meetings-for"] .bp-dd-opt', function (e) {
+      e.stopPropagation();
+      var $opt   = $(this);
+      var $wrap  = $opt.closest('.bp-dd-wrap');
+      var $row   = $opt.closest('.bp-slot-row');
+      var label  = $opt.data('label');
+      var api    = $opt.data('api');
+
+      $wrap.find('.bp-dd-val').text(label).attr('data-selected-api', api);
+      $wrap.removeClass('bp-dd-open');
+
+      /* Populate the "Meeting With" dropdown for this row */
+      var $mwWrap  = $row.find('[data-field="meeting-with"]');
+      var records  = moduleRecordsMap[api] || [];
+      var mwOpts;
+      if (records.length === 0) {
+        mwOpts = '<li class="bp-dd-empty">No records found</li>';
+      } else {
+        mwOpts = '';
+        records.forEach(function (rec) {
+          mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+                    '" data-label="' + escHtml(rec.name) + '">' + escHtml(rec.name) + '</li>';
+        });
+      }
+      $mwWrap.find('.bp-mw-list').html(mwOpts);
+      $mwWrap.find('.bp-dd-val').text('Select…').removeAttr('data-selected-id');
+    });
+
+    /* "Meeting With" option selected */
+    $(document).on('click', '#slotPickerGrid [data-field="meeting-with"] .bp-dd-opt', function (e) {
+      e.stopPropagation();
+      var $opt  = $(this);
+      var $wrap = $opt.closest('.bp-dd-wrap');
+      $wrap.find('.bp-dd-val').text($opt.data('label')).attr('data-selected-id', $opt.data('id'));
+      $wrap.removeClass('bp-dd-open');
+    });
+
+    /* Close beat plan dropdowns when clicking anywhere outside */
+    $(document).on('click', function (e) {
+      if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length) {
+        $('#slotPickerGrid .bp-dd-wrap.bp-dd-open').removeClass('bp-dd-open');
+      }
+    });
+
     /* Close popup when clicking outside */
     $(document).on('click', function (e) {
       if (!$(e.target).closest('#evtPopup').length &&
@@ -3910,6 +4076,16 @@ $(function () {
       mfSelected = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
     }
 
+    /* ── Store beat plan state for use in openSlotPicker ── */
+    beatPlanHasRefs = hasRecords;
+    if (hasRecords && savedRec) {
+      var bpModLabels = (savedRec['beatplanner__Meetings_For_Modules'] || '').split(',').filter(Boolean);
+      var bpModApis   = (savedRec['beatplanner__Meetings_For_Apis']    || '').split(',').filter(Boolean);
+      beatPlanModulesList = bpModLabels.map(function (label, i) {
+        return { label: label.trim(), api: (bpModApis[i] || '').trim() };
+      });
+    }
+
     var response = await zrc.get('/crm/v8/settings/modules');
     console.log(response);
     populateMfModules(response);
@@ -3919,7 +4095,7 @@ $(function () {
       restorePreferences(savedRec);
     }
 
-    /* ── Fetch records and field metadata for each module listed in beatplanner__Meetings_For_Apis ── */
+    /* ── Fetch records for each module in beatplanner__Meetings_For_Apis ── */
     if (hasRecords && savedRec) {
       var meetingsForApis = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
       meetingsForApis.forEach(function (moduleName) {
@@ -3928,6 +4104,11 @@ $(function () {
         ZOHO.CRM.API.getAllRecords({ Entity: moduleName, sort_order: 'asc', per_page: 200, page: 1 })
           .then(function (data) {
             console.log(data);
+            if (data && data.data) {
+              moduleRecordsMap[moduleName] = data.data.map(function (rec) {
+                return { id: rec.id, name: recordDisplayName(rec) };
+              });
+            }
           });
         ZOHO.CRM.META.getFields({ Entity: moduleName })
           .then(function (data) {
