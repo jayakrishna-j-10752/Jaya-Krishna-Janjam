@@ -1213,6 +1213,18 @@ $(function () {
                    '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
     });
 
+    /* "Type of Meeting" options – populated from module metadata */
+    var tomOptions = '';
+    if (typeOfMeetingOpts && typeOfMeetingOpts.length) {
+      typeOfMeetingOpts.forEach(function (val) {
+        tomOptions += '<li class="bp-dd-opt" data-label="' + escHtml(val) + '">' + escHtml(val) + '</li>';
+      });
+    } else {
+      tomOptions = '<li class="bp-dd-empty">' +
+                   (typeOfMeetingOpts === null ? 'Loading…' : 'No options available') +
+                   '</li>';
+    }
+
     var html = '<div class="bp-slots-wrap">';
     html += '<table class="bp-slots-table">';
     html += '<thead><tr>';
@@ -1220,6 +1232,7 @@ $(function () {
     html += '<th class="bp-th">End Time</th>';
     html += '<th class="bp-th">Meetings For</th>';
     html += '<th class="bp-th">Meeting With</th>';
+    html += '<th class="bp-th">Type of Meeting</th>';
     html += '</tr></thead>';
     html += '<tbody>';
 
@@ -1245,16 +1258,31 @@ $(function () {
       html += '</div>';
       html += '</td>';
 
-      /* ── Meeting With dropdown ── */
+      /* ── Meeting With dropdown (with avatar slot) ── */
       html += '<td class="bp-dd-cell">';
       html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meeting-with">';
       html += '<div class="bp-dd-trigger" tabindex="0">';
+      html += '<span class="bp-rec-avatar" aria-hidden="true"></span>';
       html += '<span class="bp-dd-val">Select…</span>';
       html += chevSvg;
       html += '</div>';
       html += '<div class="bp-dd-panel">';
       html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
       html += '<ul class="bp-dd-list bp-mw-list"></ul>';
+      html += '</div>';
+      html += '</div>';
+      html += '</td>';
+
+      /* ── Type of Meeting dropdown ── */
+      html += '<td class="bp-dd-cell">';
+      html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="type-of-meeting">';
+      html += '<div class="bp-dd-trigger" tabindex="0">';
+      html += '<span class="bp-dd-val">Select type…</span>';
+      html += chevSvg;
+      html += '</div>';
+      html += '<div class="bp-dd-panel">';
+      html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
+      html += '<ul class="bp-dd-list">' + tomOptions + '</ul>';
       html += '</div>';
       html += '</div>';
       html += '</td>';
@@ -1288,6 +1316,16 @@ $(function () {
            toStr(rec.Last_Name)    ||
            toStr(rec.Subject)      ||
            rec.id                  || '';
+  }
+
+  /**
+   * Return 1-2 uppercase initials from a display name (used for record avatars).
+   */
+  function buildRecordInitials(name) {
+    var parts = (name || '?').trim().split(/\s+/);
+    return (parts.length >= 2
+      ? parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
+      : (parts[0] || '?').charAt(0)).toUpperCase();
   }
 
   /**
@@ -1356,7 +1394,20 @@ $(function () {
     });
   }
 
-  function closeSlotPicker() {
+  /* ── Image preview overlay ──────────────────────────────── */
+
+  function openImgPreview(src, alt) {
+    $('#imgPreviewImg').attr({ src: src, alt: alt || '' });
+    $('#imgPreviewOverlay').addClass('img-prev-open');
+  }
+
+  function closeImgPreview() {
+    $('#imgPreviewOverlay').removeClass('img-prev-open');
+    /* Delay clearing src so the close animation (if any) finishes before the image disappears */
+    setTimeout(function () { $('#imgPreviewImg').attr('src', ''); }, 50);
+  }
+
+
     closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
     /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
@@ -2259,6 +2310,7 @@ $(function () {
   var beatPlanHasRefs     = false;  /* true when beatplanner__Beat_Plan_References has data */
   var beatPlanModulesList = [];     /* [{label: 'Leads', api: 'Leads'}, …] */
   var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
+  var typeOfMeetingOpts   = null;   /* null = not fetched; [] = empty; [str,…] = picklist values */
 
   /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
   var mfColors = (function () {
@@ -3430,15 +3482,52 @@ $(function () {
         });
       }
       $mwWrap.find('.bp-mw-list').html(mwOpts);
+      /* Reset Meeting With selection and clear its avatar */
       $mwWrap.find('.bp-dd-val').text('Select…').removeAttr('data-selected-id');
+      $mwWrap.find('.bp-rec-avatar').text('').removeClass('bp-rec-avatar--show').removeAttr('data-img-src');
     });
 
-    /* "Meeting With" option selected */
+    /* "Meeting With" option selected → show initials avatar; try to load actual photo */
     $(document).on('click', '#slotPickerGrid [data-field="meeting-with"] .bp-dd-opt', function (e) {
+      e.stopPropagation();
+      var $opt   = $(this);
+      var $wrap  = $opt.closest('.bp-dd-wrap');
+      var $row   = $opt.closest('.bp-slot-row');
+      var label  = $opt.data('label') || '';
+      var id     = $opt.data('id')    || '';
+
+      $wrap.find('.bp-dd-val').text(label).attr('data-selected-id', id);
+
+      /* Show initials avatar immediately */
+      var $avatar = $wrap.find('.bp-rec-avatar');
+      $avatar.text(buildRecordInitials(label))
+             .removeClass('bp-rec-avatar--show')
+             .removeAttr('data-img-src')
+             .addClass('bp-rec-avatar--show');
+
+      closeBpDropdown($wrap);
+
+      /* Attempt to load the actual record photo */
+      var mfApi = $row.find('[data-field="meetings-for"] .bp-dd-val').attr('data-selected-api') || '';
+      if (mfApi && id) {
+        ZOHO.CRM.API.getPhoto({ Entity: mfApi, RecordID: id })
+          .then(function (resp) {
+            if (resp && resp.data) {
+              var url = URL.createObjectURL(resp.data);
+              $avatar.html('<img src="' + url + '" alt="' + escHtml(label) + '">')
+                     .attr('data-img-src', url);
+            }
+          })
+          .catch(function () { /* no photo – keep initials fallback */ });
+      }
+    });
+
+    /* "Type of Meeting" option selected */
+    $(document).on('click', '#slotPickerGrid [data-field="type-of-meeting"] .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt  = $(this);
       var $wrap = $opt.closest('.bp-dd-wrap');
-      $wrap.find('.bp-dd-val').text($opt.data('label')).attr('data-selected-id', $opt.data('id'));
+      $wrap.find('.bp-dd-val').text($opt.data('label'));
       closeBpDropdown($wrap);
     });
 
@@ -3465,6 +3554,28 @@ $(function () {
     $(window).on('resize.bpdd', function () {
       var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
       if ($open.length) { positionBpPanel($open); }
+    });
+
+    /* ── Image preview ── */
+
+    /* Click on a user-avatar or record avatar containing an image → open full preview */
+    $(document).on('click', '.user-avatar, .bp-rec-avatar', function () {
+      var $img = $(this).find('img');
+      if ($img.length) {
+        openImgPreview($img.attr('src') || '', $img.attr('alt') || '');
+      }
+    });
+
+    /* Close preview: backdrop or close button */
+    $(document).on('click', '#imgPreviewOverlay .img-preview-backdrop, #imgPreviewClose', function () {
+      closeImgPreview();
+    });
+
+    /* Close preview: ESC key */
+    $(document).on('keydown.imgPreview', function (e) {
+      if ((e.key === 'Escape' || e.keyCode === 27) && $('#imgPreviewOverlay').hasClass('img-prev-open')) {
+        closeImgPreview();
+      }
     });
 
     /* Close popup when clicking outside */
@@ -3652,7 +3763,48 @@ $(function () {
     renderSyeFieldList();
   }
 
-  function renderSyeFieldList() {
+  /**
+   * Fetch picklist values for the "Type of Meeting" field from
+   * beatplanner__Daily_Beat_Plans metadata.  The result is cached in
+   * typeOfMeetingOpts so only one API call is made per session.
+   * If syePicklistFields is already populated (user opened the SYE picker
+   * earlier) we reuse it to avoid a duplicate network request.
+   */
+  async function fetchTypeOfMeetingOpts() {
+    try {
+      var allFields;
+      if (syePicklistFields !== null) {
+        /* Reuse the already-fetched picklist field list */
+        allFields = syePicklistFields;
+      } else {
+        var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Daily_Beat_Plans&type=all');
+        allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
+      }
+
+      /* Find a field whose label matches "Type of Meeting" (case-insensitive) */
+      var tomField = null;
+      for (var i = 0; i < allFields.length; i++) {
+        var f = allFields[i];
+        var lbl = (f.field_label || '').toLowerCase().trim();
+        if (lbl === 'type of meeting' || lbl === 'type_of_meeting') {
+          tomField = f;
+          break;
+        }
+      }
+
+      if (tomField && tomField.pick_list_values && tomField.pick_list_values.length) {
+        typeOfMeetingOpts = tomField.pick_list_values.map(function (pv) {
+          return pv.display_value || pv.actual_value || String(pv);
+        }).filter(Boolean);
+      } else {
+        typeOfMeetingOpts = [];
+      }
+    } catch (e) {
+      typeOfMeetingOpts = [];
+    }
+  }
+
+
     var $body = $('#sfpBody');
 
     if (!syePicklistFields || syePicklistFields.length === 0) {
@@ -4197,6 +4349,10 @@ $(function () {
       beatPlanModulesList = bpModLabels.map(function (label, i) {
         return { label: label.trim(), api: (bpModApis[i] || '').trim() };
       });
+
+      /* Fetch "Type of Meeting" picklist values in the background so they are
+         ready before the user first opens the slot picker. */
+      fetchTypeOfMeetingOpts().catch(function () { typeOfMeetingOpts = []; });
     }
 
     var response = await zrc.get('/crm/v8/settings/modules');

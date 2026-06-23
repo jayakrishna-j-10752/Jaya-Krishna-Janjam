@@ -3895,3 +3895,131 @@ input, select, textarea {
 .theme-night .bp-dd-opt:hover {
   background: rgba(21,101,192,.25);
 }
+
+/* ── Fix: use separate borders so position:sticky works on <th> in all browsers ──
+   border-collapse:collapse is a known blocker for position:sticky in WebKit/Blink. */
+.bp-slots-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+/* Header border via box-shadow – border-bottom on a sticky <th> can disappear when
+   border-collapse:collapse is in effect; box-shadow paints reliably over the content. */
+.bp-th {
+  box-shadow: inset 0 -2px 0 var(--border);
+  border-bottom: none;
+}
+/* Row separators: on cells, not on <tr> (tr border-top is unreliable with separate) */
+.bp-slot-row + .bp-slot-row .bp-time-cell,
+.bp-slot-row + .bp-slot-row .bp-dd-cell {
+  border-top: 1px solid var(--border);
+}
+/* Silence the old tr-level rule so it no longer doubles up with the cell border */
+.bp-slot-row + .bp-slot-row {
+  border-top: none;
+}
+
+/* ── Scroll-container fix: bp-slots-wrap owns only horizontal overflow.
+   overflow-y:clip does NOT establish a scroll container (unlike hidden/auto/scroll),
+   so position:sticky on <th> propagates up to modal-body (the true vertical scroller).
+   Fallback browsers that don't support 'clip' get overflow-y:auto which keeps the
+   table usable even though sticky may not work perfectly. */
+.bp-slots-wrap {
+  overflow-x: auto;
+  overflow-y: clip;
+  max-height: none;
+}
+
+/* ── Record avatar inside Meeting With trigger ── */
+.bp-rec-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent, #1565C0) 18%, var(--surface-2));
+  color: var(--accent, #1565C0);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+.bp-rec-avatar--show {
+  display: flex;
+}
+.bp-rec-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+/* Pointer cursor when avatars contain a clickable image */
+.user-avatar:has(img),
+.bp-rec-avatar.bp-rec-avatar--show {
+  cursor: pointer;
+}
+
+/* ── Image preview overlay ── */
+.img-preview-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  align-items: center;
+  justify-content: center;
+}
+.img-preview-overlay.img-prev-open {
+  display: flex;
+}
+.img-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: pointer;
+}
+.img-preview-box {
+  position: relative;
+  z-index: 1;
+  max-width: min(480px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.img-preview-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: background .15s;
+}
+.img-preview-close:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+.img-preview-img {
+  max-width: 100%;
+  max-height: calc(80vh - 20px);
+  border-radius: 10px;
+  object-fit: contain;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
