@@ -1153,6 +1153,9 @@ $(function () {
    * Taken slots are shown but disabled.
    */
   function openSlotPicker(date) {
+    /* Ensure no stale open beat-plan dropdown leaks into the new view */
+    closeAllBpDropdowns();
+
     /* Format heading: e.g. "Monday, June 23, 2026" */
     var parts = date.split('-');
     var d     = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
@@ -1354,6 +1357,7 @@ $(function () {
   }
 
   function closeSlotPicker() {
+    closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
     dom.modal.find('.modal-box').removeClass('modal-box--wide');
     /* Reset to form phase for next open */
@@ -1441,6 +1445,7 @@ $(function () {
   }
 
   function closeModal() {
+    closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
     state.editId = null;
     /* Always reset to form phase so next open is clean */
