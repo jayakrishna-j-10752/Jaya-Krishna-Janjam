@@ -3517,14 +3517,18 @@ $(function () {
       if (photoId) {
         ZOHO.CRM.API.getFile({ id: photoId })
           .then(function (resp) {
-            if (resp && resp.data) {
-              var imgBlob = new Blob([resp.data], { type: 'image/jpeg' });
-              var url = URL.createObjectURL(imgBlob);
-              $avatar.html('<img src="' + url + '" alt="' + escHtml(label) + '">')
-                     .attr('data-img-src', url);
+            console.log("getFile response for", label, ":", resp);
+
+            if (resp) {
+              var url = URL.createObjectURL(resp);
+
+              console.log("Loaded record photo for", label, ":", url);
+
+              $avatar
+                .html('<img>')
+                .attr("data-img-src", url);
             }
-          })
-          .catch(function () { /* no photo – keep initials fallback */ });
+          });
       }
     });
 
