@@ -4379,7 +4379,7 @@ $(function () {
                 return {
                   id:       rec.id,
                   name:     recordDisplayName(rec),
-                  photo_id: rec.Record_Image || rec['$photo_id'] || ''
+                  photo_id: rec['$photo_id'] || ''
                 };
               });
             }
