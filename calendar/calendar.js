@@ -3521,7 +3521,7 @@ $(function () {
               var imgBlob = new Blob([resp], { type: "image/jpeg" });
               var url = URL.createObjectURL(imgBlob);
               $avatar
-                .html('<img>')
+                .html('<img src="' + url + '">')
                 .attr("data-img-src", url);
             }
           })
