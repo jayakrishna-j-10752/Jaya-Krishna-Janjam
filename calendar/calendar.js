@@ -1162,8 +1162,10 @@ $(function () {
     if (beatPlanHasRefs) {
       /* Beat plan mode: table with all slots + Meetings For + Meeting With dropdowns */
       dom.slotPickerGrid.html(buildBeatPlanTable(date));
+      dom.modal.find('.modal-box').addClass('modal-box--wide');
     } else {
       /* Standard mode: clickable slot buttons, 1-hour intervals 00:00 – 23:00 */
+      dom.modal.find('.modal-box').removeClass('modal-box--wide');
       var html = '';
       for (var h = 0; h < 24; h++) {
         var taken     = !!eventAtHour(date, h);
@@ -1272,6 +1274,7 @@ $(function () {
 
   function closeSlotPicker() {
     dom.modal.removeClass('modal-open');
+    dom.modal.find('.modal-box').removeClass('modal-box--wide');
     /* Reset to form phase for next open */
     dom.slotPickerSection.hide();
     dom.eventFormSection.show();
