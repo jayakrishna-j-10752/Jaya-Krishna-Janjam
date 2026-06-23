@@ -1784,12 +1784,9 @@ $(function () {
     var isExpanded  = !!expandedNodes[user.id];
     var roleName    = (user.role && user.role.name) ? user.role.name : '';
 
-    /* Indent the entire row (avatar + info) so all items maintain consistent
-       internal spacing at every depth level — no zig-zag. */
-    var rowIndent = depth > 0 ? ' style="padding-left:' + (14 + depth * 20) + 'px"' : '';
     var html =
       '<div class="ud-item' + (isActive ? ' ud-item-active' : '') +
-      '" data-uid="' + escHtml(user.id) + '"' + rowIndent + '>' +
+      '" data-uid="' + escHtml(user.id) + '">' +
       '<div class="ud-item-avatar">' + buildAvatarInnerHtml(user) + '</div>' +
       '<div class="ud-item-info">' +
       '<div class="ud-item-name">'  + highlightText(user.full_name, q) + '</div>' +
