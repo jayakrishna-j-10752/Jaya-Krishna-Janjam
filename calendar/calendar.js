@@ -1265,11 +1265,72 @@ $(function () {
 
   /**
    * Return the best display name for a CRM record (works across Leads,
-   * Contacts, Accounts and other common modules).
+   * Contacts, Accounts, Deals and other common modules).
+   *
+   * Some related/lookup fields (e.g. Account_Name inside a Deals record)
+   * are returned by the API as objects {name, id} rather than plain strings.
+   * toStr() extracts the human-readable value from either form.
    */
   function recordDisplayName(rec) {
-    return rec.Full_Name || rec.Account_Name || rec.Name ||
-           rec.Last_Name  || rec.Subject      || rec.id  || '';
+    function toStr(v) {
+      if (!v) { return ''; }
+      if (typeof v === 'string') { return v; }
+      if (typeof v === 'object') { return v.name || v.Full_Name || ''; }
+      return '';
+    }
+    return toStr(rec.Deal_Name)    ||
+           toStr(rec.Full_Name)    ||
+           toStr(rec.Account_Name) ||
+           toStr(rec.Name)         ||
+           toStr(rec.Last_Name)    ||
+           toStr(rec.Subject)      ||
+           rec.id                  || '';
+  }
+
+  /**
+   * Position an open .bp-dd-panel as position:fixed so it is never clipped
+   * by overflow containers (modal-body, bp-slots-wrap, modal-box).
+   * The panel opens below the trigger when there is enough viewport space,
+   * and above it otherwise.
+   */
+  function positionBpPanel($wrap) {
+    var triggerEl = $wrap.find('.bp-dd-trigger')[0];
+    var $panel    = $wrap.find('.bp-dd-panel');
+    if (!triggerEl || !$panel.length) { return; }
+    var rect  = triggerEl.getBoundingClientRect();
+    var vpH   = window.innerHeight;
+    var below = vpH - rect.bottom;
+
+    $panel.css({
+      position:  'fixed',
+      width:     rect.width + 'px',
+      left:      rect.left  + 'px',
+      right:     'auto',
+      'z-index': 9999
+    });
+
+    if (below >= 80) {
+      $panel.css({ top: (rect.bottom + 3) + 'px', bottom: '' });
+    } else {
+      $panel.css({ top: '', bottom: (vpH - rect.top + 3) + 'px' });
+    }
+  }
+
+  /**
+   * Close a single .bp-dd-wrap dropdown and reset its panel's inline styles.
+   */
+  function closeBpDropdown($wrap) {
+    $wrap.removeClass('bp-dd-open');
+    $wrap.find('.bp-dd-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '', 'z-index': '' });
+  }
+
+  /**
+   * Close all open beat-plan dropdowns inside the slot picker grid.
+   */
+  function closeAllBpDropdowns() {
+    $('#slotPickerGrid .bp-dd-wrap.bp-dd-open').each(function () {
+      closeBpDropdown($(this));
+    });
   }
 
   function closeSlotPicker() {
@@ -3288,12 +3349,14 @@ $(function () {
       var $wrap  = $(this).closest('.bp-dd-wrap');
       var isOpen = $wrap.hasClass('bp-dd-open');
       /* Close any other open dropdown first */
-      $('#slotPickerGrid .bp-dd-wrap.bp-dd-open').removeClass('bp-dd-open');
+      closeAllBpDropdowns();
       if (!isOpen) {
         $wrap.addClass('bp-dd-open');
         $wrap.find('.bp-dd-search').val('').focus();
         /* Show all options */
         $wrap.find('.bp-dd-opt').show();
+        /* Position the panel as fixed so overflow containers cannot clip it */
+        positionBpPanel($wrap);
       }
     });
 
@@ -3322,7 +3385,7 @@ $(function () {
       var api    = $opt.data('api');
 
       $wrap.find('.bp-dd-val').text(label).attr('data-selected-api', api);
-      $wrap.removeClass('bp-dd-open');
+      closeBpDropdown($wrap);
 
       /* Populate the "Meeting With" dropdown for this row */
       var $mwWrap  = $row.find('[data-field="meeting-with"]');
@@ -3347,14 +3410,20 @@ $(function () {
       var $opt  = $(this);
       var $wrap = $opt.closest('.bp-dd-wrap');
       $wrap.find('.bp-dd-val').text($opt.data('label')).attr('data-selected-id', $opt.data('id'));
-      $wrap.removeClass('bp-dd-open');
+      closeBpDropdown($wrap);
     });
 
     /* Close beat plan dropdowns when clicking anywhere outside */
     $(document).on('click', function (e) {
       if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length) {
-        $('#slotPickerGrid .bp-dd-wrap.bp-dd-open').removeClass('bp-dd-open');
+        closeAllBpDropdowns();
       }
+    });
+
+    /* Reposition any open beat-plan panel when the modal body scrolls */
+    $('#eventModal .modal-body').on('scroll.bpdd', function () {
+      var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
+      if ($open.length) { positionBpPanel($open); }
     });
 
     /* Close popup when clicking outside */

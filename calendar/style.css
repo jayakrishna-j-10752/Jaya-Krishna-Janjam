@@ -3734,6 +3734,9 @@ input, select, textarea {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
+  /* When rendered inside the time-slot-grid, span every grid column so the
+     table is not constrained to a single 1fr cell. */
+  grid-column: 1 / -1;
 }
 .bp-slots-table {
   width: 100%;
