@@ -1301,18 +1301,38 @@ $(function () {
     var vpH   = window.innerHeight;
     var below = vpH - rect.bottom;
 
+    /* When an ancestor has a CSS transform it becomes the containing block
+       for position:fixed descendants (CSS spec).  .modal-box carries a
+       transform for its open/close animation, so fixed coords are relative
+       to its padding-box rather than the viewport.  Detect this and subtract
+       the ancestor's padding-box origin so the panel lands exactly below the
+       trigger regardless of where the modal sits on screen. */
+    var offsetTop    = 0;
+    var offsetLeft   = 0;
+    var offsetBottom = vpH;
+    var $box = $wrap.closest('.modal-box');
+    if ($box.length) {
+      var cs = window.getComputedStyle($box[0]);
+      if (cs.transform && cs.transform !== 'none') {
+        var boxRect = $box[0].getBoundingClientRect();
+        offsetTop    = boxRect.top    + (parseFloat(cs.borderTopWidth)    || 0);
+        offsetLeft   = boxRect.left   + (parseFloat(cs.borderLeftWidth)   || 0);
+        offsetBottom = boxRect.bottom - (parseFloat(cs.borderBottomWidth) || 0);
+      }
+    }
+
     $panel.css({
       position:  'fixed',
       width:     rect.width + 'px',
-      left:      rect.left  + 'px',
+      left:      (rect.left   - offsetLeft) + 'px',
       right:     'auto',
       'z-index': 9999
     });
 
     if (below >= 80) {
-      $panel.css({ top: (rect.bottom + 3) + 'px', bottom: '' });
+      $panel.css({ top: (rect.bottom - offsetTop + 3) + 'px', bottom: '' });
     } else {
-      $panel.css({ top: '', bottom: (vpH - rect.top + 3) + 'px' });
+      $panel.css({ top: '', bottom: (offsetBottom - rect.top + 3) + 'px' });
     }
   }
 
