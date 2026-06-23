@@ -148,9 +148,12 @@ $(function () {
     popupWhen:    $('#popupWhen'),
     popupDesc:    $('#popupDesc'),
     paCopy:       $('#paCopy'),
+    paPaste:      $('#paPaste'),
     paEdit:       $('#paEdit'),
     paDelete:     $('#paDelete'),
     paClose:      $('#paClose'),
+
+    slotMenu:     $('#slotMenu'),
 
     toast:        $('#toast'),
 
@@ -159,6 +162,9 @@ $(function () {
     depList:        $('#depList'),
     depClose:       $('#depClose')
   };
+
+  /* Tracks the date for the currently open slot-picker menu */
+  var slotMenuDate = null;
 
   /* ──────────────────────────────────────────────────────────
      TOAST
@@ -286,6 +292,7 @@ $(function () {
     updatePeriodLabel();
     updateTodayBtn();
     closePopup();
+    closeSlotMenu();
     closeDayEventsPopup();
 
     if (state.view === 'month') {
@@ -774,7 +781,7 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      openModal(date);
+      showSlotMenu(date, this);
     });
     dom.canvas.on('click.calview', '.cell-paste-btn', function (e) {
       e.stopPropagation();
@@ -833,7 +840,7 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      openModal(date);
+      showSlotMenu(date, this);
     });
     dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
       e.stopPropagation();
@@ -899,7 +906,9 @@ $(function () {
     /* "+ Add Event" toolbar button */
     dom.canvas.on('click.calview', '.dh-add-btn', function (e) {
       e.stopPropagation();
-      openModal($(this).data('date'));
+      var date = $(this).data('date');
+      if (isPast(date)) return;
+      showSlotMenu(date, this);
     });
 
     /* Mobile toolbar – Copy all events */
@@ -982,8 +991,11 @@ $(function () {
         showToast('All events deleted for ' + ds + '.');
       }
     });
-    dom.canvas.on('click.calview', '.dh-add-btn', function () {
-      openModal($(this).data('date'));
+    dom.canvas.on('click.calview', '.dh-add-btn', function (e) {
+      e.stopPropagation();
+      var date = $(this).data('date');
+      if (isPast(date)) return;
+      showSlotMenu(date, this);
     });
   }
 
@@ -1107,6 +1119,9 @@ $(function () {
     dom.popupWhen.text(ev.date + '  ·  ' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime));
     dom.popupDesc.text(ev.description || '');
 
+    /* Show paste button only when clipboard has content for a valid (non-past) date */
+    dom.paPaste.toggle(!!(state.clipboard && isValid(ev.date)));
+
     /* Position near mouse, keeping inside viewport */
     var x = mouseEvt.clientX + 12;
     var y = mouseEvt.clientY + 8;
@@ -1126,8 +1141,50 @@ $(function () {
   }
 
   /* ──────────────────────────────────────────────────────────
-     DAY EVENTS POPUP (all events for a month cell)
+     TIME SLOT PICKER MENU
   ────────────────────────────────────────────────────────── */
+
+  /**
+   * Show a dropdown of hourly time slots next to `anchorEl` for `date`.
+   * Slots that already have an event are disabled.
+   */
+  function showSlotMenu(date, anchorEl) {
+    slotMenuDate = date;
+
+    /* Build slot list */
+    var html = '<div class="slot-menu-header">Pick a time slot</div>';
+    for (var h = 0; h < 24; h++) {
+      var taken = !!eventAtHour(date, h);
+      var label = fmtTime(hourToTime(h));
+      if (taken) {
+        html += '<button class="slot-menu-item" data-hour="' + h + '" disabled>' +
+                label +
+                '<span class="slot-menu-taken-label">taken</span>' +
+                '</button>';
+      } else {
+        html += '<button class="slot-menu-item" data-hour="' + h + '">' +
+                label +
+                '</button>';
+      }
+    }
+    dom.slotMenu.html(html);
+
+    /* Position near the anchor button, keeping inside viewport */
+    var rect = anchorEl.getBoundingClientRect();
+    var mw   = 180;
+    var x    = rect.left;
+    var y    = rect.bottom + 4;
+    if (x + mw > window.innerWidth  - 8) x = window.innerWidth  - mw - 8;
+    if (y + 300 > window.innerHeight - 8) y = rect.top - 300 - 4;
+    x = Math.max(4, x);
+    y = Math.max(4, y);
+    dom.slotMenu.css({ left: x + 'px', top: y + 'px' }).addClass('slot-menu-open');
+  }
+
+  function closeSlotMenu() {
+    slotMenuDate = null;
+    dom.slotMenu.removeClass('slot-menu-open');
+  }
 
   function showDayEventsPopup(ds, mouseEvt) {
     var evts = eventsOn(ds);
@@ -3085,6 +3142,10 @@ $(function () {
     dom.paCopy.on('click',   function () {
       if (state.activePopup) { doCopy(state.activePopup); closePopup(); }
     });
+    dom.paPaste.on('click',  function () {
+      var ev = findEvent(state.activePopup);
+      if (ev && state.clipboard && isValid(ev.date)) { doPaste(ev.date); closePopup(); }
+    });
     dom.paEdit.on('click',   function () {
       var ev = findEvent(state.activePopup);
       if (ev) { closePopup(); openModal(ev.date, ev.startTime, ev.endTime, ev); }
@@ -3094,12 +3155,26 @@ $(function () {
       if (evid && window.confirm('Delete this event?')) { deleteEvent(evid); }
     });
 
-    /* Close popup when clicking outside */
+    /* Slot menu – item click */
+    $(document).on('click', '#slotMenu .slot-menu-item', function (e) {
+      e.stopPropagation();
+      var h = parseInt($(this).data('hour'), 10);
+      var date = slotMenuDate;
+      closeSlotMenu();
+      if (date) openModal(date, hourToTime(h), hourToTime(h + 1));
+    });
+
+    /* Close popup and slot menu when clicking outside */
     $(document).on('click', function (e) {
       if (!$(e.target).closest('#evtPopup').length &&
           !$(e.target).closest('.evt-chip').length &&
           !$(e.target).closest('.time-event').length) {
         closePopup();
+      }
+      if (!$(e.target).closest('#slotMenu').length &&
+          !$(e.target).closest('.cell-add-btn').length &&
+          !$(e.target).closest('.dh-add-btn').length) {
+        closeSlotMenu();
       }
       if (!$(e.target).closest('#dayEventsPopup').length &&
           !$(e.target).closest('.m-cell').length &&
@@ -3112,7 +3187,7 @@ $(function () {
     $(document).on('keydown', function (e) {
       if (dom.modal.hasClass('modal-open')) return; /* modal captures input */
       switch (e.key) {
-        case 'Escape':     closePopup(); break;
+        case 'Escape':     closePopup(); closeSlotMenu(); break;
         case 'ArrowLeft':  navigate(-1); break;
         case 'ArrowRight': navigate(1);  break;
         case 't':          goToday();    break;

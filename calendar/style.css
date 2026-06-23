@@ -1350,6 +1350,67 @@ input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════════════════
+   TIME SLOT PICKER MENU
+══════════════════════════════════════════════════════════ */
+.slot-menu {
+  position: fixed;
+  width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  z-index: 900;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity .15s, transform .15s;
+  display: flex;
+  flex-direction: column;
+}
+.slot-menu.slot-menu-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+.slot-menu-header {
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.slot-menu-item {
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background .1s;
+  text-align: left;
+  border: none;
+  background: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.slot-menu-item:hover:not([disabled]) { background: var(--surface-2); }
+.slot-menu-item[disabled] {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: .55;
+}
+.slot-menu-taken-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════
    TOAST
 ══════════════════════════════════════════════════════════ */
 .toast {
