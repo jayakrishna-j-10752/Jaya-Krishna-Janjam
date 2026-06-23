@@ -1170,7 +1170,7 @@ $(function () {
       for (var h = 0; h < 24; h++) {
         var taken     = !!eventAtHour(date, h);
         var startLbl  = fmtTime(hourToTime(h));
-        var endLbl    = fmtTime(hourToTime(h + 1));
+        var endLbl    = fmtTime(h === 23 ? '23:59' : hourToTime(h + 1));
         var takenAttr = taken ? ' disabled aria-disabled="true"' : '';
         var takenCls  = taken ? ' time-slot-item--taken' : '';
         html += '<button class="time-slot-item' + takenCls + '" data-date="' + date +
@@ -1222,7 +1222,7 @@ $(function () {
 
     for (var h = 0; h < 24; h++) {
       var startLbl = fmtTime(hourToTime(h));
-      var endLbl   = fmtTime(hourToTime(h + 1));
+      var endLbl   = fmtTime(h === 23 ? '23:59' : hourToTime(h + 1));
 
       html += '<tr class="bp-slot-row" data-date="' + date + '" data-hour="' + h + '">';
       html += '<td class="bp-time-cell">' + startLbl + '</td>';
@@ -3422,6 +3422,18 @@ $(function () {
 
     /* Reposition any open beat-plan panel when the modal body scrolls */
     $('#eventModal .modal-body').on('scroll.bpdd', function () {
+      var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
+      if ($open.length) { positionBpPanel($open); }
+    });
+
+    /* Reposition when the slots table container scrolls horizontally or vertically */
+    $(document).on('scroll.bpdd', '#slotPickerGrid .bp-slots-wrap', function () {
+      var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
+      if ($open.length) { positionBpPanel($open); }
+    });
+
+    /* Reposition when the viewport is resized */
+    $(window).on('resize.bpdd', function () {
       var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
       if ($open.length) { positionBpPanel($open); }
     });

@@ -3732,6 +3732,8 @@ input, select, textarea {
 .bp-slots-wrap {
   width: 100%;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 420px;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
   /* When rendered inside the time-slot-grid, span every grid column so the
