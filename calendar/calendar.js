@@ -2231,6 +2231,11 @@ $(function () {
     /* Toggle on button click */
     $('#userProfile').on('click', function (e) {
       e.stopPropagation();
+      /* Click came from the avatar photo → open preview, do not toggle dropdown */
+      if ($(e.target).is('.user-avatar img')) {
+        openImgPreview($(e.target).attr('src') || '', $(e.target).attr('alt') || '');
+        return;
+      }
       if ($('#userDropdown').hasClass('ud-open')) {
         closeUserDropdown();
       } else {
@@ -3559,11 +3564,11 @@ $(function () {
 
     /* ── Image preview ── */
 
-    /* Click on a user-avatar or record avatar containing an image → open full preview */
-    $(document).on('click', '.user-avatar, .bp-rec-avatar', function () {
-      var $img = $(this).find('img');
-      if ($img.length) {
-        openImgPreview($img.attr('src') || '', $img.attr('alt') || '');
+    /* Click on any avatar image → open full preview (delegated for dynamic avatars) */
+    $(document).on('click', '.bp-rec-avatar img, .user-avatar img', function () {
+      var src = $(this).attr('src') || '';
+      if (src) {
+        openImgPreview(src, $(this).attr('alt') || '');
       }
     });
 
