@@ -3510,7 +3510,7 @@ $(function () {
       /* Attempt to load the actual record photo */
       var mfApi = $row.find('[data-field="meetings-for"] .bp-dd-val').attr('data-selected-api') || '';
       if (mfApi && id) {
-        zrc.get('/crm/v8/' + mfApi + '/' + id + '/photo')
+        ZOHO.CRM.API.getPhoto({ Entity: mfApi, RecordID: id })
           .then(function (resp) {
             if (resp && resp.data) {
               var url = URL.createObjectURL(resp.data);
