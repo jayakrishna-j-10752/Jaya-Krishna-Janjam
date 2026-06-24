@@ -4154,6 +4154,28 @@ input, select, textarea {
   user-select: none;
   transition: background .12s, color .12s;
 }
+.bpf-mod-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent, #1565C0);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.bpf-mod-name-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 .bpf-mod-name:hover {
   background: var(--z-blue-pale, #E8F0FE);
   color: var(--accent, #1565C0);

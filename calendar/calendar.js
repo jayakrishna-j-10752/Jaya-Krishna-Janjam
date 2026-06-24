@@ -3665,7 +3665,10 @@ $(function () {
       }
       /* Close open filter-panel multi-selects when clicking outside */
       if (!$(e.target).closest('#bpFilterBody .bpf-ms-wrap').length) {
-        $('#bpFilterBody .bpf-ms-wrap').removeClass('bpf-ms-open');
+        $('#bpFilterBody .bpf-ms-wrap').each(function () {
+          $(this).removeClass('bpf-ms-open');
+          $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+        });
       }
     });
 
@@ -3702,9 +3705,13 @@ $(function () {
       var $wrap  = $(this).closest('.bpf-ms-wrap');
       var isOpen = $wrap.hasClass('bpf-ms-open');
       /* Close all other open multi-selects first */
-      $('#bpFilterBody .bpf-ms-wrap').removeClass('bpf-ms-open');
+      $('#bpFilterBody .bpf-ms-wrap').each(function () {
+        $(this).removeClass('bpf-ms-open');
+        $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+      });
       if (!isOpen) {
         $wrap.addClass('bpf-ms-open');
+        positionBpMsPanel($wrap);
         $wrap.find('.bpf-ms-search').val('').focus();
         $wrap.find('.bpf-ms-opt').show();
       }
@@ -4111,6 +4118,78 @@ $(function () {
 
   /* ── Filter Panel helpers ── */
 
+  /**
+   * Position a .bpf-ms-panel using position:fixed so it is never clipped by
+   * overflow:hidden on .bpf-mod-fields or any ancestor container.
+   */
+  function positionBpMsPanel($wrap) {
+    var triggerEl = $wrap.find('.bpf-ms-trigger')[0];
+    var $panel    = $wrap.find('.bpf-ms-panel');
+    if (!triggerEl || !$panel.length) { return; }
+    var rect  = triggerEl.getBoundingClientRect();
+    var vpH   = window.innerHeight;
+    var below = vpH - rect.bottom;
+
+    /* Same modal-box transform compensation used in positionBpPanel */
+    var offsetTop    = 0;
+    var offsetLeft   = 0;
+    var offsetBottom = vpH;
+    var $box = $wrap.closest('.modal-box');
+    if ($box.length) {
+      var cs = window.getComputedStyle($box[0]);
+      if (cs.transform && cs.transform !== 'none') {
+        var boxRect = $box[0].getBoundingClientRect();
+        offsetTop    = boxRect.top    + (parseFloat(cs.borderTopWidth)    || 0);
+        offsetLeft   = boxRect.left   + (parseFloat(cs.borderLeftWidth)   || 0);
+        offsetBottom = boxRect.bottom - (parseFloat(cs.borderBottomWidth) || 0);
+      }
+    }
+
+    $panel.css({
+      position:  'fixed',
+      width:     rect.width + 'px',
+      left:      (rect.left - offsetLeft) + 'px',
+      right:     'auto',
+      'z-index': 10000
+    });
+
+    if (below >= 80) {
+      $panel.css({ top: (rect.bottom - offsetTop + 3) + 'px', bottom: '' });
+    } else {
+      $panel.css({ top: '', bottom: (offsetBottom - rect.top + 3) + 'px' });
+    }
+  }
+
+  /**
+   * Update the per-module active filter count badges inside each .bpf-mod-name.
+   * Counts the total number of individually selected values for that module.
+   */
+  function updateModuleCountBadges() {
+    $('#bpFilterBody .bpf-mod-group').each(function () {
+      var $group  = $(this);
+      var modApi  = String($group.data('module') || '');
+      var $header = $group.find('.bpf-mod-name');
+      if (!modApi || !$header.length) { return; }
+      var count = 0;
+      if (activeModuleFilters[modApi]) {
+        Object.keys(activeModuleFilters[modApi]).forEach(function (fieldApi) {
+          var vals = activeModuleFilters[modApi][fieldApi];
+          if (vals && vals.length > 0) { count += vals.length; }
+        });
+      }
+      var $badge = $header.find('.bpf-mod-count');
+      if (count > 0) {
+        if ($badge.length) {
+          $badge.text(count);
+        } else {
+          $header.find('.bpf-acc-chev').before('<span class="bpf-mod-count">' + count + '</span>');
+        }
+      } else {
+        $badge.remove();
+      }
+    });
+  }
+
   /** Open the filter panel and render its current content. */
   function openFilterPanel() {
     renderFilterPanelContent();
@@ -4120,7 +4199,10 @@ $(function () {
   /** Close the filter panel and collapse any open multi-select inside it. */
   function closeFilterPanel() {
     $('#bpFilterOverlay').removeClass('bpf-open');
-    $('#bpFilterBody .bpf-ms-wrap').removeClass('bpf-ms-open');
+    $('#bpFilterBody .bpf-ms-wrap').each(function () {
+      $(this).removeClass('bpf-ms-open');
+      $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+    });
   }
 
   /** Render the filter panel body from cached modulePicklistMeta. */
@@ -4136,9 +4218,21 @@ $(function () {
     var html = '';
     beatPlanModulesList.forEach(function (mod) {
       var fields = modulePicklistMeta.hasOwnProperty(mod.api) ? modulePicklistMeta[mod.api] : null;
-      html += '<div class="bpf-mod-group">';
+      var modFilterCount = 0;
+      if (activeModuleFilters[mod.api]) {
+        Object.keys(activeModuleFilters[mod.api]).forEach(function (fieldApi) {
+          var vals = activeModuleFilters[mod.api][fieldApi];
+          if (vals && vals.length > 0) { modFilterCount += vals.length; }
+        });
+      }
+      var countBadge = modFilterCount > 0
+        ? '<span class="bpf-mod-count">' + modFilterCount + '</span>'
+        : '';
+      html += '<div class="bpf-mod-group" data-module="' + escHtml(mod.api) + '">';
       html += '<h4 class="bpf-mod-name" role="button" tabindex="0" aria-expanded="false">' +
-              escHtml(mod.label) + accChevSvg + '</h4>';
+              escHtml(mod.label) +
+              '<span class="bpf-mod-name-right">' + countBadge + accChevSvg + '</span>' +
+              '</h4>';
       html += '<div class="bpf-mod-fields">';
       if (fields === null) {
         html += '<p class="bpf-loading">Loading fields\u2026</p>';
@@ -4230,6 +4324,7 @@ $(function () {
     } else {
       $chev.before('<span class="bpf-ms-placeholder">Select\u2026</span>');
     }
+    updateModuleCountBadges();
   }
 
   /** Remove a single value from activeModuleFilters, cleaning up empty objects. */
@@ -4258,6 +4353,7 @@ $(function () {
     } else {
       $btn.removeClass('bp-filter-btn--active');
     }
+    updateModuleCountBadges();
   }
 
   /**
