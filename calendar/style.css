@@ -3740,15 +3740,10 @@ input, select, textarea {
   width: 100%;
   overflow-x: auto;
   overflow-y: auto;
+  /* ~420px fits ~10 rows before scrolling; keeps the picker compact in the modal */
   max-height: 420px;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
-}
-.bp-slots-table {
-  width: 100%;
-  min-width: 560px;
-  border-collapse: collapse;
-  font-size: 13px;
 }
 .bp-th {
   padding: 8px 10px;
