@@ -421,6 +421,25 @@
   </div><!-- /#eventModal -->
 
 
+  <!-- ══════════════════════ BEAT PLAN FILTER PANEL ══════════════════════ -->
+  <div class="bpf-overlay" id="bpFilterOverlay" aria-hidden="true">
+    <div class="bpf-backdrop" id="bpFilterBackdrop"></div>
+    <div class="bpf-panel" id="bpFilterPanel" role="dialog" aria-modal="true" aria-label="Filter Records">
+      <div class="bpf-head">
+        <h3 class="bpf-title">Filter Records</h3>
+        <button class="bpf-close-btn" id="bpFilterClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="bpf-body" id="bpFilterBody">
+        <p class="bpf-loading">Loading filters&hellip;</p>
+      </div>
+      <div class="bpf-foot">
+        <button class="btn-ghost" id="bpFilterClear">Clear All</button>
+        <button class="btn-primary" id="bpFilterApply">Apply Filters</button>
+      </div>
+    </div>
+  </div><!-- /#bpFilterOverlay -->
+
+
   <!-- ══════════════════════ EVENT DETAIL POPUP ══════════════════════ -->
   <div class="evt-popup" id="evtPopup" role="tooltip">
     <div class="popup-head">

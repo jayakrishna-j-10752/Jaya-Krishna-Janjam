@@ -1289,6 +1289,12 @@ $(function () {
                    buildDdWrap('leave-type', 'Select\u2026', buildOptList(leaveTypeField.options)) +
                    '</div>';
     }
+    /* ── Filter button (shown only when Attendance = "Working") ── */
+    attendBar += '<div class="bp-filter-action" style="display:none;">' +
+                 '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+                 '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
+                 'Filter</button>' +
+                 '</div>';
     attendBar += '</div>';
 
     /* ── Table header (hidden until Attendance = "Working") ── */
@@ -2396,6 +2402,11 @@ $(function () {
   var beatPlanModulesList = [];     /* [{label: 'Leads', api: 'Leads'}, …] */
   var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
   var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
+
+  /* ── Filter Panel state ── */
+  var modulePicklistMeta    = {};  /* {moduleName: [{api_name, field_label, options}]} – per-module picklist fields */
+  var activeModuleFilters   = {};  /* {moduleName: {fieldApiName: ['val1','val2']}} – currently applied filter selections */
+  var filteredModuleRecords = {};  /* {moduleName: [{id, name, photo_id}]} – records matching active filters */
 
   /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
   var mfColors = (function () {
@@ -3555,7 +3566,10 @@ $(function () {
 
       /* Populate the "Meeting With" dropdown for this row */
       var $mwWrap  = $row.find('[data-field="meeting-with"]');
-      var records  = moduleRecordsMap[api] || [];
+      /* Use filtered records if a filter has been applied for this module; fall back to full list */
+      var records  = filteredModuleRecords.hasOwnProperty(api)
+                       ? filteredModuleRecords[api]
+                       : (moduleRecordsMap[api] || []);
       var mwOpts;
       if (records.length === 0) {
         mwOpts = '<li class="bp-dd-empty">No records found</li>';
@@ -3631,6 +3645,11 @@ $(function () {
         var isLeave   = (label || '').toLowerCase() === 'leave';
         $grid.find('.bp-slots-table').toggle(isWorking);
         $grid.find('.bp-leave-type-field').toggle(isLeave);
+        /* Show Filter button only when Working; hide and close panel otherwise */
+        $grid.find('.bp-filter-action').toggle(isWorking);
+        if (!isWorking) {
+          closeFilterPanel();
+        }
         if (!isLeave) {
           /* Reset Leave Type selection when switching away from Leave */
           $grid.find('[data-field="leave-type"] .bp-dd-val').text('Select\u2026');
@@ -3643,6 +3662,137 @@ $(function () {
       if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length) {
         closeAllBpDropdowns();
       }
+      /* Close open filter-panel multi-selects when clicking outside */
+      if (!$(e.target).closest('#bpFilterBody .bpf-ms-wrap').length) {
+        $('#bpFilterBody .bpf-ms-wrap').removeClass('bpf-ms-open');
+      }
+    });
+
+    /* ── Filter Panel event handlers ── */
+
+    /* Open filter panel when Filter button is clicked */
+    $(document).on('click', '#bpFilterBtn', function (e) {
+      e.stopPropagation();
+      openFilterPanel();
+    });
+
+    /* Close filter panel: close button or backdrop click */
+    $(document).on('click', '#bpFilterClose, #bpFilterBackdrop', function () {
+      closeFilterPanel();
+    });
+
+    /* Apply filters */
+    $(document).on('click', '#bpFilterApply', function () {
+      applyActiveFilters();
+      closeFilterPanel();
+    });
+
+    /* Clear all filters and filtered records */
+    $(document).on('click', '#bpFilterClear', function () {
+      activeModuleFilters   = {};
+      filteredModuleRecords = {};
+      updateFilterBadge();
+      closeFilterPanel();
+    });
+
+    /* Multi-select trigger: toggle open/closed */
+    $(document).on('click', '#bpFilterBody .bpf-ms-trigger', function (e) {
+      e.stopPropagation();
+      var $wrap  = $(this).closest('.bpf-ms-wrap');
+      var isOpen = $wrap.hasClass('bpf-ms-open');
+      /* Close all other open multi-selects first */
+      $('#bpFilterBody .bpf-ms-wrap').removeClass('bpf-ms-open');
+      if (!isOpen) {
+        $wrap.addClass('bpf-ms-open');
+        $wrap.find('.bpf-ms-search').val('').focus();
+        $wrap.find('.bpf-ms-opt').show();
+      }
+    });
+
+    /* Prevent panel inner clicks from bubbling up (would close the panel) */
+    $(document).on('click', '#bpFilterBody .bpf-ms-panel', function (e) {
+      e.stopPropagation();
+    });
+
+    /* Live search within a multi-select panel */
+    $(document).on('input', '#bpFilterBody .bpf-ms-search', function () {
+      var q   = $(this).val().toLowerCase();
+      $(this).closest('.bpf-ms-panel').find('.bpf-ms-opt').each(function () {
+        $(this).toggle(String($(this).data('value')).toLowerCase().indexOf(q) !== -1);
+      });
+    });
+
+    /* Toggle individual option */
+    $(document).on('click', '#bpFilterBody .bpf-ms-opt', function (e) {
+      e.stopPropagation();
+      var $opt     = $(this);
+      var modApi   = String($opt.data('module')  || '');
+      var fieldApi = String($opt.data('field')   || '');
+      var value    = String($opt.data('value')   || '');
+      if (!activeModuleFilters[modApi])           { activeModuleFilters[modApi] = {}; }
+      if (!activeModuleFilters[modApi][fieldApi]) { activeModuleFilters[modApi][fieldApi] = []; }
+      var arr = activeModuleFilters[modApi][fieldApi];
+      var idx = arr.indexOf(value);
+      var nowChecked;
+      if (idx === -1) {
+        arr.push(value);
+        nowChecked = true;
+      } else {
+        arr.splice(idx, 1);
+        nowChecked = false;
+        if (arr.length === 0) { delete activeModuleFilters[modApi][fieldApi]; }
+        if (Object.keys(activeModuleFilters[modApi]).length === 0) { delete activeModuleFilters[modApi]; }
+      }
+      $opt.find('input[type="checkbox"]').prop('checked', nowChecked);
+      refreshMsWrapTrigger($opt.closest('.bpf-ms-wrap'));
+    });
+
+    /* Chip remove button */
+    $(document).on('click', '#bpFilterBody .bpf-ms-chip-rm', function (e) {
+      e.stopPropagation();
+      var $chip    = $(this).closest('.bpf-ms-chip');
+      var modApi   = String($chip.data('module') || '');
+      var fieldApi = String($chip.data('field')  || '');
+      var value    = String($chip.data('value')  || '');
+      removeFromActiveFilter(modApi, fieldApi, value);
+      var $wrap = $(this).closest('.bpf-ms-wrap');
+      /* Uncheck the corresponding option */
+      $wrap.find('.bpf-ms-opt[data-value="' + value + '"] input[type="checkbox"]').prop('checked', false);
+      refreshMsWrapTrigger($wrap);
+    });
+
+    /* Select All (visible options) */
+    $(document).on('click', '#bpFilterBody .bpf-ms-sel-all', function (e) {
+      e.stopPropagation();
+      var $btn     = $(this);
+      var modApi   = String($btn.data('module') || '');
+      var fieldApi = String($btn.data('field')  || '');
+      var $wrap    = $btn.closest('.bpf-ms-wrap');
+      if (!activeModuleFilters[modApi])           { activeModuleFilters[modApi] = {}; }
+      if (!activeModuleFilters[modApi][fieldApi]) { activeModuleFilters[modApi][fieldApi] = []; }
+      $wrap.find('.bpf-ms-opt:visible').each(function () {
+        var v = String($(this).data('value') || '');
+        if (activeModuleFilters[modApi][fieldApi].indexOf(v) === -1) {
+          activeModuleFilters[modApi][fieldApi].push(v);
+        }
+        $(this).find('input[type="checkbox"]').prop('checked', true);
+      });
+      refreshMsWrapTrigger($wrap);
+    });
+
+    /* Clear All for a single field */
+    $(document).on('click', '#bpFilterBody .bpf-ms-clr-all', function (e) {
+      e.stopPropagation();
+      var $btn     = $(this);
+      var modApi   = String($btn.data('module') || '');
+      var fieldApi = String($btn.data('field')  || '');
+      var $wrap    = $btn.closest('.bpf-ms-wrap');
+      if (activeModuleFilters[modApi]) {
+        delete activeModuleFilters[modApi][fieldApi];
+        if (Object.keys(activeModuleFilters[modApi]).length === 0) { delete activeModuleFilters[modApi]; }
+      }
+      $wrap.find('.bpf-ms-opt input[type="checkbox"]').prop('checked', false);
+      refreshMsWrapTrigger($wrap);
     });
 
     /* Reposition any open beat-plan panel when the modal body scrolls */
@@ -3900,6 +4050,244 @@ $(function () {
     } catch (e) {
       bprPicklistFields = [];
     }
+  }
+
+  /**
+   * Fetch picklist fields for ALL modules in beatPlanModulesList and cache
+   * them in modulePicklistMeta.  Called once after beatPlanModulesList is built.
+   * Results are cached so subsequent filter-panel opens are instant.
+   */
+  function fetchAllModulePicklistMeta() {
+    beatPlanModulesList.forEach(function (mod) {
+      if (!mod.api) { return; }
+      if (modulePicklistMeta.hasOwnProperty(mod.api)) { return; } /* already fetched */
+      /* Mark as loading (null = pending) */
+      modulePicklistMeta[mod.api] = null;
+      zrc.get('/crm/v8/settings/fields?module=' + encodeURIComponent(mod.api) + '&type=all')
+        .then(function (resp) {
+          var allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
+          var picklistFields = [];
+          allFields.forEach(function (f) {
+            if (f.data_type !== 'picklist' && f.data_type !== 'pick_list') { return; }
+            var options = [];
+            if (f.pick_list_values && f.pick_list_values.length) {
+              f.pick_list_values.forEach(function (pv) {
+                var display = pv.display_value || pv.actual_value || '';
+                if (display) { options.push(display); }
+              });
+            }
+            if (options.length > 0) {
+              picklistFields.push({
+                api_name:    f.api_name    || '',
+                field_label: f.field_label || '',
+                options:     options
+              });
+            }
+          });
+          modulePicklistMeta[mod.api] = picklistFields;
+        })
+        .catch(function () {
+          modulePicklistMeta[mod.api] = [];
+        });
+    });
+  }
+
+  /* ── Filter Panel helpers ── */
+
+  /** Open the filter panel and render its current content. */
+  function openFilterPanel() {
+    renderFilterPanelContent();
+    $('#bpFilterOverlay').addClass('bpf-open');
+  }
+
+  /** Close the filter panel and collapse any open multi-select inside it. */
+  function closeFilterPanel() {
+    $('#bpFilterOverlay').removeClass('bpf-open');
+    $('#bpFilterBody .bpf-ms-wrap').removeClass('bpf-ms-open');
+  }
+
+  /** Render the filter panel body from cached modulePicklistMeta. */
+  function renderFilterPanelContent() {
+    var $body = $('#bpFilterBody');
+    if (!beatPlanModulesList || beatPlanModulesList.length === 0) {
+      $body.html('<p class="bpf-loading">No modules configured.</p>');
+      return;
+    }
+    var html = '';
+    beatPlanModulesList.forEach(function (mod) {
+      var fields = modulePicklistMeta.hasOwnProperty(mod.api) ? modulePicklistMeta[mod.api] : null;
+      html += '<div class="bpf-mod-group">';
+      html += '<h4 class="bpf-mod-name">' + escHtml(mod.label) + '</h4>';
+      if (fields === null) {
+        html += '<p class="bpf-loading">Loading fields\u2026</p>';
+      } else if (fields.length === 0) {
+        html += '<p class="bpf-no-fields">No picklist fields available.</p>';
+      } else {
+        fields.forEach(function (f) {
+          var selectedVals = (activeModuleFilters[mod.api] && activeModuleFilters[mod.api][f.api_name]) || [];
+          html += buildFilterMultiSelect(mod.api, f, selectedVals);
+        });
+      }
+      html += '</div>';
+    });
+    $body.html(html);
+  }
+
+  /**
+   * Build the HTML for one multi-select dropdown for a picklist field in the
+   * filter panel.  Selected values are shown as removable chips in the trigger.
+   */
+  function buildFilterMultiSelect(modApi, field, selectedVals) {
+    var chevSvg = '<svg class="bpf-ms-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+    var chipsHtml = '';
+    selectedVals.forEach(function (v) {
+      chipsHtml += '<span class="bpf-ms-chip" data-module="' + escHtml(modApi) +
+                   '" data-field="' + escHtml(field.api_name) +
+                   '" data-value="' + escHtml(v) + '">' +
+                   escHtml(v) +
+                   '<span class="bpf-ms-chip-rm" role="button" aria-label="Remove ' + escHtml(v) + '">\u00d7</span>' +
+                   '</span>';
+    });
+    var placeholder = selectedVals.length === 0 ? '<span class="bpf-ms-placeholder">Select\u2026</span>' : '';
+    var optsHtml = '';
+    field.options.forEach(function (opt) {
+      var checked = selectedVals.indexOf(opt) !== -1;
+      optsHtml += '<li class="bpf-ms-opt" data-module="' + escHtml(modApi) +
+                  '" data-field="' + escHtml(field.api_name) +
+                  '" data-value="' + escHtml(opt) + '">' +
+                  '<input type="checkbox"' + (checked ? ' checked' : '') + ' tabindex="-1" />' +
+                  escHtml(opt) +
+                  '</li>';
+    });
+    return '<div class="bpf-field-row">' +
+           '<span class="bpf-field-label">' + escHtml(field.field_label) + '</span>' +
+           '<div class="bpf-ms-wrap" data-module="' + escHtml(modApi) + '" data-field="' + escHtml(field.api_name) + '">' +
+           '<div class="bpf-ms-trigger" tabindex="0">' +
+           chipsHtml + placeholder + chevSvg +
+           '</div>' +
+           '<div class="bpf-ms-panel">' +
+           '<div class="bpf-ms-panel-head">' +
+           '<input class="bpf-ms-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+           '<button class="bpf-ms-panel-act bpf-ms-sel-all" type="button" ' +
+           'data-module="' + escHtml(modApi) + '" data-field="' + escHtml(field.api_name) + '">All</button>' +
+           '<button class="bpf-ms-panel-act bpf-ms-clr-all" type="button" ' +
+           'data-module="' + escHtml(modApi) + '" data-field="' + escHtml(field.api_name) + '">Clear</button>' +
+           '</div>' +
+           '<ul class="bpf-ms-list">' + optsHtml + '</ul>' +
+           '</div>' +
+           '</div>' +
+           '</div>';
+  }
+
+  /**
+   * Refresh the chips and placeholder inside a .bpf-ms-trigger based on the
+   * current activeModuleFilters state for that wrap's module/field.
+   */
+  function refreshMsWrapTrigger($wrap) {
+    var modApi   = String($wrap.data('module')  || '');
+    var fieldApi = String($wrap.data('field')   || '');
+    var selectedVals = (activeModuleFilters[modApi] && activeModuleFilters[modApi][fieldApi]) || [];
+    var $trigger = $wrap.find('.bpf-ms-trigger');
+    /* Remove existing chips + placeholder (preserve chev) */
+    $trigger.find('.bpf-ms-chip, .bpf-ms-placeholder').remove();
+    var $chev = $trigger.find('.bpf-ms-chev');
+    if (selectedVals.length > 0) {
+      var chipsHtml = '';
+      selectedVals.forEach(function (v) {
+        chipsHtml += '<span class="bpf-ms-chip" data-module="' + escHtml(modApi) +
+                     '" data-field="' + escHtml(fieldApi) +
+                     '" data-value="' + escHtml(v) + '">' +
+                     escHtml(v) +
+                     '<span class="bpf-ms-chip-rm" role="button" aria-label="Remove ' + escHtml(v) + '">\u00d7</span>' +
+                     '</span>';
+      });
+      $chev.before(chipsHtml);
+    } else {
+      $chev.before('<span class="bpf-ms-placeholder">Select\u2026</span>');
+    }
+  }
+
+  /** Remove a single value from activeModuleFilters, cleaning up empty objects. */
+  function removeFromActiveFilter(modApi, fieldApi, value) {
+    if (!activeModuleFilters[modApi] || !activeModuleFilters[modApi][fieldApi]) { return; }
+    var arr = activeModuleFilters[modApi][fieldApi];
+    var idx = arr.indexOf(value);
+    if (idx !== -1) {
+      arr.splice(idx, 1);
+      if (arr.length === 0) { delete activeModuleFilters[modApi][fieldApi]; }
+      if (Object.keys(activeModuleFilters[modApi]).length === 0) { delete activeModuleFilters[modApi]; }
+    }
+  }
+
+  /** Update the badge count on the Filter button to reflect active filter count. */
+  function updateFilterBadge() {
+    var count = 0;
+    Object.keys(activeModuleFilters).forEach(function (mod) {
+      Object.keys(activeModuleFilters[mod]).forEach(function () { count++; });
+    });
+    var $btn = $('#bpFilterBtn');
+    $btn.find('.bp-filter-btn-badge').remove();
+    if (count > 0) {
+      $btn.addClass('bp-filter-btn--active')
+          .append('<span class="bp-filter-btn-badge">' + count + '</span>');
+    } else {
+      $btn.removeClass('bp-filter-btn--active');
+    }
+  }
+
+  /**
+   * Apply the current activeModuleFilters: fetch filtered records for each
+   * module that has filter values set; clear filteredModuleRecords for modules
+   * whose filters were removed.
+   */
+  function applyActiveFilters() {
+    updateFilterBadge();
+    beatPlanModulesList.forEach(function (mod) {
+      var modFilters = activeModuleFilters[mod.api];
+      if (!modFilters || Object.keys(modFilters).length === 0) {
+        /* No active filters for this module – revert to full unfiltered list */
+        delete filteredModuleRecords[mod.api];
+        return;
+      }
+      /* Build a ZOHO CRM criteria string: ((field:equals:val1)or(field:equals:val2))and((...)) */
+      var fieldParts = [];
+      Object.keys(modFilters).forEach(function (fieldApi) {
+        var vals = modFilters[fieldApi];
+        if (!vals || vals.length === 0) { return; }
+        var orParts = vals.map(function (v) {
+          return '(' + fieldApi + ':equals:' + v + ')';
+        }).join('or');
+        fieldParts.push('(' + orParts + ')');
+      });
+      if (fieldParts.length === 0) {
+        delete filteredModuleRecords[mod.api];
+        return;
+      }
+      var criteria = fieldParts.join('and');
+      ZOHO.CRM.API.searchRecord({
+        Entity:   mod.api,
+        Type:     'criteria',
+        Query:    criteria,
+        page:     1,
+        per_page: 200
+      }).then(function (data) {
+        if (data && data.data) {
+          filteredModuleRecords[mod.api] = data.data.map(function (rec) {
+            return {
+              id:       rec.id,
+              name:     recordDisplayName(rec),
+              photo_id: rec['$photo_id'] || ''
+            };
+          });
+        } else {
+          filteredModuleRecords[mod.api] = [];
+        }
+      }).catch(function () {
+        filteredModuleRecords[mod.api] = [];
+      });
+    });
   }
 
 
@@ -4452,6 +4840,9 @@ $(function () {
       /* Fetch all picklist fields from beatplanner__Beat_Plan_References metadata in the
          background so they are ready before the user first opens the slot picker. */
       fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+
+      /* Pre-fetch picklist metadata for ALL modules so the Filter panel opens instantly. */
+      fetchAllModulePicklistMeta();
     }
 
     var response = await zrc.get('/crm/v8/settings/modules');
