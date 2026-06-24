@@ -3729,7 +3729,8 @@ input, select, textarea {
    BEAT PLAN SLOT TABLE  (shown inside the slot-picker when
    beatplanner__Beat_Plan_References has data)
 ══════════════════════════════════════════════════════════ */
-/* Outer container — spans all grid columns and stacks attend-bar above the table */
+/* Outer container — spans all grid columns (requires the parent .time-slot-grid to be a
+   CSS grid, which is the case for #slotPickerGrid) and stacks attend-bar above the table */
 .bp-plan-container {
   width: 100%;
   grid-column: 1 / -1;
@@ -3894,7 +3895,9 @@ input, select, textarea {
   padding: 10px 10px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-  /* Prevent the attend-bar from being clipped by the scroll container */
+  /* z-index: 2 ensures attend-bar sits above z-index:1 sticky <th> cells so that
+     dropdown panels (which are promoted to position:fixed via positionBpPanel) paint
+     correctly when the table header scrolls beneath the bar */
   position: relative;
   z-index: 2;
 }
