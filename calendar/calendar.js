@@ -1169,6 +1169,7 @@ $(function () {
       }
       /* Beat plan mode: table with all slots + Meetings For + Meeting With dropdowns */
       dom.slotPickerGrid.html(buildBeatPlanTable(date));
+      updateFilterBadge();
       dom.modal.find('.modal-box').addClass('modal-box--wide');
     } else {
       /* Standard mode: clickable slot buttons, 1-hour intervals 00:00 – 23:00 */
@@ -3795,6 +3796,22 @@ $(function () {
       refreshMsWrapTrigger($wrap);
     });
 
+    /* Accordion: toggle a module section open/closed on header click or Enter/Space */
+    $(document).on('click keydown', '#bpFilterBody .bpf-mod-name', function (e) {
+      if (e.type === 'keydown' && e.which !== 13 && e.which !== 32) { return; }
+      if (e.type === 'keydown') { e.preventDefault(); }
+      var $header = $(this);
+      var $fields = $header.next('.bpf-mod-fields');
+      var isOpen  = $header.hasClass('bpf-acc-open');
+      $header.toggleClass('bpf-acc-open', !isOpen)
+             .attr('aria-expanded', String(!isOpen));
+      if (isOpen) {
+        $fields.slideUp(200);
+      } else {
+        $fields.slideDown(200);
+      }
+    });
+
     /* Reposition any open beat-plan panel when the modal body scrolls */
     $('#eventModal .modal-body').on('scroll.bpdd', function () {
       var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
@@ -4113,11 +4130,16 @@ $(function () {
       $body.html('<p class="bpf-loading">No modules configured.</p>');
       return;
     }
+    var accChevSvg = '<svg class="bpf-acc-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                     'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                     '<path d="M1 1l4 4 4-4"/></svg>';
     var html = '';
     beatPlanModulesList.forEach(function (mod) {
       var fields = modulePicklistMeta.hasOwnProperty(mod.api) ? modulePicklistMeta[mod.api] : null;
       html += '<div class="bpf-mod-group">';
-      html += '<h4 class="bpf-mod-name">' + escHtml(mod.label) + '</h4>';
+      html += '<h4 class="bpf-mod-name" role="button" tabindex="0" aria-expanded="false">' +
+              escHtml(mod.label) + accChevSvg + '</h4>';
+      html += '<div class="bpf-mod-fields">';
       if (fields === null) {
         html += '<p class="bpf-loading">Loading fields\u2026</p>';
       } else if (fields.length === 0) {
@@ -4128,6 +4150,7 @@ $(function () {
           html += buildFilterMultiSelect(mod.api, f, selectedVals);
         });
       }
+      html += '</div>';
       html += '</div>';
     });
     $body.html(html);

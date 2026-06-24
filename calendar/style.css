@@ -4134,7 +4134,7 @@ input, select, textarea {
 
 /* Module group */
 .bpf-mod-group {
-  margin-bottom: 20px;
+  margin-bottom: 4px;
 }
 .bpf-mod-name {
   font-size: 11px;
@@ -4142,9 +4142,49 @@ input, select, textarea {
   letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--text-secondary);
-  margin: 0 0 8px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--surface-2, #f5f7fa);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  transition: background .12s, color .12s;
+}
+.bpf-mod-name:hover {
+  background: var(--z-blue-pale, #E8F0FE);
+  color: var(--accent, #1565C0);
+}
+.bpf-mod-name.bpf-acc-open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+  background: var(--z-blue-pale, #E8F0FE);
+  color: var(--accent, #1565C0);
+}
+.bpf-acc-chev {
+  width: 10px;
+  height: 6px;
+  flex-shrink: 0;
+  color: currentColor;
+  transition: transform .18s;
+  pointer-events: none;
+}
+.bpf-mod-name.bpf-acc-open .bpf-acc-chev {
+  transform: rotate(180deg);
+}
+.bpf-mod-fields {
+  display: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-bottom-left-radius: var(--radius-sm, 4px);
+  border-bottom-right-radius: var(--radius-sm, 4px);
+  padding: 12px 12px 4px;
+  margin-bottom: 0;
 }
 .bpf-field-row {
   margin-bottom: 10px;
