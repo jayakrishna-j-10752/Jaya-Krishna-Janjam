@@ -1225,7 +1225,7 @@ $(function () {
          - Managers Approval, Record Status, Currency, Unsubscribed Mode → excluded entirely
          - Everything else → rendered as dynamic table columns
     ── */
-    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode'];
+    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for'];
     var tablePicklistCols = [];
     var attendanceField   = null;
     var leaveTypeField    = null;
@@ -1240,13 +1240,16 @@ $(function () {
       });
     }
 
-    /* Build an <li> option list from an array of value strings */
+    /* Build an <li> option list from an array of {display, actual} objects or strings */
     function buildOptList(opts) {
       if (!opts || !opts.length) {
         return '<li class="bp-dd-empty">No options available</li>';
       }
       return opts.map(function (v) {
-        return '<li class="bp-dd-opt" data-label="' + escHtml(v) + '">' + escHtml(v) + '</li>';
+        var display = (typeof v === 'object') ? v.display : v;
+        var actual  = (typeof v === 'object') ? v.actual  : v;
+        return '<li class="bp-dd-opt" data-label="' + escHtml(display) +
+               '" data-actual="' + escHtml(actual) + '">' + escHtml(display) + '</li>';
       }).join('');
     }
 
@@ -3599,8 +3602,9 @@ $(function () {
       var $wrap  = $opt.closest('.bp-dd-wrap');
       var field  = $wrap.data('field');
       var label  = $opt.data('label');
+      var actual = $opt.data('actual') || label;
 
-      $wrap.find('.bp-dd-val').text(label);
+      $wrap.find('.bp-dd-val').text(label).attr('data-actual-val', actual);
       closeBpDropdown($wrap);
 
       /* Attendance controls table / Leave Type visibility */
@@ -3849,13 +3853,13 @@ $(function () {
   }
 
   /**
-   * Fetch all picklist fields from beatplanner__Beat_Plan_References metadata.
+   * Fetch all picklist fields from beatplanner__Daily_Beat_Plans metadata.
    * The result is cached in bprPicklistFields so only one API call is made per session.
-   * Each entry: { api_name, field_label, options: [string, …] }
+   * Each entry: { api_name, field_label, options: [{display, actual}, …] }
    */
   async function fetchBprPicklistFields() {
     try {
-      var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Beat_Plan_References&type=all');
+      var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Daily_Beat_Plans&type=all');
       var allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
 
       bprPicklistFields = [];
@@ -3864,7 +3868,9 @@ $(function () {
         var options = [];
         if (f.pick_list_values && f.pick_list_values.length) {
           options = f.pick_list_values.map(function (pv) {
-            return pv.display_value || pv.actual_value || String(pv);
+            var display = pv.display_value || pv.actual_value || '';
+            var actual  = pv.actual_value  || pv.display_value || '';
+            return display ? { display: display, actual: actual } : null;
           }).filter(Boolean);
         }
         bprPicklistFields.push({
