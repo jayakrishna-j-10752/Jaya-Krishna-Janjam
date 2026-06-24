@@ -3575,7 +3575,7 @@ $(function () {
           var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
           var fieldLbl   = (f.field_label || '').toLowerCase();
           if (modApiName === api || fieldLbl === label.toLowerCase()) {
-            lookupApiName = f.lookup.api_name || '';
+            lookupApiName = modApiName;
             break;
           }
         }
