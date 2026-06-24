@@ -3841,7 +3841,7 @@ input, select, textarea {
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  z-index: 10000;
+  z-index: 2100;
   overflow: hidden;
 }
 .bp-dd-wrap.bp-dd-open .bp-dd-panel {

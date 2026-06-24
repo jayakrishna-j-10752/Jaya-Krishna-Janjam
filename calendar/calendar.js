@@ -1442,7 +1442,7 @@ $(function () {
       width:     rect.width + 'px',
       left:      (rect.left  - offsetLeft) + 'px',
       right:     'auto',
-      'z-index': 10000
+      'z-index': 2100
     });
 
     if (below >= 80) {
