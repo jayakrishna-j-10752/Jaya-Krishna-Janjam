@@ -1198,6 +1198,13 @@ $(function () {
     dom.eventFormFoot.hide();
 
     dom.modal.addClass('modal-open');
+    /* After the open animation (0.24 s) finishes, clear the CSS transform on
+       .modal-box.  While a transform is set (even the identity matrix produced
+       by translateY(0) scale(1)), the element becomes the containing block for
+       any position:fixed descendants, which also makes overflow:hidden clip
+       those descendants.  Setting transform:none releases that containment so
+       .bp-dd-panel escapes the modal boundary and is never clipped. */
+    setTimeout(function () { dom.modal.find('.modal-box').css('transform', 'none'); }, 260);
   }
 
   /**
@@ -1396,6 +1403,14 @@ $(function () {
    * by overflow containers (modal-body, bp-slots-wrap, modal-box).
    * The panel opens below the trigger when there is enough viewport space,
    * and above it otherwise.
+   *
+   * NOTE: .modal-box has its CSS transform cleared to 'none' after the open
+   * animation finishes (see openSlotPicker).  With transform:none the element
+   * is no longer the containing block for position:fixed descendants, so the
+   * panel positions against the real viewport and is not clipped by
+   * overflow:hidden on the modal.  The offset-correction block below acts as a
+   * safety-net for the brief (~260 ms) window while the animation is still
+   * running and the transform is still active.
    */
   function positionBpPanel($wrap) {
     var triggerEl = $wrap.find('.bp-dd-trigger')[0];
@@ -1405,12 +1420,9 @@ $(function () {
     var vpH   = window.innerHeight;
     var below = vpH - rect.bottom;
 
-    /* When an ancestor has a CSS transform it becomes the containing block
-       for position:fixed descendants (CSS spec).  .modal-box carries a
-       transform for its open/close animation, so fixed coords are relative
-       to its padding-box rather than the viewport.  Detect this and subtract
-       the ancestor's padding-box origin so the panel lands exactly below the
-       trigger regardless of where the modal sits on screen. */
+    /* Safety-net: if .modal-box still carries an active transform (during the
+       brief open animation), position:fixed is relative to the modal's
+       padding-box rather than the viewport.  Detect and compensate. */
     var offsetTop    = 0;
     var offsetLeft   = 0;
     var offsetBottom = vpH;
@@ -1428,9 +1440,9 @@ $(function () {
     $panel.css({
       position:  'fixed',
       width:     rect.width + 'px',
-      left:      (rect.left   - offsetLeft) + 'px',
+      left:      (rect.left  - offsetLeft) + 'px',
       right:     'auto',
-      'z-index': 9999
+      'z-index': 10000
     });
 
     if (below >= 80) {
@@ -1472,6 +1484,11 @@ $(function () {
 
   function closeSlotPicker() {
     closeAllBpDropdowns();
+    /* Restore the CSS-driven transform so the close animation can play.
+       The inline 'none' we set after opening must be cleared first, otherwise
+       the box stays flat and the scale-down / translateY exit transition is
+       skipped. */
+    dom.modal.find('.modal-box').css('transform', '');
     dom.modal.removeClass('modal-open');
     /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
     setTimeout(function () {

@@ -1138,7 +1138,7 @@ input, select, textarea {
   transition: transform .24s cubic-bezier(.4,0,.2,1);
 }
 .modal-box--wide {
-  width: min(780px, 96vw);
+  width: 96vw;
 }
 .modal-backdrop.modal-open .modal-box {
   transform: translateY(0) scale(1);
@@ -1181,6 +1181,7 @@ input, select, textarea {
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
+  overflow-x: auto;
   flex: 1;
   min-height: 0;
 }
@@ -3840,7 +3841,7 @@ input, select, textarea {
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  z-index: 200;
+  z-index: 10000;
   overflow: hidden;
 }
 .bp-dd-wrap.bp-dd-open .bp-dd-panel {
