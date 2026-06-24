@@ -4231,7 +4231,7 @@ $(function () {
       html += '<div class="bpf-mod-group" data-module="' + escHtml(mod.api) + '">';
       html += '<h4 class="bpf-mod-name" role="button" tabindex="0" aria-expanded="false">' +
               escHtml(mod.label) +
-              '<span class="bpf-mod-name-right">' + countBadge + accChevSvg + '</span>' +
+              '<span class="bpf-mod-header-right">' + countBadge + accChevSvg + '</span>' +
               '</h4>';
       html += '<div class="bpf-mod-fields">';
       if (fields === null) {

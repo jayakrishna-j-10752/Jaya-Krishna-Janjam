@@ -4158,7 +4158,7 @@ input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent, #1565C0);
+  background: var(--z-blue, #1565C0);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -4171,7 +4171,7 @@ input, select, textarea {
   text-transform: none;
   letter-spacing: 0;
 }
-.bpf-mod-name-right {
+.bpf-mod-header-right {
   display: flex;
   align-items: center;
   flex-shrink: 0;
