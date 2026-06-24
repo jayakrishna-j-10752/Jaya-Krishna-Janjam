@@ -2403,6 +2403,7 @@ $(function () {
   var beatPlanModulesList = [];     /* [{label: 'Leads', api: 'Leads'}, …] */
   var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
   var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
+  var bpDailyAllFields    = [];     /* all fields from beatplanner__Daily_Beat_Plans (including lookups) */
 
   /* ── Filter Panel state ── */
   var modulePicklistMeta    = {};  /* {moduleName: [{api_name, field_label, options}]} – per-module picklist fields */
@@ -3565,8 +3566,29 @@ $(function () {
       $wrap.find('.bp-dd-val').text(label).attr('data-selected-api', api);
       closeBpDropdown($wrap);
 
+      /* Find the lookup field in beatplanner__Daily_Beat_Plans whose lookup.module.api_name
+         matches the selected module, and stamp its api_name onto the Meeting With wrap */
+      var lookupApiName = '';
+      for (var i = 0; i < bpDailyAllFields.length; i++) {
+        var f = bpDailyAllFields[i];
+        if (f.data_type === 'lookup' && f.lookup && f.lookup.module) {
+          var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
+          var fieldLbl   = (f.field_label || '').toLowerCase();
+          if (modApiName === api || fieldLbl === label.toLowerCase()) {
+            lookupApiName = f.lookup.api_name || '';
+            break;
+          }
+        }
+      }
+
       /* Populate the "Meeting With" dropdown for this row */
       var $mwWrap  = $row.find('[data-field="meeting-with"]');
+      /* Stamp the resolved lookup field API name so it can be used when saving records */
+      if (lookupApiName) {
+        $mwWrap.attr('data-lookup-api', lookupApiName);
+      } else {
+        $mwWrap.removeAttr('data-lookup-api');
+      }
       /* Use filtered records if a filter has been applied for this module; fall back to full list */
       var records  = filteredModuleRecords.hasOwnProperty(api)
                        ? filteredModuleRecords[api]
@@ -4056,6 +4078,9 @@ $(function () {
       var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Daily_Beat_Plans&type=all');
       var allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
 
+      /* Cache the full field list (used for lookup resolution) */
+      bpDailyAllFields = allFields;
+
       bprPicklistFields = [];
       allFields.forEach(function (f) {
         if (f.data_type !== 'picklist' && f.data_type !== 'pick_list') { return; }
@@ -4075,6 +4100,7 @@ $(function () {
       });
     } catch (e) {
       bprPicklistFields = [];
+      bpDailyAllFields  = [];
     }
   }
 
