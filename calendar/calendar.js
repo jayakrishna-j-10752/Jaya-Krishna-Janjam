@@ -1152,7 +1152,7 @@ $(function () {
    * Renders all 24 hourly slots as a grid inside the modal body.
    * Taken slots are shown but disabled.
    */
-  function openSlotPicker(date) {
+  async function openSlotPicker(date) {
     /* Ensure no stale open beat-plan dropdown leaks into the new view */
     closeAllBpDropdowns();
 
@@ -1163,6 +1163,10 @@ $(function () {
     dom.modalHeading.text(heading);
 
     if (beatPlanHasRefs) {
+      /* Ensure BPR picklist fields are loaded before building the table */
+      if (bprPicklistFields === null) {
+        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+      }
       /* Beat plan mode: table with all slots + Meetings For + Meeting With dropdowns */
       dom.slotPickerGrid.html(buildBeatPlanTable(date));
       dom.modal.find('.modal-box').addClass('modal-box--wide');
@@ -1218,9 +1222,10 @@ $(function () {
     /* ── Separate BPR picklist fields:
          - Attendance  → shown at top, controls table visibility
          - Leave Type  → shown at top, visible only when Attendance = "Leave"
-         - Managers Approval → excluded entirely
+         - Managers Approval, Record Status, Currency, Unsubscribed Mode → excluded entirely
          - Everything else → rendered as dynamic table columns
     ── */
+    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode'];
     var tablePicklistCols = [];
     var attendanceField   = null;
     var leaveTypeField    = null;
@@ -1228,7 +1233,7 @@ $(function () {
     if (bprPicklistFields && bprPicklistFields.length) {
       bprPicklistFields.forEach(function (f) {
         var lbl = (f.field_label || '').toLowerCase().trim();
-        if (lbl === 'managers approval') { return; }
+        if (HIDDEN_BPR_LABELS.indexOf(lbl) !== -1) { return; }
         if (lbl === 'attendance')        { attendanceField = f; return; }
         if (lbl === 'leave type')        { leaveTypeField  = f; return; }
         tablePicklistCols.push(f);
@@ -3855,7 +3860,7 @@ $(function () {
 
       bprPicklistFields = [];
       allFields.forEach(function (f) {
-        if (f.data_type !== 'picklist') { return; }
+        if (f.data_type !== 'picklist' && f.data_type !== 'pick_list') { return; }
         var options = [];
         if (f.pick_list_values && f.pick_list_values.length) {
           options = f.pick_list_values.map(function (pv) {
