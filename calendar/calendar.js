@@ -4175,7 +4175,7 @@ $(function () {
 
   /**
    * Update the per-module active filter count badges inside each .bpf-mod-name.
-   * Counts the total number of individually selected values for that module.
+   * Counts the number of .bpf-ms-trigger elements that have at least one selection.
    */
   function updateModuleCountBadges() {
     $('#bpFilterBody .bpf-mod-group').each(function () {
@@ -4183,7 +4183,9 @@ $(function () {
       var modApi  = String($group.data('module') || '');
       var $header = $group.find('.bpf-mod-name');
       if (!modApi || !$header.length) { return; }
-      var count = $group.find('.bpf-ms-opt input[type="checkbox"]:checked').length;
+      var count = $group.find('.bpf-ms-trigger').filter(function () {
+        return $(this).find('.bpf-ms-chip').length > 0;
+      }).length;
       var $badge = $header.find('.bpf-mod-count');
       if (count > 0) {
         if ($badge.length) {
@@ -4230,7 +4232,7 @@ $(function () {
       if (activeModuleFilters[mod.api]) {
         Object.keys(activeModuleFilters[mod.api]).forEach(function (fieldApi) {
           var vals = activeModuleFilters[mod.api][fieldApi];
-          if (vals && vals.length > 0) { modFilterCount += vals.length; }
+          if (vals && vals.length > 0) { modFilterCount += 1; }
         });
       }
       var countBadge = modFilterCount > 0
