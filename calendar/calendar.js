@@ -3668,6 +3668,7 @@ $(function () {
         $('#bpFilterBody .bpf-ms-wrap').each(function () {
           $(this).removeClass('bpf-ms-open');
           $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+          $(this).find('.bpf-ms-list').css('max-height', '');
         });
       }
     });
@@ -3708,6 +3709,7 @@ $(function () {
       $('#bpFilterBody .bpf-ms-wrap').each(function () {
         $(this).removeClass('bpf-ms-open');
         $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+        $(this).find('.bpf-ms-list').css('max-height', '');
       });
       if (!isOpen) {
         $wrap.addClass('bpf-ms-open');
@@ -4129,6 +4131,7 @@ $(function () {
     var rect  = triggerEl.getBoundingClientRect();
     var vpH   = window.innerHeight;
     var below = vpH - rect.bottom;
+    var above = rect.top;
 
     /* Same modal-box transform compensation used in positionBpPanel */
     var offsetTop    = 0;
@@ -4145,6 +4148,9 @@ $(function () {
       }
     }
 
+    var GAP = 3;
+    var PAD = 8;
+
     $panel.css({
       position:  'fixed',
       width:     rect.width + 'px',
@@ -4153,11 +4159,18 @@ $(function () {
       'z-index': 10000
     });
 
-    if (below >= 80) {
-      $panel.css({ top: (rect.bottom - offsetTop + 3) + 'px', bottom: '' });
+    /* Open toward whichever side has more room; clamp list height to fit. */
+    var availH;
+    if (below >= above) {
+      availH = below - GAP - PAD;
+      $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: 'auto' });
     } else {
-      $panel.css({ top: '', bottom: (offsetBottom - rect.top + 3) + 'px' });
+      availH = above - GAP - PAD - offsetTop;
+      $panel.css({ top: 'auto', bottom: (offsetBottom - rect.top + GAP) + 'px' });
     }
+    var headH    = ($panel.find('.bpf-ms-panel-head').outerHeight(true) || 38);
+    var maxListH = Math.max(60, availH - headH);
+    $panel.find('.bpf-ms-list').css('max-height', maxListH + 'px');
   }
 
   /**
@@ -4170,13 +4183,7 @@ $(function () {
       var modApi  = String($group.data('module') || '');
       var $header = $group.find('.bpf-mod-name');
       if (!modApi || !$header.length) { return; }
-      var count = 0;
-      if (activeModuleFilters[modApi]) {
-        Object.keys(activeModuleFilters[modApi]).forEach(function (fieldApi) {
-          var vals = activeModuleFilters[modApi][fieldApi];
-          if (vals && vals.length > 0) { count += vals.length; }
-        });
-      }
+      var count = $group.find('.bpf-ms-opt input[type="checkbox"]:checked').length;
       var $badge = $header.find('.bpf-mod-count');
       if (count > 0) {
         if ($badge.length) {
@@ -4202,6 +4209,7 @@ $(function () {
     $('#bpFilterBody .bpf-ms-wrap').each(function () {
       $(this).removeClass('bpf-ms-open');
       $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+      $(this).find('.bpf-ms-list').css('max-height', '');
     });
   }
 
