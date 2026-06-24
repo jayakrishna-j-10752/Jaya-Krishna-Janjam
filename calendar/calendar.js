@@ -1284,8 +1284,8 @@ $(function () {
     }
     attendBar += '</div>';
 
-    /* ── Table header ── */
-    var tableHtml = '<table class="bp-slots-table">';
+    /* ── Table header (hidden until Attendance = "Working") ── */
+    var tableHtml = '<table class="bp-slots-table" style="display:none;">';
     tableHtml += '<thead><tr>';
     tableHtml += '<th class="bp-th">Start Time</th>';
     tableHtml += '<th class="bp-th">End Time</th>';
@@ -1354,7 +1354,7 @@ $(function () {
 
     tableHtml += '</tbody></table>';
 
-    return '<div class="bp-slots-wrap">' + attendBar + tableHtml + '</div>';
+    return '<div class="bp-plan-container">' + attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
   }
 
   /**
@@ -3609,9 +3609,10 @@ $(function () {
 
       /* Attendance controls table / Leave Type visibility */
       if (field === 'attendance') {
-        var $grid   = $('#slotPickerGrid');
-        var isLeave = (label || '').toLowerCase() === 'leave';
-        $grid.find('.bp-slots-table').toggle(!isLeave);
+        var $grid     = $('#slotPickerGrid');
+        var isWorking = (label || '').toLowerCase() === 'working';
+        var isLeave   = (label || '').toLowerCase() === 'leave';
+        $grid.find('.bp-slots-table').toggle(isWorking);
         $grid.find('.bp-leave-type-field').toggle(isLeave);
         if (!isLeave) {
           /* Reset Leave Type selection when switching away from Leave */

@@ -3729,6 +3729,13 @@ input, select, textarea {
    BEAT PLAN SLOT TABLE  (shown inside the slot-picker when
    beatplanner__Beat_Plan_References has data)
 ══════════════════════════════════════════════════════════ */
+/* Outer container — spans all grid columns and stacks attend-bar above the table */
+.bp-plan-container {
+  width: 100%;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+}
 .bp-slots-wrap {
   width: 100%;
   overflow-x: auto;
@@ -3736,9 +3743,6 @@ input, select, textarea {
   max-height: 420px;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
-  /* When rendered inside the time-slot-grid, span every grid column so the
-     table is not constrained to a single 1fr cell. */
-  grid-column: 1 / -1;
 }
 .bp-slots-table {
   width: 100%;
@@ -3886,7 +3890,7 @@ input, select, textarea {
   font-style: italic;
 }
 
-/* ── Attendance / Leave Type bar (top-left of .bp-slots-wrap) ── */
+/* ── Attendance / Leave Type bar (above the scrollable table) ── */
 .bp-attend-bar {
   display: flex;
   flex-wrap: wrap;
@@ -3894,6 +3898,10 @@ input, select, textarea {
   gap: 12px;
   padding: 10px 10px 8px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  /* Prevent the attend-bar from being clipped by the scroll container */
+  position: relative;
+  z-index: 2;
 }
 .bp-attend-field {
   display: flex;
@@ -3943,17 +3951,6 @@ input, select, textarea {
 /* Silence the old tr-level rule so it no longer doubles up with the cell border */
 .bp-slot-row + .bp-slot-row {
   border-top: none;
-}
-
-/* ── Scroll-container fix: bp-slots-wrap owns only horizontal overflow.
-   overflow-y:clip does NOT establish a scroll container (unlike hidden/auto/scroll),
-   so position:sticky on <th> propagates up to modal-body (the true vertical scroller).
-   Fallback browsers that don't support 'clip' get overflow-y:auto which keeps the
-   table usable even though sticky may not work perfectly. */
-.bp-slots-wrap {
-  overflow-x: auto;
-  overflow-y: clip;
-  max-height: none;
 }
 
 /* ── Record avatar inside Meeting With trigger ── */
