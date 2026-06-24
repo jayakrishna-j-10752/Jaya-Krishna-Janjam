@@ -3886,6 +3886,30 @@ input, select, textarea {
   font-style: italic;
 }
 
+/* ── Attendance / Leave Type bar (top-left of .bp-slots-wrap) ── */
+.bp-attend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.bp-attend-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+.bp-attend-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* ── Dark / Night theme overrides ── */
 .theme-dark .bp-dd-trigger,
 .theme-night .bp-dd-trigger {

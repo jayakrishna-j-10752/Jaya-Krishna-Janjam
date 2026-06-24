@@ -1198,8 +1198,10 @@ $(function () {
 
   /**
    * Build the beat-plan slot table HTML for the given date.
-   * Renders 24 rows (one per hour) with auto-filled Start/End times and
-   * custom searchable dropdowns for "Meetings For" and "Meeting With".
+   * Renders 24 rows (one per hour) with auto-filled Start/End times,
+   * fixed Meetings For / Meeting With columns, and dynamically-built
+   * picklist columns sourced from beatplanner__Beat_Plan_References metadata.
+   * Attendance and Leave Type are shown at the top-left of the wrapper.
    */
   function buildBeatPlanTable(date) {
     var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
@@ -1213,85 +1215,138 @@ $(function () {
                    '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
     });
 
-    /* "Type of Meeting" options – populated from module metadata */
-    var tomOptions = '';
-    if (typeOfMeetingOpts && typeOfMeetingOpts.length) {
-      typeOfMeetingOpts.forEach(function (val) {
-        tomOptions += '<li class="bp-dd-opt" data-label="' + escHtml(val) + '">' + escHtml(val) + '</li>';
+    /* ── Separate BPR picklist fields:
+         - Attendance  → shown at top, controls table visibility
+         - Leave Type  → shown at top, visible only when Attendance = "Leave"
+         - Managers Approval → excluded entirely
+         - Everything else → rendered as dynamic table columns
+    ── */
+    var tablePicklistCols = [];
+    var attendanceField   = null;
+    var leaveTypeField    = null;
+
+    if (bprPicklistFields && bprPicklistFields.length) {
+      bprPicklistFields.forEach(function (f) {
+        var lbl = (f.field_label || '').toLowerCase().trim();
+        if (lbl === 'managers approval') { return; }
+        if (lbl === 'attendance')        { attendanceField = f; return; }
+        if (lbl === 'leave type')        { leaveTypeField  = f; return; }
+        tablePicklistCols.push(f);
       });
-    } else {
-      tomOptions = '<li class="bp-dd-empty">' +
-                   (typeOfMeetingOpts === null ? 'Loading…' : 'No options available') +
-                   '</li>';
     }
 
-    var html = '<div class="bp-slots-wrap">';
-    html += '<table class="bp-slots-table">';
-    html += '<thead><tr>';
-    html += '<th class="bp-th">Start Time</th>';
-    html += '<th class="bp-th">End Time</th>';
-    html += '<th class="bp-th">Meetings For</th>';
-    html += '<th class="bp-th">Meeting With</th>';
-    html += '<th class="bp-th">Type of Meeting</th>';
-    html += '</tr></thead>';
-    html += '<tbody>';
+    /* Build an <li> option list from an array of value strings */
+    function buildOptList(opts) {
+      if (!opts || !opts.length) {
+        return '<li class="bp-dd-empty">No options available</li>';
+      }
+      return opts.map(function (v) {
+        return '<li class="bp-dd-opt" data-label="' + escHtml(v) + '">' + escHtml(v) + '</li>';
+      }).join('');
+    }
+
+    /* Build a full searchable bp-dd-wrap dropdown */
+    function buildDdWrap(fieldKey, placeholder, optListHtml, rowAttr) {
+      var rowPart = rowAttr ? ' ' + rowAttr : '';
+      return '<div class="bp-dd-wrap"' + rowPart + ' data-field="' + escHtml(fieldKey) + '">' +
+             '<div class="bp-dd-trigger" tabindex="0">' +
+             '<span class="bp-dd-val">' + escHtml(placeholder) + '</span>' +
+             chevSvg +
+             '</div>' +
+             '<div class="bp-dd-panel">' +
+             '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+             '<ul class="bp-dd-list">' + optListHtml + '</ul>' +
+             '</div>' +
+             '</div>';
+    }
+
+    /* ── Attendance + Leave Type bar (top-left of .bp-slots-wrap) ── */
+    var attendBar = '<div class="bp-attend-bar">';
+    if (attendanceField) {
+      attendBar += '<div class="bp-attend-field">' +
+                   '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
+                   buildDdWrap('attendance', 'Select\u2026', buildOptList(attendanceField.options)) +
+                   '</div>';
+    }
+    if (leaveTypeField) {
+      attendBar += '<div class="bp-attend-field bp-leave-type-field" style="display:none;">' +
+                   '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
+                   buildDdWrap('leave-type', 'Select\u2026', buildOptList(leaveTypeField.options)) +
+                   '</div>';
+    }
+    attendBar += '</div>';
+
+    /* ── Table header ── */
+    var tableHtml = '<table class="bp-slots-table">';
+    tableHtml += '<thead><tr>';
+    tableHtml += '<th class="bp-th">Start Time</th>';
+    tableHtml += '<th class="bp-th">End Time</th>';
+    tableHtml += '<th class="bp-th">Meetings For</th>';
+    tableHtml += '<th class="bp-th">Meeting With</th>';
+    tablePicklistCols.forEach(function (f) {
+      tableHtml += '<th class="bp-th">' + escHtml(f.field_label) + '</th>';
+    });
+    tableHtml += '</tr></thead><tbody>';
 
     for (var h = 0; h < 24; h++) {
       var startLbl = fmtTime(hourToTime(h));
       var endLbl   = fmtTime(h === 23 ? '23:59' : hourToTime(h + 1));
 
-      html += '<tr class="bp-slot-row" data-date="' + date + '" data-hour="' + h + '">';
-      html += '<td class="bp-time-cell">' + startLbl + '</td>';
-      html += '<td class="bp-time-cell">' + endLbl + '</td>';
+      tableHtml += '<tr class="bp-slot-row" data-date="' + date + '" data-hour="' + h + '">';
+      tableHtml += '<td class="bp-time-cell">' + startLbl + '</td>';
+      tableHtml += '<td class="bp-time-cell">' + endLbl + '</td>';
 
       /* ── Meetings For dropdown ── */
-      html += '<td class="bp-dd-cell">';
-      html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meetings-for">';
-      html += '<div class="bp-dd-trigger" tabindex="0">';
-      html += '<span class="bp-dd-val">Select module…</span>';
-      html += chevSvg;
-      html += '</div>';
-      html += '<div class="bp-dd-panel">';
-      html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
-      html += '<ul class="bp-dd-list">' + mfOptions + '</ul>';
-      html += '</div>';
-      html += '</div>';
-      html += '</td>';
+      tableHtml += '<td class="bp-dd-cell">' +
+                   '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meetings-for">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val">Select module\u2026</span>' +
+                   chevSvg +
+                   '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + mfOptions + '</ul>' +
+                   '</div>' +
+                   '</div>' +
+                   '</td>';
 
       /* ── Meeting With dropdown (with avatar slot) ── */
-      html += '<td class="bp-dd-cell">';
-      html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meeting-with">';
-      html += '<div class="bp-dd-trigger" tabindex="0">';
-      html += '<span class="bp-rec-avatar" aria-hidden="true"></span>';
-      html += '<span class="bp-dd-val">Select…</span>';
-      html += chevSvg;
-      html += '</div>';
-      html += '<div class="bp-dd-panel">';
-      html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
-      html += '<ul class="bp-dd-list bp-mw-list"></ul>';
-      html += '</div>';
-      html += '</div>';
-      html += '</td>';
+      tableHtml += '<td class="bp-dd-cell">' +
+                   '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meeting-with">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-rec-avatar" aria-hidden="true"></span>' +
+                   '<span class="bp-dd-val">Select\u2026</span>' +
+                   chevSvg +
+                   '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list bp-mw-list"></ul>' +
+                   '</div>' +
+                   '</div>' +
+                   '</td>';
 
-      /* ── Type of Meeting dropdown ── */
-      html += '<td class="bp-dd-cell">';
-      html += '<div class="bp-dd-wrap" data-row="' + h + '" data-field="type-of-meeting">';
-      html += '<div class="bp-dd-trigger" tabindex="0">';
-      html += '<span class="bp-dd-val">Select type…</span>';
-      html += chevSvg;
-      html += '</div>';
-      html += '<div class="bp-dd-panel">';
-      html += '<input class="bp-dd-search" type="text" placeholder="Search…" autocomplete="off" />';
-      html += '<ul class="bp-dd-list">' + tomOptions + '</ul>';
-      html += '</div>';
-      html += '</div>';
-      html += '</td>';
+      /* ── Dynamic picklist columns ── */
+      tablePicklistCols.forEach(function (f) {
+        tableHtml += '<td class="bp-dd-cell">' +
+                     '<div class="bp-dd-wrap" data-row="' + h + '" data-field="' + escHtml(f.api_name) + '">' +
+                     '<div class="bp-dd-trigger" tabindex="0">' +
+                     '<span class="bp-dd-val">Select\u2026</span>' +
+                     chevSvg +
+                     '</div>' +
+                     '<div class="bp-dd-panel">' +
+                     '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                     '<ul class="bp-dd-list">' + buildOptList(f.options) + '</ul>' +
+                     '</div>' +
+                     '</div>' +
+                     '</td>';
+      });
 
-      html += '</tr>';
+      tableHtml += '</tr>';
     }
 
-    html += '</tbody></table></div>';
-    return html;
+    tableHtml += '</tbody></table>';
+
+    return '<div class="bp-slots-wrap">' + attendBar + tableHtml + '</div>';
   }
 
   /**
@@ -2315,7 +2370,7 @@ $(function () {
   var beatPlanHasRefs     = false;  /* true when beatplanner__Beat_Plan_References has data */
   var beatPlanModulesList = [];     /* [{label: 'Leads', api: 'Leads'}, …] */
   var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
-  var typeOfMeetingOpts   = null;   /* null = not fetched; [] = empty; [str,…] = picklist values */
+  var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
 
   /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
   var mfColors = (function () {
@@ -3531,13 +3586,29 @@ $(function () {
       }
     });
 
-    /* "Type of Meeting" option selected */
-    $(document).on('click', '#slotPickerGrid [data-field="type-of-meeting"] .bp-dd-opt', function (e) {
+    /* Generic picklist option selected for all dynamic BPR columns
+       (meetings-for and meeting-with have their own handlers above) */
+    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not([data-field="meetings-for"]):not([data-field="meeting-with"]) .bp-dd-opt', function (e) {
       e.stopPropagation();
-      var $opt  = $(this);
-      var $wrap = $opt.closest('.bp-dd-wrap');
-      $wrap.find('.bp-dd-val').text($opt.data('label'));
+      var $opt   = $(this);
+      var $wrap  = $opt.closest('.bp-dd-wrap');
+      var field  = $wrap.data('field');
+      var label  = $opt.data('label');
+
+      $wrap.find('.bp-dd-val').text(label);
       closeBpDropdown($wrap);
+
+      /* Attendance controls table / Leave Type visibility */
+      if (field === 'attendance') {
+        var $grid   = $('#slotPickerGrid');
+        var isLeave = (label || '').toLowerCase() === 'leave';
+        $grid.find('.bp-slots-table').toggle(!isLeave);
+        $grid.find('.bp-leave-type-field').toggle(isLeave);
+        if (!isLeave) {
+          /* Reset Leave Type selection when switching away from Leave */
+          $grid.find('[data-field="leave-type"] .bp-dd-val').text('Select\u2026');
+        }
+      }
     });
 
     /* Close beat plan dropdowns when clicking anywhere outside */
@@ -3773,43 +3844,32 @@ $(function () {
   }
 
   /**
-   * Fetch picklist values for the "Type of Meeting" field from
-   * beatplanner__Daily_Beat_Plans metadata.  The result is cached in
-   * typeOfMeetingOpts so only one API call is made per session.
-   * If syePicklistFields is already populated (user opened the SYE picker
-   * earlier) we reuse it to avoid a duplicate network request.
+   * Fetch all picklist fields from beatplanner__Beat_Plan_References metadata.
+   * The result is cached in bprPicklistFields so only one API call is made per session.
+   * Each entry: { api_name, field_label, options: [string, …] }
    */
-  async function fetchTypeOfMeetingOpts() {
+  async function fetchBprPicklistFields() {
     try {
-      var allFields;
-      if (syePicklistFields !== null) {
-        /* Reuse the already-fetched picklist field list */
-        allFields = syePicklistFields;
-      } else {
-        var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Daily_Beat_Plans&type=all');
-        allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
-      }
+      var resp = await zrc.get('/crm/v8/settings/fields?module=beatplanner__Beat_Plan_References&type=all');
+      var allFields = (resp && resp.data && resp.data.fields) ? resp.data.fields : [];
 
-      /* Find a field whose label matches "Type of Meeting" (case-insensitive) */
-      var tomField = null;
-      for (var i = 0; i < allFields.length; i++) {
-        var f = allFields[i];
-        var lbl = (f.field_label || '').toLowerCase().trim();
-        if (lbl === 'type of meeting' || lbl === 'type_of_meeting') {
-          tomField = f;
-          break;
+      bprPicklistFields = [];
+      allFields.forEach(function (f) {
+        if (f.data_type !== 'picklist') { return; }
+        var options = [];
+        if (f.pick_list_values && f.pick_list_values.length) {
+          options = f.pick_list_values.map(function (pv) {
+            return pv.display_value || pv.actual_value || String(pv);
+          }).filter(Boolean);
         }
-      }
-
-      if (tomField && tomField.pick_list_values && tomField.pick_list_values.length) {
-        typeOfMeetingOpts = tomField.pick_list_values.map(function (pv) {
-          return pv.display_value || pv.actual_value || String(pv);
-        }).filter(Boolean);
-      } else {
-        typeOfMeetingOpts = [];
-      }
+        bprPicklistFields.push({
+          api_name:    f.api_name    || '',
+          field_label: f.field_label || '',
+          options:     options
+        });
+      });
     } catch (e) {
-      typeOfMeetingOpts = [];
+      bprPicklistFields = [];
     }
   }
 
@@ -4360,9 +4420,9 @@ $(function () {
         return { label: label.trim(), api: (bpModApis[i] || '').trim() };
       });
 
-      /* Fetch "Type of Meeting" picklist values in the background so they are
-         ready before the user first opens the slot picker. */
-      fetchTypeOfMeetingOpts().catch(function () { typeOfMeetingOpts = []; });
+      /* Fetch all picklist fields from beatplanner__Beat_Plan_References metadata in the
+         background so they are ready before the user first opens the slot picker. */
+      fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
     }
 
     var response = await zrc.get('/crm/v8/settings/modules');
