@@ -1176,7 +1176,22 @@ $(function () {
          if openSlotPicker is called multiple times). */
       dom.slotPickerGrid.find('.bp-slots-wrap').off('scroll.bpdd').on('scroll.bpdd', function () {
         var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
-        if ($open.length) { positionBpPanel($open); }
+        if (!$open.length) { return; }
+        /* Close the dropdown if its trigger has scrolled out of the visible
+           table-body area (above the sticky thead or below the scroll viewport),
+           so the fixed-position panel never renders on top of the sticky header. */
+        var triggerEl  = $open.find('.bp-dd-trigger')[0];
+        if (triggerEl) {
+          var wrapRect    = this.getBoundingClientRect();
+          var triggerRect = triggerEl.getBoundingClientRect();
+          var $thead      = $(this).find('thead');
+          var theadBottom = $thead.length ? $thead[0].getBoundingClientRect().bottom : wrapRect.top;
+          if (triggerRect.bottom <= theadBottom || triggerRect.top >= wrapRect.bottom) {
+            closeAllBpDropdowns();
+            return;
+          }
+        }
+        positionBpPanel($open);
       });
       updateFilterBadge();
       dom.modal.find('.modal-box').addClass('modal-box--wide');
@@ -3871,10 +3886,21 @@ $(function () {
       }
     });
 
-    /* Reposition any open beat-plan panel when the modal body scrolls */
+    /* Reposition any open beat-plan panel when the modal body scrolls.
+       Close the dropdown if the trigger has scrolled out of the visible area. */
     $('#eventModal .modal-body').on('scroll.bpdd', function () {
       var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
-      if ($open.length) { positionBpPanel($open); }
+      if (!$open.length) { return; }
+      var triggerEl = $open.find('.bp-dd-trigger')[0];
+      if (triggerEl) {
+        var bodyRect    = this.getBoundingClientRect();
+        var triggerRect = triggerEl.getBoundingClientRect();
+        if (triggerRect.bottom <= bodyRect.top || triggerRect.top >= bodyRect.bottom) {
+          closeAllBpDropdowns();
+          return;
+        }
+      }
+      positionBpPanel($open);
     });
 
     /* NOTE: The .bp-slots-wrap scroll binding is set up in openSlotPicker()
