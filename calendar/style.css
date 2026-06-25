@@ -3798,6 +3798,8 @@ input, select, textarea {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 5px 10px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm, 6px);
@@ -3845,7 +3847,7 @@ input, select, textarea {
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  z-index: 2100;
+  z-index: 2300;
   overflow: hidden;
 }
 .bp-dd-wrap.bp-dd-open .bp-dd-panel {
