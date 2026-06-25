@@ -1169,6 +1169,15 @@ $(function () {
       }
       /* Beat plan mode: table with all slots + Meetings For + Meeting With dropdowns */
       dom.slotPickerGrid.html(buildBeatPlanTable(date));
+      /* Bind scroll directly on the newly-created element so the open dropdown
+         panel repositions correctly.  Scroll events do not bubble, so the
+         delegated listener registered in initEvents() cannot fire; we must
+         bind here after the element exists (and unbind first to avoid duplicates
+         if openSlotPicker is called multiple times). */
+      dom.slotPickerGrid.find('.bp-slots-wrap').off('scroll.bpdd').on('scroll.bpdd', function () {
+        var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
+        if ($open.length) { positionBpPanel($open); }
+      });
       updateFilterBadge();
       dom.modal.find('.modal-box').addClass('modal-box--wide');
     } else {
@@ -1426,6 +1435,7 @@ $(function () {
     var rect  = triggerEl.getBoundingClientRect();
     var vpH   = window.innerHeight;
     var below = vpH - rect.bottom;
+    var above = rect.top;
 
     /* Safety-net: if .modal-box still carries an active transform (during the
        brief open animation), position:fixed is relative to the modal's
@@ -1457,11 +1467,19 @@ $(function () {
       'z-index': 2100
     });
 
-    if (below >= 80) {
-      $panel.css({ top: (rect.bottom - offsetTop + 3) + 'px', bottom: '' });
+    var searchH  = ($panel.find('.bp-dd-search').outerHeight(true) || 36);
+    var GAP      = 3;
+    var PAD      = 8;
+    var MIN_LIST = 60;
+    var availH;
+    if (below >= above) {
+      availH = below - searchH - GAP - PAD;
+      $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: '' });
     } else {
-      $panel.css({ top: '', bottom: (offsetBottom - rect.top + 3) + 'px' });
+      availH = above - searchH - GAP - PAD - offsetTop;
+      $panel.css({ top: '', bottom: (offsetBottom - rect.top + GAP) + 'px' });
     }
+    $panel.find('.bp-dd-list').css('max-height', Math.max(MIN_LIST, Math.min(180, availH)) + 'px');
   }
 
   /**
@@ -1470,6 +1488,7 @@ $(function () {
   function closeBpDropdown($wrap) {
     $wrap.removeClass('bp-dd-open');
     $wrap.find('.bp-dd-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '', 'z-index': '' });
+    $wrap.find('.bp-dd-list').css('max-height', '');
   }
 
   /**
@@ -3858,11 +3877,9 @@ $(function () {
       if ($open.length) { positionBpPanel($open); }
     });
 
-    /* Reposition when the slots table container scrolls horizontally or vertically */
-    $(document).on('scroll.bpdd', '#slotPickerGrid .bp-slots-wrap', function () {
-      var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
-      if ($open.length) { positionBpPanel($open); }
-    });
+    /* NOTE: The .bp-slots-wrap scroll binding is set up in openSlotPicker()
+       after the element is created, because scroll events do not bubble and
+       event delegation on the document cannot capture them. */
 
     /* Reposition when the viewport is resized */
     $(window).on('resize.bpdd', function () {
@@ -3870,8 +3887,9 @@ $(function () {
       if ($open.length) { positionBpPanel($open); }
     });
 
-    /* Reposition any open filter multi-select panel when its container scrolls */
-    $(document).on('scroll.bpms', '#bpFilterBody', function () {
+    /* Reposition any open filter multi-select panel when its container scrolls.
+       Scroll events do not bubble, so bind directly on the element. */
+    $('#bpFilterBody').on('scroll.bpms', function () {
       var $open = $('#bpFilterBody .bpf-ms-wrap.bpf-ms-open');
       if ($open.length) { positionBpMsPanel($open); }
     });
