@@ -1444,10 +1444,15 @@ $(function () {
       }
     }
 
+    var vpW       = window.innerWidth;
+    var panelW    = rect.width;
+    var rawLeft   = rect.left - offsetLeft;
+    var clampedLeft = Math.max(0, Math.min(rawLeft, vpW - panelW - 4));
+
     $panel.css({
       position:  'fixed',
-      width:     rect.width + 'px',
-      left:      (rect.left  - offsetLeft) + 'px',
+      width:     panelW + 'px',
+      left:      clampedLeft + 'px',
       right:     'auto',
       'z-index': 2100
     });
@@ -3719,6 +3724,10 @@ $(function () {
       activeModuleFilters   = {};
       filteredModuleRecords = {};
       updateFilterBadge();
+      /* Refresh every row's Meeting With list to restore the full unfiltered records */
+      beatPlanModulesList.forEach(function (mod) {
+        refreshMeetingWithRows(mod.api);
+      });
       closeFilterPanel();
     });
 
@@ -3859,6 +3868,18 @@ $(function () {
     $(window).on('resize.bpdd', function () {
       var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
       if ($open.length) { positionBpPanel($open); }
+    });
+
+    /* Reposition any open filter multi-select panel when its container scrolls */
+    $(document).on('scroll.bpms', '#bpFilterBody', function () {
+      var $open = $('#bpFilterBody .bpf-ms-wrap.bpf-ms-open');
+      if ($open.length) { positionBpMsPanel($open); }
+    });
+
+    /* Reposition open filter multi-select panel on viewport resize */
+    $(window).on('resize.bpms', function () {
+      var $open = $('#bpFilterBody .bpf-ms-wrap.bpf-ms-open');
+      if ($open.length) { positionBpMsPanel($open); }
     });
 
     /* ── Image preview ── */
@@ -4177,10 +4198,15 @@ $(function () {
     var GAP = 3;
     var PAD = 8;
 
+    var vpW2        = window.innerWidth;
+    var panelW2     = rect.width;
+    var rawLeft2    = rect.left - offsetLeft;
+    var clampedLeft2 = Math.max(0, Math.min(rawLeft2, vpW2 - panelW2 - 4));
+
     $panel.css({
       position:  'fixed',
-      width:     rect.width + 'px',
-      left:      (rect.left - offsetLeft) + 'px',
+      width:     panelW2 + 'px',
+      left:      clampedLeft2 + 'px',
       right:     'auto',
       'z-index': 10000
     });
@@ -4393,6 +4419,50 @@ $(function () {
   }
 
   /**
+   * Rebuild the Meeting With dropdown list for every row in the slot grid
+   * that currently has the given module selected in its "Meetings For" cell.
+   * Preserves the current selection when the selected record still appears in
+   * the new list; clears it when it has been filtered out.
+   */
+  function refreshMeetingWithRows(modApi) {
+    var records = filteredModuleRecords.hasOwnProperty(modApi)
+      ? filteredModuleRecords[modApi]
+      : (moduleRecordsMap[modApi] || []);
+
+    var mwOpts;
+    if (records.length === 0) {
+      mwOpts = '<li class="bp-dd-empty">No records found</li>';
+    } else {
+      mwOpts = records.map(function (rec) {
+        return '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+               '" data-label="' + escHtml(rec.name) +
+               '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' +
+               escHtml(rec.name) + '</li>';
+      }).join('');
+    }
+
+    $('#slotPickerGrid .bp-slot-row').each(function () {
+      var $row = $(this);
+      var selectedApi = $row.find('[data-field="meetings-for"] .bp-dd-val').attr('data-selected-api');
+      if (selectedApi !== modApi) { return; }
+
+      var $mwWrap = $row.find('[data-field="meeting-with"]');
+      $mwWrap.find('.bp-mw-list').html(mwOpts);
+
+      /* Clear the current selection when the selected record is no longer in the list */
+      var selectedId = $mwWrap.find('.bp-dd-val').attr('data-selected-id');
+      if (selectedId) {
+        var stillExists = records.some(function (r) { return r.id === selectedId; });
+        if (!stillExists) {
+          $mwWrap.find('.bp-dd-val').text('Select\u2026').removeAttr('data-selected-id');
+          $mwWrap.find('.bp-rec-avatar')
+            .text('').removeClass('bp-rec-avatar--show').removeAttr('data-img-src');
+        }
+      }
+    });
+  }
+
+  /**
    * Apply the current activeModuleFilters: fetch filtered records for each
    * module that has filter values set; clear filteredModuleRecords for modules
    * whose filters were removed.
@@ -4404,6 +4474,7 @@ $(function () {
       if (!modFilters || Object.keys(modFilters).length === 0) {
         /* No active filters for this module – revert to full unfiltered list */
         delete filteredModuleRecords[mod.api];
+        refreshMeetingWithRows(mod.api);
         return;
       }
       /* Build a ZOHO CRM criteria string: ((field:equals:val1)or(field:equals:val2))and((...)) */
@@ -4439,8 +4510,10 @@ $(function () {
         } else {
           filteredModuleRecords[mod.api] = [];
         }
+        refreshMeetingWithRows(mod.api);
       }).catch(function () {
         filteredModuleRecords[mod.api] = [];
+        refreshMeetingWithRows(mod.api);
       });
     });
   }
