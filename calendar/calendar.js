@@ -1443,9 +1443,9 @@ $(function () {
    * below the trigger when there is enough space inside the scroll container,
    * and above it otherwise.  The available space is bounded by the visible
    * portion of .bp-slots-wrap (between the sticky thead and the container
-   * bottom) so the panel never grows into the modal header, table header, or
-   * footer — those elements carry z-index:2200 (above the panel's 2100) and
-   * will paint on top of any overflow anyway.
+   * bottom) so the panel never grows beyond the visible scroll container.
+   * The panel uses z-index:2300, which is above .modal-head/.modal-foot
+   * (z-index:2200), ensuring the options list is never obscured by the footer.
    *
    * NOTE: .modal-box has its CSS transform cleared to 'none' after the open
    * animation finishes (see openSlotPicker).  With transform:none the element
@@ -1512,7 +1512,7 @@ $(function () {
       width:     panelW + 'px',
       left:      clampedLeft + 'px',
       right:     'auto',
-      'z-index': 2100
+      'z-index': 2300
     });
 
     var searchH  = ($panel.find('.bp-dd-search').outerHeight(true) || 36);

@@ -3901,8 +3901,9 @@ input, select, textarea {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   /* z-index: 2200 ensures attend-bar sits above the sticky <th> cells (also
-     z-index:2200) and above any open .bp-dd-panel (z-index:2100) so the bar
-     always paints on top when the table header scrolls beneath it */
+     z-index:2200) so the bar always paints on top when the table header
+     scrolls beneath it.  Open .bp-dd-panel panels use z-index:2300 (set via
+     positionBpPanel) so they appear above this bar and above .modal-foot. */
   position: relative;
   z-index: 2200;
 }
