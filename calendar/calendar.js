@@ -1444,8 +1444,12 @@ $(function () {
    * and above it otherwise.  The available space is bounded by the visible
    * portion of .bp-slots-wrap (between the sticky thead and the container
    * bottom) so the panel never grows beyond the visible scroll container.
-   * The panel uses z-index:2300, which is above .modal-head/.modal-foot
-   * (z-index:2200), ensuring the options list is never obscured by the footer.
+   * The panel uses z-index:2300 (local to its stacking-context ancestor).
+   * For table-row panels the nearest stacking context is .modal-backdrop, so
+   * z-index:2300 > 2200 keeps the panel above .modal-foot.  For attend-bar
+   * panels the nearest ancestor stacking context is .bp-attend-bar itself
+   * (z-index:2400 in .modal-backdrop), which is above .modal-foot (z-index:
+   * 2200), ensuring the panel is never obscured by the footer.
    *
    * NOTE: .modal-box has its CSS transform cleared to 'none' after the open
    * animation finishes (see openSlotPicker).  With transform:none the element
