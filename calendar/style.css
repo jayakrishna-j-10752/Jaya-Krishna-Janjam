@@ -1133,7 +1133,7 @@ input, select, textarea {
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip;
   transform: translateY(-14px) scale(.96);
   transition: transform .24s cubic-bezier(.4,0,.2,1);
 }

@@ -1474,10 +1474,10 @@ $(function () {
     var availH;
     if (below >= above) {
       availH = below - searchH - GAP - PAD;
-      $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: '' });
+      $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: 'auto' });
     } else {
       availH = above - searchH - GAP - PAD - offsetTop;
-      $panel.css({ top: '', bottom: (offsetBottom - rect.top + GAP) + 'px' });
+      $panel.css({ top: 'auto', bottom: (offsetBottom - rect.top + GAP) + 'px' });
     }
     $panel.find('.bp-dd-list').css('max-height', Math.max(MIN_LIST, Math.min(180, availH)) + 'px');
   }
