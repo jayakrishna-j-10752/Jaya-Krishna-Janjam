@@ -1229,7 +1229,14 @@ $(function () {
        any position:fixed descendants, which also makes overflow:hidden clip
        those descendants.  Setting transform:none releases that containment so
        .bp-dd-panel escapes the modal boundary and is never clipped. */
-    setTimeout(function () { dom.modal.find('.modal-box').css('transform', 'none'); }, 260);
+    setTimeout(function () {
+      dom.modal.find('.modal-box').css('transform', 'none');
+      /* Re-position any open dropdown now that transform:none is set – the
+         safety-net offset-correction is no longer needed and the panel can be
+         placed accurately against the real viewport. */
+      var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
+      if ($open.length) { positionBpPanel($open); }
+    }, 260);
   }
 
   /**
@@ -1512,6 +1519,9 @@ $(function () {
     var GAP      = 3;
     var PAD      = 8;
     var MIN_LIST = 60;
+    /* Minimum total vertical space required to open upward usefully.
+       If less space is available above, fall back to opening downward. */
+    var MIN_PANEL = searchH + MIN_LIST + GAP + PAD;
 
     /* Space below the trigger within the visible scroll container */
     var below = Math.max(0, Math.min(vpH - rect.bottom, bottomBound - rect.bottom));
@@ -1520,14 +1530,21 @@ $(function () {
     var above = Math.max(0, rect.top - Math.max(topBound, offsetTop));
 
     var availH;
-    if (below >= above) {
+    /* Open upward only when above > below AND enough room exists above for a
+       useful panel.  Without the MIN_PANEL guard the list would be forced to
+       MIN_LIST height even when availH is tiny, pushing the panel above topBound
+       and out of the modal. */
+    if (below >= above || above < MIN_PANEL) {
+      /* Open downward (or fall back to downward when space above is too small) */
       availH = below - searchH - GAP - PAD;
       $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: 'auto' });
+      $panel.find('.bp-dd-list').css('max-height', Math.max(MIN_LIST, Math.min(180, availH)) + 'px');
     } else {
+      /* Open upward – no MIN_LIST floor so the panel never overflows above topBound */
       availH = above - searchH - GAP - PAD;
       $panel.css({ top: 'auto', bottom: (offsetBottom - rect.top + GAP) + 'px' });
+      $panel.find('.bp-dd-list').css('max-height', Math.max(0, Math.min(180, availH)) + 'px');
     }
-    $panel.find('.bp-dd-list').css('max-height', Math.max(MIN_LIST, Math.min(180, availH)) + 'px');
   }
 
   /**
