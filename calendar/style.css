@@ -1152,6 +1152,8 @@ input, select, textarea {
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
   flex-shrink: 0;
+  position: relative;
+  z-index: 2200;
 }
 .modal-heading {
   font-size: 14px;
@@ -1255,6 +1257,8 @@ input, select, textarea {
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   flex-shrink: 0;
+  position: relative;
+  z-index: 2200;
 }
 
 .btn-primary {
@@ -3760,7 +3764,7 @@ input, select, textarea {
   background: var(--surface);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2200;
 }
 .bp-slot-row {
   transition: background .1s;
@@ -3896,11 +3900,11 @@ input, select, textarea {
   padding: 10px 10px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-  /* z-index: 2 ensures attend-bar sits above z-index:1 sticky <th> cells so that
-     dropdown panels (which are promoted to position:fixed via positionBpPanel) paint
-     correctly when the table header scrolls beneath the bar */
+  /* z-index: 2200 ensures attend-bar sits above the sticky <th> cells (also
+     z-index:2200) and above any open .bp-dd-panel (z-index:2100) so the bar
+     always paints on top when the table header scrolls beneath it */
   position: relative;
-  z-index: 2;
+  z-index: 2200;
 }
 .bp-attend-field {
   display: flex;

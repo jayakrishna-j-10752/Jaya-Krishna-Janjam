@@ -1431,9 +1431,14 @@ $(function () {
 
   /**
    * Position an open .bp-dd-panel as position:fixed so it is never clipped
-   * by overflow containers (modal-body, bp-slots-wrap, modal-box).
-   * The panel opens below the trigger when there is enough viewport space,
-   * and above it otherwise.
+   * by overflow containers (modal-body, bp-slots-wrap, modal-box), while
+   * keeping it visually contained within the table body.  The panel opens
+   * below the trigger when there is enough space inside the scroll container,
+   * and above it otherwise.  The available space is bounded by the visible
+   * portion of .bp-slots-wrap (between the sticky thead and the container
+   * bottom) so the panel never grows into the modal header, table header, or
+   * footer — those elements carry z-index:2200 (above the panel's 2100) and
+   * will paint on top of any overflow anyway.
    *
    * NOTE: .modal-box has its CSS transform cleared to 'none' after the open
    * animation finishes (see openSlotPicker).  With transform:none the element
@@ -1449,8 +1454,29 @@ $(function () {
     if (!triggerEl || !$panel.length) { return; }
     var rect  = triggerEl.getBoundingClientRect();
     var vpH   = window.innerHeight;
-    var below = vpH - rect.bottom;
-    var above = rect.top;
+
+    /* Determine the visual bounding box so the panel stays within the
+       visible table-body area.  For table-row dropdowns use the slots-wrap
+       bounds (thead bottom → container bottom); for attend-bar dropdowns
+       (outside the scroll wrapper) use the modal-body bounds. */
+    var $slotsWrap = $wrap.closest('.bp-slots-wrap');
+    var topBound, bottomBound;
+    if ($slotsWrap.length) {
+      var swRect   = $slotsWrap[0].getBoundingClientRect();
+      var $thead   = $slotsWrap.find('thead');
+      topBound     = $thead.length ? $thead[0].getBoundingClientRect().bottom : swRect.top;
+      bottomBound  = swRect.bottom;
+    } else {
+      var $mb = $wrap.closest('.modal-body');
+      if ($mb.length) {
+        var mbRect  = $mb[0].getBoundingClientRect();
+        topBound    = mbRect.top;
+        bottomBound = mbRect.bottom;
+      } else {
+        topBound    = 0;
+        bottomBound = vpH;
+      }
+    }
 
     /* Safety-net: if .modal-box still carries an active transform (during the
        brief open animation), position:fixed is relative to the modal's
@@ -1486,12 +1512,19 @@ $(function () {
     var GAP      = 3;
     var PAD      = 8;
     var MIN_LIST = 60;
+
+    /* Space below the trigger within the visible scroll container */
+    var below = Math.max(0, Math.min(vpH - rect.bottom, bottomBound - rect.bottom));
+    /* Space above the trigger within the visible scroll container
+       (bounded by the sticky thead bottom or modal-body top) */
+    var above = Math.max(0, rect.top - Math.max(topBound, offsetTop));
+
     var availH;
     if (below >= above) {
       availH = below - searchH - GAP - PAD;
       $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: 'auto' });
     } else {
-      availH = above - searchH - GAP - PAD - offsetTop;
+      availH = above - searchH - GAP - PAD;
       $panel.css({ top: 'auto', bottom: (offsetBottom - rect.top + GAP) + 'px' });
     }
     $panel.find('.bp-dd-list').css('max-height', Math.max(MIN_LIST, Math.min(180, availH)) + 'px');
