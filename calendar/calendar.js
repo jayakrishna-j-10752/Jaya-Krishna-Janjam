@@ -1440,10 +1440,10 @@ $(function () {
   /**
    * Move the open .bp-dd-panel belonging to $wrap into #bp-dd-portal (a div
    * that lives outside .modal-box) so it is never clipped by overflow:clip on
-   * .modal-box or overflow:auto on .bp-slots-wrap.  The portal is positioned
-   * absolute with inset:0 inside .modal-backdrop (position:fixed; inset:0), so
-   * viewport coordinates from getBoundingClientRect() equal portal-relative
-   * coordinates — no transform-offset correction is required.
+   * .modal-box or overflow:auto on .bp-slots-wrap.  The panel is then given
+   * position:fixed so it is always positioned relative to the viewport — the
+   * same coordinate space used by getBoundingClientRect().  Because the panel
+   * is outside .modal-box, the modal-box CSS transform does not interfere.
    *
    * The panel opens below the trigger when there is room, or above it when
    * the trigger is near the bottom of the scroll container.
@@ -1509,7 +1509,7 @@ $(function () {
     var clampedLeft = Math.max(0, Math.min(rect.left, vpW - panelW - 4));
 
     $panel.css({
-      position:  'absolute',
+      position:  'fixed',
       display:   'block',
       width:     panelW + 'px',
       left:      clampedLeft + 'px',
