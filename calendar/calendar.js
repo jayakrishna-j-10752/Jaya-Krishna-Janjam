@@ -1289,11 +1289,14 @@ $(function () {
                  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
                  'Filter</button>' +
                  '</div>';
+    /* ── Mass Create button (right-aligned; hidden until a row checkbox is checked) ── */
+    attendBar += '<button class="bp-mass-create-btn" type="button" style="display:none;">Mass Create</button>';
     attendBar += '</div>';
 
     /* ── Table header (hidden until Attendance = "Working") ── */
     var tableHtml = '<table class="bp-slots-table" style="display:none;">';
     tableHtml += '<thead><tr>';
+    tableHtml += '<th class="bp-th bp-cb-th"></th>';
     tableHtml += '<th class="bp-th">Start Time</th>';
     tableHtml += '<th class="bp-th">End Time</th>';
     tableHtml += '<th class="bp-th">Meetings For</th>';
@@ -1303,11 +1306,15 @@ $(function () {
     });
     tableHtml += '</tr></thead><tbody>';
 
-    for (var h = 0; h < 24; h++) {
+    /* Determine the earliest hour to show: for today, skip hours that have already passed */
+    var currentHour = isToday(date) ? new Date().getHours() : 0;
+
+    for (var h = currentHour; h < 24; h++) {
       var startLbl = fmtTime(hourToTime(h));
       var endLbl   = fmtTime(h === 23 ? '23:59' : hourToTime(h + 1));
 
       tableHtml += '<tr class="bp-slot-row" data-date="' + date + '" data-hour="' + h + '">';
+      tableHtml += '<td class="bp-cb-cell"><input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>';
       tableHtml += '<td class="bp-time-cell">' + startLbl + '</td>';
       tableHtml += '<td class="bp-time-cell">' + endLbl + '</td>';
 
@@ -3618,6 +3625,13 @@ $(function () {
           $grid.find('[data-field="leave-type"] .bp-dd-val').text('Select\u2026');
         }
       }
+    });
+
+    /* Row checkbox → show/hide Mass Create button */
+    $(document).on('change', '#slotPickerGrid .bp-row-cb', function () {
+      var $grid    = $('#slotPickerGrid');
+      var anyChecked = $grid.find('.bp-row-cb:checked').length > 0;
+      $grid.find('.bp-mass-create-btn').toggle(anyChecked);
     });
 
     /* Close beat plan dropdowns when clicking anywhere outside */

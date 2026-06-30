@@ -4430,3 +4430,48 @@ input, select, textarea {
   height: 16px;
 }
 
+
+/* ── Row checkbox column ── */
+.bp-cb-th {
+  width: 36px;
+  min-width: 36px;
+  padding: 8px 6px;
+}
+.bp-cb-cell {
+  padding: 0 6px;
+  text-align: center;
+  vertical-align: middle;
+  width: 36px;
+}
+.bp-row-cb {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent, #1565C0);
+}
+/* Row separator for the new checkbox cell */
+.bp-slot-row + .bp-slot-row .bp-cb-cell {
+  border-top: 1px solid var(--border);
+}
+
+/* ── Mass Create button (right-aligned in the Attendance bar) ── */
+.bp-mass-create-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 14px;
+  border: 1.5px solid var(--accent, #1565C0);
+  border-radius: var(--radius-sm);
+  background: var(--accent, #1565C0);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .12s, background .12s;
+  user-select: none;
+}
+.bp-mass-create-btn:hover {
+  opacity: .88;
+}
