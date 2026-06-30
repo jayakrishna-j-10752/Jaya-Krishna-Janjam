@@ -3902,6 +3902,7 @@ $(function () {
   function showMeetingsBarOnly() {
     $meetingsBar.show();
     $otherContent.hide();
+    $('#legendsDisplay').hide();
   }
 
   function showMainContent() {
@@ -3910,6 +3911,10 @@ $(function () {
     $legendBar.hide();
     $settingsBackBtn.hide();
     $otherContent.show();
+    /* Show the legends display strip only if it has been populated */
+    if ($('#legendsDisplay').children().length > 0) {
+      $('#legendsDisplay').show();
+    }
   }
 
   /* Settings icon → show meetings-bar + styleBar + back button, hide rest */
@@ -4052,7 +4057,8 @@ $(function () {
           options = f.pick_list_values.map(function (pv) {
             var display = pv.display_value || pv.actual_value || '';
             var actual  = pv.actual_value  || pv.display_value || '';
-            return display ? { display: display, actual: actual } : null;
+            var colour  = pv.colour_code   || '';
+            return display ? { display: display, actual: actual, colour: colour } : null;
           }).filter(Boolean);
         }
         bprPicklistFields.push({
@@ -4065,6 +4071,84 @@ $(function () {
       bprPicklistFields = [];
       bpDailyAllFields  = [];
     }
+  }
+
+  /**
+   * Render the legends display strip (#legendsDisplay) dynamically.
+   *
+   * Flow:
+   *   1. Accept the list of legend field API names (from beatplanner__Legends_Field_Api_Name).
+   *   2. Ensure beatplanner__Daily_Beat_Plans field metadata is loaded (bprPicklistFields).
+   *   3. For each legend API name that matches a picklist field in the metadata,
+   *      build one legend group showing the field label as heading and its
+   *      picklist values as colour-coded items.
+   *   4. Inject the HTML into #legendsDisplay and show/hide the container.
+   *
+   * @param {string[]} legApiNames - Array of Daily Beat Plans field API names to render.
+   */
+  async function renderLegendsDisplay(legApiNames) {
+    var $container = $('#legendsDisplay');
+
+    /* No legend fields configured → hide the strip and return */
+    if (!legApiNames || !legApiNames.length) {
+      $container.hide().empty();
+      return;
+    }
+
+    /* Ensure Daily Beat Plans field metadata is available */
+    if (bprPicklistFields === null) {
+      try {
+        await fetchBprPicklistFields();
+      } catch (e) {
+        bprPicklistFields = [];
+      }
+    }
+
+    /* Build a lookup map: api_name → picklist field descriptor */
+    var fieldMap = {};
+    (bprPicklistFields || []).forEach(function (f) {
+      fieldMap[f.api_name] = f;
+    });
+
+    /* Build legend group HTML for each configured API name */
+    var groupsHtml = '';
+    legApiNames.forEach(function (apiName) {
+      apiName = apiName.trim();
+      if (!apiName) { return; }
+
+      var field = fieldMap[apiName];
+      if (!field || !field.options || !field.options.length) { return; }
+
+      /* Heading for this legend group */
+      var titleHtml = '<span class="legends-group-title">' + escHtml(field.field_label || apiName) + '</span>';
+
+      /* One item per picklist value */
+      var itemsHtml = '';
+      field.options.forEach(function (opt) {
+        var colour = opt.colour || '#BDBDBD';
+        /* Ensure colour starts with # for inline CSS */
+        if (colour && colour.charAt(0) !== '#') { colour = '#' + colour; }
+        itemsHtml +=
+          '<span class="legend-item">' +
+            '<span class="legend-dot" style="background:' + escHtml(colour) + ';border-color:' + escHtml(colour) + ';"></span>' +
+            '<span class="legend-item-label">' + escHtml(opt.display) + '</span>' +
+          '</span>';
+      });
+
+      groupsHtml +=
+        '<div class="legends-group">' +
+          titleHtml +
+          '<span class="legends-group-sep" aria-hidden="true"></span>' +
+          '<div class="legends-items-row">' + itemsHtml + '</div>' +
+        '</div>';
+    });
+
+    if (!groupsHtml) {
+      $container.hide().empty();
+      return;
+    }
+
+    $container.html(groupsHtml).show();
   }
 
   /**
@@ -4805,6 +4889,11 @@ $(function () {
       console.error('Failed to save Beat Plan Reference:', err);
     }
 
+    /* ── Re-render legends display with the newly saved configuration ── */
+    renderLegendsDisplay(legApiNames).catch(function (e) {
+      console.error('Legend render error:', e);
+    });
+
     /* ── Transition to main calendar view ── */
     showMainContent();
   });
@@ -5016,7 +5105,7 @@ $(function () {
 
       /* Fetch all picklist fields from beatplanner__Beat_Plan_References metadata in the
          background so they are ready before the user first opens the slot picker. */
-      fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+      await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
 
       /* Pre-fetch picklist metadata for ALL modules so the Filter panel opens instantly. */
       fetchAllModulePicklistMeta();
@@ -5029,6 +5118,14 @@ $(function () {
     /* ── Restore remaining preferences (slots + legends) ── */
     if (savedRec) {
       restorePreferences(savedRec);
+    }
+
+    /* ── Render legends display strip from saved configuration ── */
+    if (hasRecords && savedRec) {
+      var savedLegApiNames = (savedRec['beatplanner__Legends_Field_Api_Name'] || '').split(',').filter(Boolean);
+      renderLegendsDisplay(savedLegApiNames).catch(function (e) {
+        console.error('Legend render error:', e);
+      });
     }
 
     /* ── Fetch records for each module in beatplanner__Meetings_For_Apis ── */

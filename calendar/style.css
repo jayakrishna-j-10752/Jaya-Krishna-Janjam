@@ -4559,3 +4559,90 @@ input, select, textarea {
 .bp-row-save:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
 .bp-row-copy:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
 .bp-row-paste:hover { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
+
+/* ══════════════════════════════════════════════════════════
+   LEGENDS DISPLAY STRIP
+   Dynamic colour-coded legend bar rendered below the header.
+══════════════════════════════════════════════════════════ */
+.legends-display {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 24px;
+  padding: 10px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* One group per picklist field (e.g. "Meeting Status") */
+.legends-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 0;
+}
+
+/* Field-name label preceding each group's items */
+.legends-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+/* Thin vertical divider between title and items */
+.legends-group-sep {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin-right: 8px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* Row of colour-coded items */
+.legends-items-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+/* Single legend item: dot + label */
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Colour circle */
+.legend-dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid transparent;
+  opacity: .85;
+}
+
+.legend-item-label {
+  line-height: 1.2;
+}
+
+/* Responsive: on narrow screens wrap tighter */
+@media (max-width: 600px) {
+  .legends-display {
+    padding: 8px 12px;
+    gap: 8px 16px;
+  }
+  .legend-item {
+    font-size: 11px;
+  }
+}
