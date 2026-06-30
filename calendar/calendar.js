@@ -1369,7 +1369,7 @@ $(function () {
       tableHtml += '<td class="bp-action-cell">' +
                    '<button class="bp-row-action bp-row-save" type="button" title="Save row">' + SVG.save + '</button>' +
                    '<button class="bp-row-action bp-row-copy" type="button" title="Copy row">' + SVG.copy + '</button>' +
-                   '<button class="bp-row-action bp-row-paste" type="button" title="Paste row">' + SVG.paste + '</button>' +
+                   '<button class="bp-row-action bp-row-paste" type="button" title="Paste row" disabled>' + SVG.paste + '</button>' +
                    '</td>';
 
       tableHtml += '</tr>';
@@ -2361,6 +2361,7 @@ $(function () {
   var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
   var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
   var bpDailyAllFields    = [];     /* all fields from beatplanner__Daily_Beat_Plans (including lookups) */
+  var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
 
   /* ── Filter Panel state ── */
   var modulePicklistMeta    = {};  /* {moduleName: [{api_name, field_label, options}]} – per-module picklist fields */
@@ -3641,6 +3642,134 @@ $(function () {
       var $grid    = $('#slotPickerGrid');
       var anyChecked = $grid.find('.bp-row-cb:checked').length > 0;
       $grid.find('.bp-mass-create-btn').toggle(anyChecked);
+    });
+
+    /* ── Beat plan row: Copy ── */
+    $(document).on('click', '#slotPickerGrid .bp-row-copy', function () {
+      var $row  = $(this).closest('.bp-slot-row');
+      var data  = {};
+
+      /* Meetings For */
+      var $mfWrap = $row.find('[data-field="meetings-for"]');
+      var $mfVal  = $mfWrap.find('.bp-dd-val');
+      data['meetings-for'] = {
+        label: $mfVal.text(),
+        api:   $mfVal.attr('data-selected-api') || ''
+      };
+
+      /* Meeting With */
+      var $mwWrap   = $row.find('[data-field="meeting-with"]');
+      var $mwVal    = $mwWrap.find('.bp-dd-val');
+      var $mwAvatar = $mwWrap.find('.bp-rec-avatar');
+      data['meeting-with'] = {
+        label:        $mwVal.text(),
+        id:           $mwVal.attr('data-selected-id') || '',
+        lookupApi:    $mwWrap.attr('data-lookup-api') || '',
+        avatarText:   $mwAvatar.text(),
+        avatarImgSrc: $mwAvatar.find('img').attr('src') || '',
+        avatarShow:   $mwAvatar.hasClass('bp-rec-avatar--show')
+      };
+
+      /* All other dropdowns (dynamic picklist columns) */
+      $row.find('.bp-dd-wrap').not('[data-field="meetings-for"]').not('[data-field="meeting-with"]').each(function () {
+        var $wrap = $(this);
+        var field = String($wrap.data('field') || '');
+        if (!field) { return; }
+        var $val = $wrap.find('.bp-dd-val');
+        data[field] = {
+          label:     $val.text(),
+          actualVal: $val.attr('data-actual-val') || ''
+        };
+      });
+
+      copiedRowData = data;
+
+      /* Enable paste on every row except the source row */
+      $('#slotPickerGrid .bp-slot-row').not($row).find('.bp-row-paste').prop('disabled', false);
+    });
+
+    /* ── Beat plan row: Paste ── */
+    $(document).on('click', '#slotPickerGrid .bp-row-paste', function () {
+      if (!copiedRowData) { return; }
+      var $row = $(this).closest('.bp-slot-row');
+
+      /* ── Meetings For ── */
+      var mfData  = copiedRowData['meetings-for'];
+      var $mfWrap = $row.find('[data-field="meetings-for"]');
+      var $mfVal  = $mfWrap.find('.bp-dd-val');
+      $mfVal.text(mfData.label);
+      if (mfData.api) {
+        $mfVal.attr('data-selected-api', mfData.api);
+      } else {
+        $mfVal.removeAttr('data-selected-api');
+      }
+
+      /* ── Meeting With: repopulate list then restore selection ── */
+      var mwData  = copiedRowData['meeting-with'];
+      var $mwWrap = $row.find('[data-field="meeting-with"]');
+
+      /* Stamp lookup api */
+      if (mwData.lookupApi) {
+        $mwWrap.attr('data-lookup-api', mwData.lookupApi);
+      } else {
+        $mwWrap.removeAttr('data-lookup-api');
+      }
+
+      /* Re-populate the Meeting With list so the option exists in the DOM */
+      if (mfData.api) {
+        var records = filteredModuleRecords.hasOwnProperty(mfData.api)
+                        ? filteredModuleRecords[mfData.api]
+                        : (moduleRecordsMap[mfData.api] || []);
+        var mwOpts;
+        if (records.length === 0) {
+          mwOpts = '<li class="bp-dd-empty">No records found</li>';
+        } else {
+          mwOpts = '';
+          records.forEach(function (rec) {
+            mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+                      '" data-label="' + escHtml(rec.name) +
+                      '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' + escHtml(rec.name) + '</li>';
+          });
+        }
+        $mwWrap.find('.bp-mw-list').html(mwOpts);
+      }
+
+      /* Restore Meeting With value */
+      var $mwVal = $mwWrap.find('.bp-dd-val');
+      $mwVal.text(mwData.label);
+      if (mwData.id) {
+        $mwVal.attr('data-selected-id', mwData.id);
+      } else {
+        $mwVal.removeAttr('data-selected-id');
+      }
+
+      /* Restore avatar */
+      var $mwAvatar = $mwWrap.find('.bp-rec-avatar');
+      $mwAvatar.removeClass('bp-rec-avatar--show').removeAttr('data-img-src').html('');
+      if (mwData.avatarShow) {
+        if (mwData.avatarImgSrc) {
+          $mwAvatar.html('<img src="' + escHtml(mwData.avatarImgSrc) + '">')
+                   .attr('data-img-src', mwData.avatarImgSrc)
+                   .addClass('bp-rec-avatar--show');
+        } else if (mwData.avatarText) {
+          $mwAvatar.text(mwData.avatarText).addClass('bp-rec-avatar--show');
+        }
+      }
+
+      /* ── Dynamic picklist columns ── */
+      $row.find('.bp-dd-wrap').not('[data-field="meetings-for"]').not('[data-field="meeting-with"]').each(function () {
+        var $wrap = $(this);
+        var field = String($wrap.data('field') || '');
+        if (!field || !copiedRowData.hasOwnProperty(field)) { return; }
+        var fData = copiedRowData[field];
+        var $val  = $wrap.find('.bp-dd-val');
+        $val.text(fData.label);
+        if (fData.actualVal) {
+          $val.attr('data-actual-val', fData.actualVal);
+        } else {
+          $val.removeAttr('data-actual-val');
+        }
+      });
     });
 
     /* Close beat plan dropdowns when clicking anywhere outside */

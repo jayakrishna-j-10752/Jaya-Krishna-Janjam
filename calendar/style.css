@@ -4559,6 +4559,8 @@ input, select, textarea {
 .bp-row-save:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
 .bp-row-copy:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
 .bp-row-paste:hover { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
+.bp-row-paste:disabled { opacity: 0.38; cursor: not-allowed; }
+.bp-row-paste:disabled:hover { background: none; color: var(--text-secondary); border-color: transparent; }
 
 /* ══════════════════════════════════════════════════════════
    LEGENDS DISPLAY STRIP
