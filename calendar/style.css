@@ -1124,23 +1124,6 @@ input, select, textarea {
   pointer-events: all;
 }
 
-/* Portal that receives open .bp-dd-panel elements so they are never clipped
-   by .modal-box overflow:clip or the table's overflow:auto containers.
-   The portal is a DOM-only container; panels inside it use position:fixed so
-   they are always positioned relative to the viewport — no coordinate-space
-   mismatch with getBoundingClientRect().  Because the portal sits outside
-   .modal-box, the modal-box transform does not affect fixed descendants here.
-   pointer-events:none lets clicks fall through to the backdrop; each panel
-   inside opts back in with pointer-events:auto. */
-#bp-dd-portal {
-  position: absolute;
-  inset: 0;
-  overflow: visible;
-  pointer-events: none;
-}
-#bp-dd-portal .bp-dd-panel {
-  pointer-events: auto;
-}
 
 .modal-box {
   background: var(--surface);
@@ -3857,15 +3840,14 @@ input, select, textarea {
 .bp-dd-panel {
   display: none;
   position: absolute;
-  top: calc(100% + 3px);
+  top: 100%;
   left: 0;
-  right: 0;
+  width: 100%;
   min-width: 180px;
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  z-index: 2300;
   overflow: hidden;
 }
 .bp-dd-wrap.bp-dd-open .bp-dd-panel {
@@ -3920,11 +3902,8 @@ input, select, textarea {
   padding: 10px 10px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-  /* z-index: 2400 ensures the attend-bar (and any open .bp-dd-panel within
-     it) paints above .modal-foot / .modal-head (both z-index:2200) and above
-     the sticky <th> cells (also z-index:2200).  The bar creates a stacking
-     context, so its z-index in the parent context must exceed the footer's
-     z-index (2200) to prevent the footer from overlapping open panels. */
+  /* z-index: 2400 ensures the attend-bar paints above .modal-foot / .modal-head
+     (both z-index:2200) and above the sticky <th> cells (also z-index:2200). */
   position: relative;
   z-index: 2400;
 }
