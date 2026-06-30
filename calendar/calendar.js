@@ -4342,8 +4342,8 @@ $(function () {
   /**
    * Rebuild the Meeting With dropdown list for every row in the slot grid
    * that currently has the given module selected in its "Meetings For" cell.
-   * Preserves the current selection when the selected record still appears in
-   * the new list; clears it when it has been filtered out.
+   * Preserves the current selection regardless of whether the selected record
+   * appears in the filtered list.
    */
   function refreshMeetingWithRows(modApi) {
     var records = filteredModuleRecords.hasOwnProperty(modApi)
@@ -4369,17 +4369,6 @@ $(function () {
 
       var $mwWrap = $row.find('[data-field="meeting-with"]');
       $mwWrap.find('.bp-mw-list').html(mwOpts);
-
-      /* Clear the current selection when the selected record is no longer in the list */
-      var selectedId = $mwWrap.find('.bp-dd-val').attr('data-selected-id');
-      if (selectedId) {
-        var stillExists = records.some(function (r) { return r.id === selectedId; });
-        if (!stillExists) {
-          $mwWrap.find('.bp-dd-val').text('Select\u2026').removeAttr('data-selected-id');
-          $mwWrap.find('.bp-rec-avatar')
-            .text('').removeClass('bp-rec-avatar--show').removeAttr('data-img-src');
-        }
-      }
     });
   }
 
