@@ -1477,6 +1477,15 @@ $(function () {
       var $thead   = $slotsWrap.find('thead');
       topBound     = $thead.length ? $thead[0].getBoundingClientRect().bottom : swRect.top;
       bottomBound  = swRect.bottom;
+      /* Safety guard: if the trigger has scrolled outside the visible
+         table-body area (under the sticky thead or past the container
+         bottom) close the dropdown instead of painting it in an invalid
+         position.  This catches every call-site (scroll, resize, setTimeout)
+         so the panel can never appear above the header or outside the modal. */
+      if (rect.top < topBound || rect.top >= bottomBound) {
+        closeAllBpDropdowns();
+        return;
+      }
     } else {
       var $mb = $wrap.closest('.modal-body');
       if ($mb.length) {
@@ -3949,11 +3958,15 @@ $(function () {
       if (triggerEl) {
         var bodyRect    = this.getBoundingClientRect();
         var triggerRect = triggerEl.getBoundingClientRect();
-        if (triggerRect.bottom <= bodyRect.top || triggerRect.top >= bodyRect.bottom) {
+        /* Use triggerRect.top (not .bottom) so the panel is closed as soon as
+           any part of the trigger row starts scrolling out of the modal body. */
+        if (triggerRect.top <= bodyRect.top || triggerRect.top >= bodyRect.bottom) {
           closeAllBpDropdowns();
           return;
         }
       }
+      /* positionBpPanel contains its own safety guard that closes the dropdown
+         if the trigger has gone under the sticky thead, so simply delegate. */
       positionBpPanel($open);
     });
 
