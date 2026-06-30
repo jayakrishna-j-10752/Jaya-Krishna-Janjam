@@ -4475,3 +4475,87 @@ input, select, textarea {
 .bp-mass-create-btn:hover {
   opacity: .88;
 }
+
+/* ── Slot clear (×) button inside .sye-slot-field ── */
+.sye-slot-clear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .1s, color .1s;
+  user-select: none;
+  margin-left: 2px;
+}
+.sye-slot-clear:hover {
+  background: var(--z-red-pale, #FDECEA);
+  color: var(--z-red, #C62828);
+}
+/* Lay .sye-slot-field and .sye-slot-clear side-by-side */
+.sye-slot-info {
+  position: relative;
+}
+/* Wrap sye-slot-field + clear in a flex row */
+.sye-slot-field ~ .sye-slot-clear {
+  /* already displayed inline next to the field span via parent flex */
+}
+/* Make the bottom row of sye-slot-info a flex row so field + clear align */
+.sye-slot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Override: last two children (field + clear) flow in a row */
+.sye-slot-field,
+.sye-slot-clear {
+  align-self: flex-start;
+}
+/* Visually group field text and the × on one line */
+.sye-slot-field-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ── Actions column in .bp-slots-table ── */
+.bp-action-th {
+  width: 90px;
+  min-width: 90px;
+}
+.bp-action-cell {
+  padding: 4px 6px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.bp-slot-row + .bp-slot-row .bp-action-cell {
+  border-top: 1px solid var(--border);
+}
+.bp-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background .1s, border-color .1s, color .1s;
+  padding: 0;
+}
+.bp-row-action svg {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.bp-row-save:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
+.bp-row-copy:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
+.bp-row-paste:hover { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }

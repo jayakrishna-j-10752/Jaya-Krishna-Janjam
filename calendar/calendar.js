@@ -282,7 +282,8 @@ $(function () {
     paste: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="13" rx="1.5"/><path d="M6 2v2h4V2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>',
     trash: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5"/><rect x="3.5" y="4.5" width="9" height="9" rx="1.25"/><line x1="6.5" y1="7" x2="6.5" y2="11"/><line x1="9.5" y1="7" x2="9.5" y2="11"/></svg>',
     edit:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg>',
-    close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>'
+    close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>',
+    save:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 13.5H3a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5h7.5l3 3V13a.5.5 0 0 1-.5.5z"/><rect x="5" y="9" width="6" height="4.5" rx=".5"/><rect x="5.5" y="2.5" width="4" height="3" rx=".5"/></svg>'
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -1304,6 +1305,7 @@ $(function () {
     tablePicklistCols.forEach(function (f) {
       tableHtml += '<th class="bp-th">' + escHtml(f.field_label) + '</th>';
     });
+    tableHtml += '<th class="bp-th bp-action-th">Actions</th>';
     tableHtml += '</tr></thead><tbody>';
 
     /* Determine the earliest hour to show: for today, skip hours that have already passed */
@@ -1362,6 +1364,13 @@ $(function () {
                      '</div>' +
                      '</td>';
       });
+
+      /* ── Actions column ── */
+      tableHtml += '<td class="bp-action-cell">' +
+                   '<button class="bp-row-action bp-row-save" type="button" title="Save row">' + SVG.save + '</button>' +
+                   '<button class="bp-row-action bp-row-copy" type="button" title="Copy row">' + SVG.copy + '</button>' +
+                   '<button class="bp-row-action bp-row-paste" type="button" title="Paste row">' + SVG.paste + '</button>' +
+                   '</td>';
 
       tableHtml += '</tr>';
     }
@@ -4462,7 +4471,7 @@ $(function () {
     var currentAssignment = syeSlotAssignments[syeActiveSlot];
 
     var html = '';
-    var HIDDEN_FIELD_LABELS = ['record status', 'currency', 'unsubscribed mode'];
+    var HIDDEN_FIELD_LABELS = ['record status', 'currency', 'unsubscribed mode', 'attendance', 'leave type'];
     $.each(syePicklistFields, function (_, f) {
       var apiName  = f.api_name    || '';
       var label    = f.field_label || apiName;
@@ -4505,6 +4514,7 @@ $(function () {
 
     /* Update the slot button's field sub-label */
     $('.sye-slot[data-slot="' + syeActiveSlot + '"] .sye-slot-field').text(label);
+    $('.sye-slot[data-slot="' + syeActiveSlot + '"] .sye-slot-clear').show();
 
     /* Show the configured border on the preview event by default */
     var SYE_BORDER_CLASS = {
@@ -4521,6 +4531,20 @@ $(function () {
     }
 
     closeSyeFieldPicker();
+  });
+
+  /* Clear a slot assignment from within the slot button */
+  $(document).on('click keydown', '.sye-slot-clear', function (e) {
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') { return; }
+    e.stopPropagation();
+    var $slot = $(this).closest('.sye-slot');
+    var slotKey = $slot.data('slot');
+    if (!slotKey) { return; }
+    delete syeSlotAssignments[slotKey];
+    $slot.find('.sye-slot-field').text('Choose field…');
+    $(this).hide();
+    /* Re-render picker list if it is currently open for this slot */
+    if (syeActiveSlot === slotKey) { renderSyeFieldList(); }
   });
 
   /* Close button */
@@ -4863,6 +4887,7 @@ $(function () {
       if (api) {
         syeSlotAssignments[slotKey] = { api_name: api, field_label: label };
         $('.sye-slot[data-slot="' + slotKey + '"] .sye-slot-field').text(label);
+        $('.sye-slot[data-slot="' + slotKey + '"] .sye-slot-clear').show();
       }
     });
 
