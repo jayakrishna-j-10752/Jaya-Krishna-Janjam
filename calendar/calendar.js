@@ -1177,8 +1177,8 @@ $(function () {
       dom.slotPickerGrid.find('.bp-slots-wrap').off('scroll.bpdd').on('scroll.bpdd', function () {
         var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
         if (!$open.length) { return; }
-        /* Close the dropdown if its trigger has scrolled out of the visible
-           table-body area (above the sticky thead or below the scroll viewport),
+        /* Close the dropdown as soon as any part of its trigger row starts
+           scrolling under the sticky thead (or below the visible viewport),
            so the fixed-position panel never renders on top of the sticky header. */
         var triggerEl  = $open.find('.bp-dd-trigger')[0];
         if (triggerEl) {
@@ -1186,7 +1186,7 @@ $(function () {
           var triggerRect = triggerEl.getBoundingClientRect();
           var $thead      = $(this).find('thead');
           var theadBottom = $thead.length ? $thead[0].getBoundingClientRect().bottom : wrapRect.top;
-          if (triggerRect.bottom <= theadBottom || triggerRect.top >= wrapRect.bottom) {
+          if (triggerRect.top < theadBottom || triggerRect.top >= wrapRect.bottom) {
             closeAllBpDropdowns();
             return;
           }
