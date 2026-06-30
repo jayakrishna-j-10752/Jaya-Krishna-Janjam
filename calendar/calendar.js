@@ -1223,20 +1223,6 @@ $(function () {
     dom.eventFormFoot.hide();
 
     dom.modal.addClass('modal-open');
-    /* After the open animation (0.24 s) finishes, clear the CSS transform on
-       .modal-box.  While a transform is set (even the identity matrix produced
-       by translateY(0) scale(1)), the element becomes the containing block for
-       any position:fixed descendants, which also makes overflow:hidden clip
-       those descendants.  Setting transform:none releases that containment so
-       .bp-dd-panel escapes the modal boundary and is never clipped. */
-    setTimeout(function () {
-      dom.modal.find('.modal-box').css('transform', 'none');
-      /* Re-position any open dropdown now that transform:none is set – the
-         safety-net offset-correction is no longer needed and the panel can be
-         placed accurately against the real viewport. */
-      var $open = $('#slotPickerGrid .bp-dd-wrap.bp-dd-open');
-      if ($open.length) { positionBpPanel($open); }
-    }, 260);
   }
 
   /**
@@ -1437,51 +1423,72 @@ $(function () {
   }
 
   /**
-   * Position an open .bp-dd-panel as position:fixed so it is never clipped
-   * by overflow containers (modal-body, bp-slots-wrap, modal-box), while
-   * keeping it visually contained within the table body.  The panel opens
-   * below the trigger when there is enough space inside the scroll container,
-   * and above it otherwise.  The available space is bounded by the visible
-   * portion of .bp-slots-wrap (between the sticky thead and the container
-   * bottom) so the panel never grows beyond the visible scroll container.
-   * The panel uses z-index:2300 (local to its stacking-context ancestor).
-   * For table-row panels the nearest stacking context is .modal-backdrop, so
-   * z-index:2300 > 2200 keeps the panel above .modal-foot.  For attend-bar
-   * panels the nearest ancestor stacking context is .bp-attend-bar itself
-   * (z-index:2400 in .modal-backdrop), which is above .modal-foot (z-index:
-   * 2200), ensuring the panel is never obscured by the footer.
+   * Return the .bp-dd-wrap that owns a given element inside a beat-plan
+   * dropdown.  When a panel has been moved to #bp-dd-portal the normal DOM
+   * traversal ($el.closest('.bp-dd-wrap')) finds nothing; fall back to the
+   * owner reference stored as jQuery data on the panel element.
+   */
+  function bpWrapOf($el) {
+    var $panel = $el.closest('.bp-dd-panel');
+    if ($panel.length) {
+      var owner = $panel.data('bpOwner');
+      if (owner && owner.length) { return owner; }
+    }
+    return $el.closest('.bp-dd-wrap');
+  }
+
+  /**
+   * Move the open .bp-dd-panel belonging to $wrap into #bp-dd-portal (a div
+   * that lives outside .modal-box) so it is never clipped by overflow:clip on
+   * .modal-box or overflow:auto on .bp-slots-wrap.  The portal is positioned
+   * absolute with inset:0 inside .modal-backdrop (position:fixed; inset:0), so
+   * viewport coordinates from getBoundingClientRect() equal portal-relative
+   * coordinates — no transform-offset correction is required.
    *
-   * NOTE: .modal-box has its CSS transform cleared to 'none' after the open
-   * animation finishes (see openSlotPicker).  With transform:none the element
-   * is no longer the containing block for position:fixed descendants, so the
-   * panel positions against the real viewport and is not clipped by
-   * overflow:hidden on the modal.  The offset-correction block below acts as a
-   * safety-net for the brief (~260 ms) window while the animation is still
-   * running and the transform is still active.
+   * The panel opens below the trigger when there is room, or above it when
+   * the trigger is near the bottom of the scroll container.
    */
   function positionBpPanel($wrap) {
     var triggerEl = $wrap.find('.bp-dd-trigger')[0];
-    var $panel    = $wrap.find('.bp-dd-panel');
-    if (!triggerEl || !$panel.length) { return; }
-    var rect  = triggerEl.getBoundingClientRect();
-    var vpH   = window.innerHeight;
+    if (!triggerEl) { return; }
+    var rect = triggerEl.getBoundingClientRect();
+    var vpH  = window.innerHeight;
+    var vpW  = window.innerWidth;
 
-    /* Determine the visual bounding box so the panel stays within the
-       visible table-body area.  For table-row dropdowns use the slots-wrap
-       bounds (thead bottom → container bottom); for attend-bar dropdowns
-       (outside the scroll wrapper) use the modal-body bounds. */
+    /* Find the panel.  On the initial open it is still inside $wrap; on
+       scroll/resize repositioning it has already been moved to the portal. */
+    var $portal = $('#bp-dd-portal');
+    var $panel  = $wrap.find('.bp-dd-panel');
+    if ($panel.length) {
+      /* First open: stamp data-field / data-row on the panel so the event-
+         delegation selectors in initEvents() match from inside the portal,
+         store the owner wrap reference, then move the panel out of the
+         overflow-clipping containers. */
+      $panel
+        .attr('data-field', $wrap.attr('data-field') || '')
+        .attr('data-row',   $wrap.attr('data-row')   || '')
+        .data('bpOwner', $wrap)
+        .appendTo($portal);
+    } else {
+      /* Reposition call: retrieve the panel from the portal by owner. */
+      $panel = $portal.children('.bp-dd-panel').filter(function () {
+        var o = $(this).data('bpOwner');
+        return o && o.length && o[0] === $wrap[0];
+      });
+      if (!$panel.length) { return; }
+    }
+
+    /* Safety guard: if the trigger has scrolled outside the visible
+       table-body area close the dropdown instead of placing the panel in an
+       invalid position.  For attend-bar dropdowns (outside .bp-slots-wrap)
+       bound to the modal-body rectangle. */
     var $slotsWrap = $wrap.closest('.bp-slots-wrap');
     var topBound, bottomBound;
     if ($slotsWrap.length) {
-      var swRect   = $slotsWrap[0].getBoundingClientRect();
-      var $thead   = $slotsWrap.find('thead');
-      topBound     = $thead.length ? $thead[0].getBoundingClientRect().bottom : swRect.top;
-      bottomBound  = swRect.bottom;
-      /* Safety guard: if the trigger has scrolled outside the visible
-         table-body area (under the sticky thead or past the container
-         bottom) close the dropdown instead of painting it in an invalid
-         position.  This catches every call-site (scroll, resize, setTimeout)
-         so the panel can never appear above the header or outside the modal. */
+      var swRect  = $slotsWrap[0].getBoundingClientRect();
+      var $thead  = $slotsWrap.find('thead');
+      topBound    = $thead.length ? $thead[0].getBoundingClientRect().bottom : swRect.top;
+      bottomBound = swRect.bottom;
       if (rect.top < topBound || rect.top >= bottomBound) {
         closeAllBpDropdowns();
         return;
@@ -1498,75 +1505,62 @@ $(function () {
       }
     }
 
-    /* Safety-net: if .modal-box still carries an active transform (during the
-       brief open animation), position:fixed is relative to the modal's
-       padding-box rather than the viewport.  Detect and compensate. */
-    var offsetTop    = 0;
-    var offsetLeft   = 0;
-    var offsetBottom = vpH;
-    var $box = $wrap.closest('.modal-box');
-    if ($box.length) {
-      var cs = window.getComputedStyle($box[0]);
-      if (cs.transform && cs.transform !== 'none') {
-        var boxRect = $box[0].getBoundingClientRect();
-        offsetTop    = boxRect.top    + (parseFloat(cs.borderTopWidth)    || 0);
-        offsetLeft   = boxRect.left   + (parseFloat(cs.borderLeftWidth)   || 0);
-        offsetBottom = boxRect.bottom - (parseFloat(cs.borderBottomWidth) || 0);
-      }
-    }
-
-    var vpW       = window.innerWidth;
-    var panelW    = rect.width;
-    var rawLeft   = rect.left - offsetLeft;
-    var clampedLeft = Math.max(0, Math.min(rawLeft, vpW - panelW - 4));
+    var panelW      = rect.width;
+    var clampedLeft = Math.max(0, Math.min(rect.left, vpW - panelW - 4));
 
     $panel.css({
-      position:  'fixed',
+      position:  'absolute',
+      display:   'block',
       width:     panelW + 'px',
       left:      clampedLeft + 'px',
       right:     'auto',
       'z-index': 2300
     });
 
-    var searchH  = ($panel.find('.bp-dd-search').outerHeight(true) || 36);
-    var GAP      = 3;
-    var PAD      = 8;
-    var MIN_LIST = 60;
-    /* Minimum total vertical space required to open upward usefully.
-       If less space is available above, fall back to opening downward. */
+    var searchH   = ($panel.find('.bp-dd-search').outerHeight(true) || 36);
+    var GAP       = 3;
+    var PAD       = 8;
+    var MIN_LIST  = 60;
+    /* Minimum total vertical space needed to open upward usefully. */
     var MIN_PANEL = searchH + MIN_LIST + GAP + PAD;
 
-    /* Space below the trigger within the visible scroll container */
+    /* Space below / above the trigger within the visible container bounds. */
     var below = Math.max(0, Math.min(vpH - rect.bottom, bottomBound - rect.bottom));
-    /* Space above the trigger within the visible scroll container
-       (bounded by the sticky thead bottom or modal-body top) */
-    var above = Math.max(0, rect.top - Math.max(topBound, offsetTop));
+    var above = Math.max(0, rect.top - Math.max(topBound, 0));
 
     var availH;
-    /* Open upward only when above > below AND enough room exists above for a
-       useful panel.  Without the MIN_PANEL guard the list would be forced to
-       MIN_LIST height even when availH is tiny, pushing the panel above topBound
-       and out of the modal. */
     if (below >= above || above < MIN_PANEL) {
-      /* Open downward (or fall back to downward when space above is too small) */
+      /* Open downward (or fall back when above is too small). */
       availH = below - searchH - GAP - PAD;
-      $panel.css({ top: (rect.bottom - offsetTop + GAP) + 'px', bottom: 'auto' });
+      $panel.css({ top: (rect.bottom + GAP) + 'px', bottom: 'auto' });
       $panel.find('.bp-dd-list').css('max-height', Math.max(MIN_LIST, Math.min(180, availH)) + 'px');
     } else {
-      /* Open upward – no MIN_LIST floor so the panel never overflows above topBound */
+      /* Open upward. */
       availH = above - searchH - GAP - PAD;
-      $panel.css({ top: 'auto', bottom: (offsetBottom - rect.top + GAP) + 'px' });
+      $panel.css({ top: 'auto', bottom: (vpH - rect.top + GAP) + 'px' });
       $panel.find('.bp-dd-list').css('max-height', Math.max(0, Math.min(180, availH)) + 'px');
     }
   }
 
   /**
-   * Close a single .bp-dd-wrap dropdown and reset its panel's inline styles.
+   * Close a single .bp-dd-wrap dropdown and return its panel from the portal.
    */
   function closeBpDropdown($wrap) {
     $wrap.removeClass('bp-dd-open');
-    $wrap.find('.bp-dd-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '', 'z-index': '' });
-    $wrap.find('.bp-dd-list').css('max-height', '');
+    /* The panel may have been moved to #bp-dd-portal; find it there first. */
+    var $portal = $('#bp-dd-portal');
+    var $panel  = $portal.children('.bp-dd-panel').filter(function () {
+      var o = $(this).data('bpOwner');
+      return o && o.length && o[0] === $wrap[0];
+    });
+    if (!$panel.length) {
+      $panel = $wrap.find('.bp-dd-panel');
+    }
+    if ($panel.length) {
+      $panel.removeData('bpOwner').appendTo($wrap);
+      $panel.css({ position: '', display: '', top: '', bottom: '', left: '', right: '', width: '', 'z-index': '' });
+      $panel.find('.bp-dd-list').css('max-height', '');
+    }
   }
 
   /**
@@ -1593,11 +1587,6 @@ $(function () {
 
   function closeSlotPicker() {
     closeAllBpDropdowns();
-    /* Restore the CSS-driven transform so the close animation can play.
-       The inline 'none' we set after opening must be cleared first, otherwise
-       the box stays flat and the scale-down / translateY exit transition is
-       skipped. */
-    dom.modal.find('.modal-box').css('transform', '');
     dom.modal.removeClass('modal-open');
     /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
     setTimeout(function () {
@@ -3633,21 +3622,24 @@ $(function () {
       closeAllBpDropdowns();
       if (!isOpen) {
         $wrap.addClass('bp-dd-open');
-        $wrap.find('.bp-dd-search').val('').focus();
-        /* Show all options */
-        $wrap.find('.bp-dd-opt').show();
-        /* Position the panel as fixed so overflow containers cannot clip it */
+        /* Grab panel reference before positionBpPanel moves it to the portal */
+        var $panel = $wrap.find('.bp-dd-panel');
+        $panel.find('.bp-dd-opt').show();
+        $panel.find('.bp-dd-search').val('');
+        /* Move the panel to #bp-dd-portal so it is never clipped */
         positionBpPanel($wrap);
+        /* Focus search input after the panel has been repositioned */
+        $panel.find('.bp-dd-search').focus();
       }
     });
 
     /* Prevent search input click from bubbling and closing the panel */
-    $(document).on('click', '#slotPickerGrid .bp-dd-search', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-search, #bp-dd-portal .bp-dd-search', function (e) {
       e.stopPropagation();
     });
 
     /* Live-filter dropdown options as the user types */
-    $(document).on('input', '#slotPickerGrid .bp-dd-search', function () {
+    $(document).on('input', '#slotPickerGrid .bp-dd-search, #bp-dd-portal .bp-dd-search', function () {
       var q    = $(this).val().toLowerCase();
       var $ul  = $(this).closest('.bp-dd-panel').find('.bp-dd-opt');
       $ul.each(function () {
@@ -3657,11 +3649,11 @@ $(function () {
     });
 
     /* "Meetings For" option selected → set value + populate Meeting With */
-    $(document).on('click', '#slotPickerGrid [data-field="meetings-for"] .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid [data-field="meetings-for"] .bp-dd-opt, #bp-dd-portal .bp-dd-panel[data-field="meetings-for"] .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
-      var $wrap  = $opt.closest('.bp-dd-wrap');
-      var $row   = $opt.closest('.bp-slot-row');
+      var $wrap  = bpWrapOf($opt);
+      var $row   = $wrap.closest('.bp-slot-row');
       var label  = $opt.data('label');
       var api    = $opt.data('api');
 
@@ -3713,10 +3705,10 @@ $(function () {
     });
 
     /* "Meeting With" option selected → show initials avatar; try to load actual photo */
-    $(document).on('click', '#slotPickerGrid [data-field="meeting-with"] .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid [data-field="meeting-with"] .bp-dd-opt, #bp-dd-portal .bp-dd-panel[data-field="meeting-with"] .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt    = $(this);
-      var $wrap   = $opt.closest('.bp-dd-wrap');
+      var $wrap   = bpWrapOf($opt);
       var label   = $opt.data('label')    || '';
       var id      = $opt.data('id')       || '';
       var photoId = $opt.data('photo-id') || '';
@@ -3752,10 +3744,10 @@ $(function () {
 
     /* Generic picklist option selected for all dynamic BPR columns
        (meetings-for and meeting-with have their own handlers above) */
-    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not([data-field="meetings-for"]):not([data-field="meeting-with"]) .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not([data-field="meetings-for"]):not([data-field="meeting-with"]) .bp-dd-opt, #bp-dd-portal .bp-dd-panel:not([data-field="meetings-for"]):not([data-field="meeting-with"]) .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
-      var $wrap  = $opt.closest('.bp-dd-wrap');
+      var $wrap  = bpWrapOf($opt);
       var field  = $wrap.data('field');
       var label  = $opt.data('label');
       var actual = $opt.data('actual') || label;
@@ -3784,7 +3776,8 @@ $(function () {
 
     /* Close beat plan dropdowns when clicking anywhere outside */
     $(document).on('click', function (e) {
-      if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length) {
+      /* Clicks inside the open portal panel or its trigger wrap must not close */
+      if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap, #bp-dd-portal').length) {
         closeAllBpDropdowns();
       }
       /* Close open filter-panel multi-selects when clicking outside */
@@ -4291,7 +4284,9 @@ $(function () {
     var below = vpH - rect.bottom;
     var above = rect.top;
 
-    /* Same modal-box transform compensation used in positionBpPanel */
+    /* Offset correction: if an ancestor .modal-box still has an active CSS
+       transform it becomes the containing block for position:fixed descendants.
+       Detect and compensate so the panel renders at the correct viewport position. */
     var offsetTop    = 0;
     var offsetLeft   = 0;
     var offsetBottom = vpH;

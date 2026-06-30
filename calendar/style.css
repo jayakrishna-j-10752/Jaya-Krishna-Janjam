@@ -1124,6 +1124,22 @@ input, select, textarea {
   pointer-events: all;
 }
 
+/* Portal that receives open .bp-dd-panel elements so they are never clipped
+   by .modal-box overflow:clip or the table's overflow:auto containers.
+   Positioned absolutely to cover the full modal-backdrop (inset:0), so
+   top/left values from getBoundingClientRect() equal portal-relative coords.
+   pointer-events:none lets clicks fall through to the backdrop; each panel
+   inside opts back in with pointer-events:auto. */
+#bp-dd-portal {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+#bp-dd-portal .bp-dd-panel {
+  pointer-events: auto;
+}
+
 .modal-box {
   background: var(--surface);
   border-radius: 16px;
