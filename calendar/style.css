@@ -3749,7 +3749,6 @@ input, select, textarea {
   overflow-y: auto;
   /* ~420px fits ~10 rows before scrolling; keeps the picker compact in the modal */
   max-height: 420px;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
 }
 .bp-th {
@@ -3842,6 +3841,9 @@ input, select, textarea {
   position: absolute;
   top: 100%;
   left: 0;
+  /* z-index: 100 — above same-row static table content (z-index:auto)
+     but below sticky thead / modal-head (2200) and attend-bar (2400). */
+  z-index: 100;
   width: 100%;
   min-width: 180px;
   background: var(--surface);
