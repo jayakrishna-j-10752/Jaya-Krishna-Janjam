@@ -415,6 +415,9 @@ $(function () {
       if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft  + ';border-left-style:solid;border-left-width:3px;'; }
       if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight + ';border-right-style:solid;border-right-width:2px;'; }
       if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
+      /* When no bg-colour is resolved but a left-border color exists, derive a tinted
+         background from the border colour to keep the chip visually distinct. */
+      if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
     } else {
       /* Fallback: use the event's manually chosen colour */
       var bg     = ev.color + '22';
@@ -1354,10 +1357,10 @@ $(function () {
       if (lbl === 'end time')     { endTimeMeta   = f; }
       if (lbl === 'meetings for') { mfMeta        = f; }
     });
-    var startTimeApi   = 'beatplanner__Start_Time';
-    var startTimeLbl   = 'Start Time';
-    var endTimeApi     = 'beatplanner__End_Time';
-    var endTimeLbl     = 'End Time';
+    var startTimeApi   = 'beatplanner__Date_Time_From';
+    var startTimeLbl   = 'Date Time From';
+    var endTimeApi     = 'beatplanner__Date_Time_To';
+    var endTimeLbl     = 'Date Time To';
     var mfFieldApi     = (mfMeta && mfMeta.api_name)                  || 'beatplanner__Meetings_For';
     var mfFieldLabel   = (mfMeta && mfMeta.field_label)               || 'Meetings For';
 
@@ -1389,8 +1392,8 @@ $(function () {
     var tableHtml = '<table class="bp-slots-table" style="display:none;">';
     tableHtml += '<thead><tr>';
     tableHtml += '<th class="bp-th bp-cb-th"></th>';
-    tableHtml += '<th class="bp-th">Start Time</th>';
-    tableHtml += '<th class="bp-th">End Time</th>';
+    tableHtml += '<th class="bp-th">Date Time From</th>';
+    tableHtml += '<th class="bp-th">Date Time To</th>';
     tableHtml += '<th class="bp-th">Meetings For</th>';
     tableHtml += '<th class="bp-th">Meeting With</th>';
     tablePicklistCols.forEach(function (f) {
@@ -1403,6 +1406,9 @@ $(function () {
     var currentHour = isToday(date) ? new Date().getHours() : 0;
 
     for (var h = currentHour; h < 24; h++) {
+      /* Skip slots that already contain an existing event */
+      if (eventAtHour(date, h)) { continue; }
+
       var startLbl = fmtTime(hourToTime(h));
       var endLbl   = fmtTime(h === 23 ? '23:59' : hourToTime(h + 1));
 
@@ -2400,6 +2406,8 @@ $(function () {
       var user   = userMap[userId];
       if (!user) return;
       activeUserId = userId;
+      /* Persist the selected user ID on the profile button for use during record creation */
+      $('#userProfile').attr('data-userid', userId);
       $('.user-name').text(user.full_name);
       /* Copy the exact avatar content from the selected .ud-item-avatar so the
          header always reflects what is shown in the list (image or initials). */
@@ -3772,8 +3780,8 @@ $(function () {
         var endTime    = hour === 23 ? '23:59' : hourToTime(hour + 1);
         var $sc        = $row.find('.bp-time-cell').eq(0);
         var $ec        = $row.find('.bp-time-cell').eq(1);
-        recordData[$sc.data('api') || 'beatplanner__Start_Time'] = startTime;
-        recordData[$ec.data('api') || 'beatplanner__End_Time']   = endTime;
+        recordData[$sc.data('api') || 'beatplanner__Date_Time_From'] = startTime;
+        recordData[$ec.data('api') || 'beatplanner__Date_Time_To']   = endTime;
 
         if (date) { recordData['beatplanner__Date'] = date; }
 
@@ -3825,6 +3833,12 @@ $(function () {
         /* Always default Managers Approval to "Pending" on creation */
         recordData['beatplanner__Managers_Approval'] = 'Pending';
 
+        /* Assign the record to the currently selected user */
+        var massOwnerId = $('#userProfile').attr('data-userid');
+        if (massOwnerId) {
+          recordData['Owner'] = { id: massOwnerId };
+        }
+
         try {
           await ZOHO.CRM.API.insertRecord({
             Entity:  'beatplanner__Daily_Beat_Plans',
@@ -3868,8 +3882,8 @@ $(function () {
       var endTime     = hour === 23 ? '23:59' : hourToTime(hour + 1);
       var $startCell  = $row.find('.bp-time-cell').eq(0);
       var $endCell    = $row.find('.bp-time-cell').eq(1);
-      recordData[$startCell.data('api') || 'beatplanner__Start_Time'] = startTime;
-      recordData[$endCell.data('api')   || 'beatplanner__End_Time']   = endTime;
+      recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startTime;
+      recordData[$endCell.data('api')   || 'beatplanner__Date_Time_To']   = endTime;
 
       /* Date field */
       if (date) {
@@ -3936,11 +3950,17 @@ $(function () {
       /* Mandatory Name field */
       recordData['Name'] = 'Meeting With ' + mwName;
 
-      /* Always default Managers Approval to "Pending" on creation (Issue 3).
+      /* Always default Managers Approval to "Pending" on creation.
          Also add to bprFieldValues so the left-border colour is resolved from
-         the beatplanner__Daily_Beat_Plans metadata (Issue 2). */
+         the beatplanner__Daily_Beat_Plans metadata. */
       recordData['beatplanner__Managers_Approval'] = 'Pending';
       bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+
+      /* Assign the record to the currently selected user */
+      var saveOwnerId = $('#userProfile').attr('data-userid');
+      if (saveOwnerId) {
+        recordData['Owner'] = { id: saveOwnerId };
+      }
 
       /* Disable the save button while the API call is in progress */
       $btn.prop('disabled', true);
@@ -4522,6 +4542,9 @@ $(function () {
       if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
       if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
       if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
+      /* When no bg-colour is resolved but a left-border color exists, derive a tinted
+         background from the border colour to keep the chip visually distinct. */
+      if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
       if (s.markerColor)  { $chip.find('.chip-marker').css('background', s.markerColor); }
       if (styleStr)       { $chip.attr('style', ($chip.attr('style') || '') + styleStr); }
     });
@@ -4597,8 +4620,10 @@ $(function () {
           options = f.pick_list_values.map(function (pv) {
             var display = pv.display_value || pv.actual_value || '';
             var actual  = pv.actual_value  || pv.display_value || '';
-            /* Zoho CRM v8 uses 'colour_code'; guard against alternate spellings */
-            var colour  = pv.colour_code || pv.color_code || '';
+            /* Zoho CRM v8 returns the colour as colour_code (hex, with or without '#').
+               Guard against alternate spellings and ensure we always get a string. */
+            var rawColour = pv.colour_code || pv.color_code || pv.colour || pv.color || '';
+            var colour = rawColour ? String(rawColour).trim() : '';
             return display ? { display: display, actual: actual, colour: colour } : null;
           }).filter(Boolean);
         }
@@ -5590,6 +5615,8 @@ $(function () {
       activeUserId = loggedInUserId;
       $('.user-name').text(loggedUser.full_name);
       $('.user-avatar').html(buildAvatarInnerHtml(loggedUser));
+      /* Seed the profile button with the logged-in user's ID so record creation uses it */
+      $('#userProfile').attr('data-userid', loggedInUserId);
     }
 
     /* ── Step 3: childrenMap is already built from Reporting_To in buildUserMaps() ── */
