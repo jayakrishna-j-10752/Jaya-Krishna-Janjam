@@ -1190,13 +1190,13 @@ input, select, textarea {
 .modal-init-loader {
   height: 3px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  background: color-mix(in srgb, var(--z-blue) 18%, transparent);
   flex-shrink: 0;
 }
 .modal-init-loader-bar {
   height: 100%;
   width: 40%;
-  background: var(--accent);
+  background: var(--z-blue);
   border-radius: 0 2px 2px 0;
   animation: modal-loader-slide 1.2s ease-in-out infinite;
 }

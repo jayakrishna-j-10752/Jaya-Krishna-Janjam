@@ -424,7 +424,7 @@ $(function () {
     }
 
     var bprAttr = (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length)
-      ? ' data-bpr-fields=\'' + escHtml(JSON.stringify(ev.bprFieldValues)) + '\''
+      ? ' data-bpr-fields="' + escHtml(JSON.stringify(ev.bprFieldValues)) + '"'
       : '';
 
     return '<div class="evt-chip' + pastCls + '" ' +
