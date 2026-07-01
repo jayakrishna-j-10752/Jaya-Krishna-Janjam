@@ -3822,6 +3822,9 @@ $(function () {
         /* Mandatory Name field */
         recordData['Name'] = 'Meeting With ' + mwName;
 
+        /* Always default Managers Approval to "Pending" on creation */
+        recordData['beatplanner__Managers_Approval'] = 'Pending';
+
         try {
           await ZOHO.CRM.API.insertRecord({
             Entity:  'beatplanner__Daily_Beat_Plans',
@@ -3932,6 +3935,12 @@ $(function () {
 
       /* Mandatory Name field */
       recordData['Name'] = 'Meeting With ' + mwName;
+
+      /* Always default Managers Approval to "Pending" on creation (Issue 3).
+         Also add to bprFieldValues so the left-border colour is resolved from
+         the beatplanner__Daily_Beat_Plans metadata (Issue 2). */
+      recordData['beatplanner__Managers_Approval'] = 'Pending';
+      bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
 
       /* Disable the save button while the API call is in progress */
       $btn.prop('disabled', true);
@@ -4588,7 +4597,8 @@ $(function () {
           options = f.pick_list_values.map(function (pv) {
             var display = pv.display_value || pv.actual_value || '';
             var actual  = pv.actual_value  || pv.display_value || '';
-            var colour  = pv.colour_code   || '';
+            /* Zoho CRM v8 uses 'colour_code'; guard against alternate spellings */
+            var colour  = pv.colour_code || pv.color_code || '';
             return display ? { display: display, actual: actual, colour: colour } : null;
           }).filter(Boolean);
         }
