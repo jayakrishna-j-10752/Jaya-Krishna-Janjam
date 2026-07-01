@@ -1354,10 +1354,10 @@ $(function () {
       if (lbl === 'end time')     { endTimeMeta   = f; }
       if (lbl === 'meetings for') { mfMeta        = f; }
     });
-    var startTimeApi   = (startTimeMeta && startTimeMeta.api_name)   || 'beatplanner__Start_Time';
-    var startTimeLbl   = (startTimeMeta && startTimeMeta.field_label) || 'Start Time';
-    var endTimeApi     = (endTimeMeta && endTimeMeta.api_name)        || 'beatplanner__End_Time';
-    var endTimeLbl     = (endTimeMeta && endTimeMeta.field_label)     || 'End Time';
+    var startTimeApi   = 'beatplanner__Start_Time';
+    var startTimeLbl   = 'Start Time';
+    var endTimeApi     = 'beatplanner__End_Time';
+    var endTimeLbl     = 'End Time';
     var mfFieldApi     = (mfMeta && mfMeta.api_name)                  || 'beatplanner__Meetings_For';
     var mfFieldLabel   = (mfMeta && mfMeta.field_label)               || 'Meetings For';
 
@@ -3887,6 +3887,7 @@ $(function () {
       var $mwVal      = $mwWrap.find('.bp-dd-val');
       var mwId        = $mwVal.attr('data-selected-id') || '';
       var mwLookupApi = $mwWrap.attr('data-api') || '';
+      var mwName      = $mwVal.text() || '';
       if (mwId && mwLookupApi) {
         recordData[mwLookupApi] = { id: mwId };
       }
@@ -3928,6 +3929,9 @@ $(function () {
       if (monthlyBeatPlanId) {
         recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
       }
+
+      /* Mandatory Name field */
+      recordData['Name'] = 'Meeting With ' + mwName;
 
       /* Disable the save button while the API call is in progress */
       $btn.prop('disabled', true);
