@@ -1332,9 +1332,9 @@ $(function () {
     }
 
     /* Build a full searchable bp-dd-wrap dropdown */
-    function buildDdWrap(fieldKey, placeholder, optListHtml, rowAttr) {
+    function buildDdWrap(fieldApi, fieldLabel, placeholder, optListHtml, rowAttr) {
       var rowPart = rowAttr ? ' ' + rowAttr : '';
-      return '<div class="bp-dd-wrap"' + rowPart + ' data-field="' + escHtml(fieldKey) + '">' +
+      return '<div class="bp-dd-wrap"' + rowPart + ' data-api="' + escHtml(fieldApi) + '" data-label="' + escHtml(fieldLabel) + '">' +
              '<div class="bp-dd-trigger" tabindex="0">' +
              '<span class="bp-dd-val">' + escHtml(placeholder) + '</span>' +
              chevSvg +
@@ -1346,18 +1346,33 @@ $(function () {
              '</div>';
     }
 
+    /* ── Resolve field metadata for time and meetings-for fields ── */
+    var startTimeMeta = null, endTimeMeta = null, mfMeta = null;
+    bpDailyAllFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase();
+      if (lbl === 'start time')   { startTimeMeta = f; }
+      if (lbl === 'end time')     { endTimeMeta   = f; }
+      if (lbl === 'meetings for') { mfMeta        = f; }
+    });
+    var startTimeApi   = (startTimeMeta && startTimeMeta.api_name)   || 'beatplanner__Start_Time';
+    var startTimeLbl   = (startTimeMeta && startTimeMeta.field_label) || 'Start Time';
+    var endTimeApi     = (endTimeMeta && endTimeMeta.api_name)        || 'beatplanner__End_Time';
+    var endTimeLbl     = (endTimeMeta && endTimeMeta.field_label)     || 'End Time';
+    var mfFieldApi     = (mfMeta && mfMeta.api_name)                  || 'beatplanner__Meetings_For';
+    var mfFieldLabel   = (mfMeta && mfMeta.field_label)               || 'Meetings For';
+
     /* ── Attendance + Leave Type bar (top-left of .bp-slots-wrap) ── */
     var attendBar = '<div class="bp-attend-bar">';
     if (attendanceField) {
       attendBar += '<div class="bp-attend-field">' +
                    '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
-                   buildDdWrap('attendance', 'Select\u2026', buildOptList(attendanceField.options)) +
+                   buildDdWrap(attendanceField.api_name, attendanceField.field_label, 'Select\u2026', buildOptList(attendanceField.options)) +
                    '</div>';
     }
     if (leaveTypeField) {
       attendBar += '<div class="bp-attend-field bp-leave-type-field" style="display:none;">' +
                    '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
-                   buildDdWrap('leave-type', 'Select\u2026', buildOptList(leaveTypeField.options)) +
+                   buildDdWrap(leaveTypeField.api_name, leaveTypeField.field_label, 'Select\u2026', buildOptList(leaveTypeField.options)) +
                    '</div>';
     }
     /* ── Filter button (shown only when Attendance = "Working") ── */
@@ -1393,12 +1408,12 @@ $(function () {
 
       tableHtml += '<tr class="bp-slot-row" data-date="' + date + '" data-hour="' + h + '">';
       tableHtml += '<td class="bp-cb-cell"><input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>';
-      tableHtml += '<td class="bp-time-cell">' + startLbl + '</td>';
-      tableHtml += '<td class="bp-time-cell">' + endLbl + '</td>';
+      tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
+      tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(endTimeApi) + '" data-label="' + escHtml(endTimeLbl) + '">' + endLbl + '</td>';
 
       /* ── Meetings For dropdown ── */
       tableHtml += '<td class="bp-dd-cell">' +
-                   '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meetings-for">' +
+                   '<div class="bp-dd-wrap bp-mf-wrap" data-row="' + h + '" data-api="' + escHtml(mfFieldApi) + '" data-label="' + escHtml(mfFieldLabel) + '">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-dd-val">Select module\u2026</span>' +
                    chevSvg +
@@ -1412,7 +1427,7 @@ $(function () {
 
       /* ── Meeting With dropdown (with avatar slot) ── */
       tableHtml += '<td class="bp-dd-cell">' +
-                   '<div class="bp-dd-wrap" data-row="' + h + '" data-field="meeting-with">' +
+                   '<div class="bp-dd-wrap bp-mw-wrap" data-row="' + h + '" data-api="" data-label="Meeting With">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-rec-avatar" aria-hidden="true"></span>' +
                    '<span class="bp-dd-val">Select\u2026</span>' +
@@ -1428,7 +1443,7 @@ $(function () {
       /* ── Dynamic picklist columns ── */
       tablePicklistCols.forEach(function (f) {
         tableHtml += '<td class="bp-dd-cell">' +
-                     '<div class="bp-dd-wrap" data-row="' + h + '" data-field="' + escHtml(f.api_name) + '">' +
+                     '<div class="bp-dd-wrap" data-row="' + h + '" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
                      '<div class="bp-dd-trigger" tabindex="0">' +
                      '<span class="bp-dd-val">Select\u2026</span>' +
                      chevSvg +
@@ -3589,7 +3604,7 @@ $(function () {
     });
 
     /* "Meetings For" option selected → set value + populate Meeting With */
-    $(document).on('click', '#slotPickerGrid [data-field="meetings-for"] .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-mf-wrap .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
       var $wrap  = bpWrapOf($opt);
@@ -3616,13 +3631,9 @@ $(function () {
       }
 
       /* Populate the "Meeting With" dropdown for this row */
-      var $mwWrap  = $row.find('[data-field="meeting-with"]');
-      /* Stamp the resolved lookup field API name so it can be used when saving records */
-      if (lookupApiName) {
-        $mwWrap.attr('data-lookup-api', lookupApiName);
-      } else {
-        $mwWrap.removeAttr('data-lookup-api');
-      }
+      var $mwWrap  = $row.find('.bp-mw-wrap');
+      /* Stamp the resolved lookup field API name onto data-api so it can be used when saving */
+      $mwWrap.attr('data-api', lookupApiName || '');
       /* Use filtered records if a filter has been applied for this module; fall back to full list */
       var records  = filteredModuleRecords.hasOwnProperty(api)
                        ? filteredModuleRecords[api]
@@ -3645,7 +3656,7 @@ $(function () {
     });
 
     /* "Meeting With" option selected → show initials avatar; try to load actual photo */
-    $(document).on('click', '#slotPickerGrid [data-field="meeting-with"] .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-mw-wrap .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt    = $(this);
       var $wrap   = bpWrapOf($opt);
@@ -3684,19 +3695,21 @@ $(function () {
 
     /* Generic picklist option selected for all dynamic BPR columns
        (meetings-for and meeting-with have their own handlers above) */
-    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not([data-field="meetings-for"]):not([data-field="meeting-with"]) .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
       var $wrap  = bpWrapOf($opt);
-      var field  = $wrap.data('field');
       var label  = $opt.data('label');
       var actual = $opt.data('actual') || label;
 
       $wrap.find('.bp-dd-val').text(label).attr('data-actual-val', actual);
       closeBpDropdown($wrap);
 
-      /* Attendance controls table / Leave Type visibility */
-      if (field === 'attendance') {
+      /* Attendance controls table / Leave Type visibility.
+         Identify attendance dropdown by its position in the attend bar (not the leave-type field). */
+      var isAttendanceDd = $wrap.closest('.bp-attend-bar').length > 0 &&
+                           !$wrap.closest('.bp-leave-type-field').length;
+      if (isAttendanceDd) {
         var $grid     = $('#slotPickerGrid');
         var isWorking = (label || '').toLowerCase() === 'working';
         var isLeave   = (label || '').toLowerCase() === 'leave';
@@ -3709,7 +3722,7 @@ $(function () {
         }
         if (!isLeave) {
           /* Reset Leave Type selection when switching away from Leave */
-          $grid.find('[data-field="leave-type"] .bp-dd-val').text('Select\u2026');
+          $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val').text('Select\u2026');
         }
       }
     });
@@ -3719,6 +3732,122 @@ $(function () {
       var $grid    = $('#slotPickerGrid');
       var anyChecked = $grid.find('.bp-row-cb:checked').length > 0;
       $grid.find('.bp-mass-create-btn').toggle(anyChecked);
+    });
+
+    /* ── Bulk Create Daily Beat Plans ── */
+    $(document).on('click', '#slotPickerGrid .bp-mass-create-btn', async function () {
+      var $btn  = $(this);
+      var $grid = $('#slotPickerGrid');
+
+      /* Collect only rows where the checkbox is checked */
+      var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
+        return $(this).find('.bp-row-cb').is(':checked');
+      });
+
+      if ($checkedRows.length === 0) { return; }
+
+      $btn.prop('disabled', true);
+
+      /* Read shared attendance/leave-type from the plan container (one container per date) */
+      var $container  = $grid.find('.bp-plan-container').first();
+      var $attendWrap = $container.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
+      var attendApi   = $attendWrap.data('api') || 'beatplanner__Attendance';
+      var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+      var $leaveWrap  = $container.find('.bp-leave-type-field .bp-dd-wrap');
+      var leaveApi    = $leaveWrap.data('api') || 'beatplanner__Leave_Type';
+      var leaveVal    = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+
+      var created = 0;
+      var failed  = 0;
+
+      for (var ri = 0; ri < $checkedRows.length; ri++) {
+        var $row = $($checkedRows[ri]);
+        var date = $row.data('date') || '';
+        var hour = $row.data('hour');
+
+        var recordData = {};
+
+        /* Start / End time fields – read API names from time cell metadata */
+        var startTime  = hourToTime(hour);
+        var endTime    = hour === 23 ? '23:59' : hourToTime(hour + 1);
+        var $sc        = $row.find('.bp-time-cell').eq(0);
+        var $ec        = $row.find('.bp-time-cell').eq(1);
+        recordData[$sc.data('api') || 'beatplanner__Start_Time'] = startTime;
+        recordData[$ec.data('api') || 'beatplanner__End_Time']   = endTime;
+
+        if (date) { recordData['beatplanner__Date'] = date; }
+
+        /* Meetings For */
+        var $mfWrap    = $row.find('.bp-mf-wrap');
+        var $mfVal     = $mfWrap.find('.bp-dd-val');
+        var mfModApi   = $mfVal.attr('data-selected-api') || '';
+        var mfFieldApi = $mfWrap.data('api') || 'beatplanner__Meetings_For';
+        if (mfModApi) { recordData[mfFieldApi] = mfModApi; }
+
+        /* Meeting With */
+        var $mwWrap     = $row.find('.bp-mw-wrap');
+        var $mwVal      = $mwWrap.find('.bp-dd-val');
+        var mwId        = $mwVal.attr('data-selected-id') || '';
+        var mwLookupApi = $mwWrap.attr('data-api') || '';
+        var mwName      = $mwVal.text() || '';
+        if (mwId && mwLookupApi) {
+          recordData[mwLookupApi] = { id: mwId };
+        }
+
+        /* Dynamic picklist columns */
+        $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+          var $wrap    = $(this);
+          var fieldApi = String($wrap.data('api') || '');
+          if (!fieldApi) { return; }
+          var $val   = $wrap.find('.bp-dd-val');
+          var actual = $val.attr('data-actual-val') || '';
+          if (actual && actual !== 'Select\u2026') {
+            recordData[fieldApi] = actual;
+          }
+        });
+
+        /* Attendance / Leave Type */
+        if (attendVal && attendVal !== 'Select\u2026') {
+          recordData[attendApi] = attendVal;
+        }
+        if (leaveVal && leaveVal !== 'Select\u2026') {
+          recordData[leaveApi] = leaveVal;
+        }
+
+        /* Link to the Monthly Beat Plan record */
+        if (monthlyBeatPlanId) {
+          recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
+        }
+
+        /* Mandatory Name field */
+        recordData['Name'] = 'Meeting With ' + mwName;
+
+        try {
+          await ZOHO.CRM.API.insertRecord({
+            Entity:  'beatplanner__Daily_Beat_Plans',
+            APIData: recordData,
+            Trigger: ['workflow']
+          });
+          created++;
+        } catch (err) {
+          console.error('Bulk create failed for row', hour, err);
+          failed++;
+        }
+      }
+
+      /* Uncheck all processed rows and hide the Mass Create button */
+      $grid.find('.bp-row-cb').prop('checked', false);
+      $btn.hide();
+
+      render();
+
+      if (failed > 0) {
+        showToast(created + ' record(s) created. ' + failed + ' failed.');
+      } else {
+        showToast(created + ' beat plan record(s) created.');
+      }
+
+      $btn.prop('disabled', false);
     });
 
     /* ── Beat plan row: Save ── */
@@ -3731,30 +3860,33 @@ $(function () {
       /* Build the record data for beatplanner__Daily_Beat_Plans */
       var recordData = {};
 
-      /* Start / End time fields */
-      var startTime = hourToTime(hour);
-      var endTime   = hour === 23 ? '23:59' : hourToTime(hour + 1);
-      recordData['beatplanner__Start_Time'] = startTime;
-      recordData['beatplanner__End_Time']   = endTime;
+      /* Start / End time fields – read API names from time cell metadata */
+      var startTime   = hourToTime(hour);
+      var endTime     = hour === 23 ? '23:59' : hourToTime(hour + 1);
+      var $startCell  = $row.find('.bp-time-cell').eq(0);
+      var $endCell    = $row.find('.bp-time-cell').eq(1);
+      recordData[$startCell.data('api') || 'beatplanner__Start_Time'] = startTime;
+      recordData[$endCell.data('api')   || 'beatplanner__End_Time']   = endTime;
 
       /* Date field */
       if (date) {
         recordData['beatplanner__Date'] = date;
       }
 
-      /* Meetings For (picklist) */
-      var $mfWrap = $row.find('[data-field="meetings-for"]');
-      var $mfVal  = $mfWrap.find('.bp-dd-val');
-      var mfApi   = $mfVal.attr('data-selected-api') || '';
+      /* Meetings For (picklist) – use data-api from the wrap for the field key */
+      var $mfWrap    = $row.find('.bp-mf-wrap');
+      var $mfVal     = $mfWrap.find('.bp-dd-val');
+      var mfApi      = $mfVal.attr('data-selected-api') || '';
+      var mfFieldApi = $mfWrap.data('api') || 'beatplanner__Meetings_For';
       if (mfApi) {
-        recordData['beatplanner__Meetings_For'] = mfApi;
+        recordData[mfFieldApi] = mfApi;
       }
 
-      /* Meeting With (lookup field) */
-      var $mwWrap     = $row.find('[data-field="meeting-with"]');
+      /* Meeting With (lookup field) – data-api is set dynamically to the resolved lookup API */
+      var $mwWrap     = $row.find('.bp-mw-wrap');
       var $mwVal      = $mwWrap.find('.bp-dd-val');
       var mwId        = $mwVal.attr('data-selected-id') || '';
-      var mwLookupApi = $mwWrap.attr('data-lookup-api') || '';
+      var mwLookupApi = $mwWrap.attr('data-api') || '';
       if (mwId && mwLookupApi) {
         recordData[mwLookupApi] = { id: mwId };
       }
@@ -3762,12 +3894,12 @@ $(function () {
       /* Dynamic picklist columns – also collect values for BPR chip styling */
       var bprFieldValues = {};
       $row.find('.bp-dd-wrap')
-          .not('[data-field="meetings-for"]')
-          .not('[data-field="meeting-with"]')
+          .not('.bp-mf-wrap')
+          .not('.bp-mw-wrap')
           .each(function () {
             var $wrap    = $(this);
-            var fieldApi = String($wrap.data('field') || '');
-            if (!fieldApi || fieldApi === 'attendance' || fieldApi === 'leave-type') { return; }
+            var fieldApi = String($wrap.data('api') || '');
+            if (!fieldApi) { return; }
             var $val     = $wrap.find('.bp-dd-val');
             var actual   = $val.attr('data-actual-val') || $val.text() || '';
             if (actual && actual !== 'Select\u2026') {
@@ -3776,18 +3908,20 @@ $(function () {
             }
           });
 
-      /* Attendance / Leave Type (top-bar fields) */
-      var $attendWrap = $row.closest('.bp-plan-container').find('[data-field="attendance"]');
+      /* Attendance / Leave Type (top-bar fields) – read API names via data-api */
+      var $attendWrap = $row.closest('.bp-plan-container').find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
       var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
       if (attendVal && attendVal !== 'Select\u2026') {
-        recordData['beatplanner__Attendance'] = attendVal;
-        bprFieldValues['beatplanner__Attendance'] = attendVal;
+        var attendApi = $attendWrap.data('api') || 'beatplanner__Attendance';
+        recordData[attendApi]     = attendVal;
+        bprFieldValues[attendApi] = attendVal;
       }
-      var $leaveWrap = $row.closest('.bp-plan-container').find('[data-field="leave-type"]');
+      var $leaveWrap = $row.closest('.bp-plan-container').find('.bp-leave-type-field .bp-dd-wrap');
       var leaveVal   = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
       if (leaveVal && leaveVal !== 'Select\u2026') {
-        recordData['beatplanner__Leave_Type'] = leaveVal;
-        bprFieldValues['beatplanner__Leave_Type'] = leaveVal;
+        var leaveApi = $leaveWrap.data('api') || 'beatplanner__Leave_Type';
+        recordData[leaveApi]     = leaveVal;
+        bprFieldValues[leaveApi] = leaveVal;
       }
 
       /* Link to the Monthly Beat Plan record resolved during modal init */
@@ -3837,7 +3971,7 @@ $(function () {
       var data  = {};
 
       /* Meetings For */
-      var $mfWrap = $row.find('[data-field="meetings-for"]');
+      var $mfWrap = $row.find('.bp-mf-wrap');
       var $mfVal  = $mfWrap.find('.bp-dd-val');
       data['meetings-for'] = {
         label: $mfVal.text(),
@@ -3845,22 +3979,22 @@ $(function () {
       };
 
       /* Meeting With */
-      var $mwWrap   = $row.find('[data-field="meeting-with"]');
+      var $mwWrap   = $row.find('.bp-mw-wrap');
       var $mwVal    = $mwWrap.find('.bp-dd-val');
       var $mwAvatar = $mwWrap.find('.bp-rec-avatar');
       data['meeting-with'] = {
         label:        $mwVal.text(),
         id:           $mwVal.attr('data-selected-id') || '',
-        lookupApi:    $mwWrap.attr('data-lookup-api') || '',
+        lookupApi:    $mwWrap.attr('data-api') || '',
         avatarText:   $mwAvatar.text(),
         avatarImgSrc: $mwAvatar.find('img').attr('src') || '',
         avatarShow:   $mwAvatar.hasClass('bp-rec-avatar--show')
       };
 
       /* All other dropdowns (dynamic picklist columns) */
-      $row.find('.bp-dd-wrap').not('[data-field="meetings-for"]').not('[data-field="meeting-with"]').each(function () {
+      $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
         var $wrap = $(this);
-        var field = String($wrap.data('field') || '');
+        var field = String($wrap.data('api') || '');
         if (!field) { return; }
         var $val = $wrap.find('.bp-dd-val');
         data[field] = {
@@ -3882,7 +4016,7 @@ $(function () {
 
       /* ── Meetings For ── */
       var mfData  = copiedRowData['meetings-for'];
-      var $mfWrap = $row.find('[data-field="meetings-for"]');
+      var $mfWrap = $row.find('.bp-mf-wrap');
       var $mfVal  = $mfWrap.find('.bp-dd-val');
       $mfVal.text(mfData.label);
       if (mfData.api) {
@@ -3893,14 +4027,10 @@ $(function () {
 
       /* ── Meeting With: repopulate list then restore selection ── */
       var mwData  = copiedRowData['meeting-with'];
-      var $mwWrap = $row.find('[data-field="meeting-with"]');
+      var $mwWrap = $row.find('.bp-mw-wrap');
 
-      /* Stamp lookup api */
-      if (mwData.lookupApi) {
-        $mwWrap.attr('data-lookup-api', mwData.lookupApi);
-      } else {
-        $mwWrap.removeAttr('data-lookup-api');
-      }
+      /* Stamp resolved lookup API name onto data-api */
+      $mwWrap.attr('data-api', mwData.lookupApi || '');
 
       /* Re-populate the Meeting With list so the option exists in the DOM */
       if (mfData.api) {
@@ -3944,9 +4074,9 @@ $(function () {
       }
 
       /* ── Dynamic picklist columns ── */
-      $row.find('.bp-dd-wrap').not('[data-field="meetings-for"]').not('[data-field="meeting-with"]').each(function () {
+      $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
         var $wrap = $(this);
-        var field = String($wrap.data('field') || '');
+        var field = String($wrap.data('api') || '');
         if (!field || !copiedRowData.hasOwnProperty(field)) { return; }
         var fData = copiedRowData[field];
         var $val  = $wrap.find('.bp-dd-val');
@@ -4868,10 +4998,10 @@ $(function () {
 
     $('#slotPickerGrid .bp-slot-row').each(function () {
       var $row = $(this);
-      var selectedApi = $row.find('[data-field="meetings-for"] .bp-dd-val').attr('data-selected-api');
+      var selectedApi = $row.find('.bp-mf-wrap .bp-dd-val').attr('data-selected-api');
       if (selectedApi !== modApi) { return; }
 
-      var $mwWrap = $row.find('[data-field="meeting-with"]');
+      var $mwWrap = $row.find('.bp-mw-wrap');
       $mwWrap.find('.bp-mw-list').html(mwOpts);
     });
   }
