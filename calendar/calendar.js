@@ -407,17 +407,24 @@ $(function () {
 
     if (beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length &&
         ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
-      /* Dynamic BPR styling: derive colours from picklist metadata */
-      var s = buildBprChipStyle(ev.bprFieldValues);
-      if (s.bg)           { styleStr += 'background:'          + s.bg          + ';'; }
-      if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop   + ';border-top-style:solid;border-top-width:2px;'; }
-      if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
-      if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft  + ';border-left-style:solid;border-left-width:3px;'; }
-      if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight + ';border-right-style:solid;border-right-width:2px;'; }
-      if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
-      /* When no bg-colour is resolved but a left-border color exists, derive a tinted
-         background from the border colour to keep the chip visually distinct. */
-      if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
+      /* When Attendance = Leave, use the Leave Type picklist color as the chip background. */
+      var leaveColor = getLeaveTypeColor(ev.bprFieldValues);
+      if (leaveColor) {
+        styleStr = 'background:' + leaveColor + '22;border-left-color:' + leaveColor +
+                   ';border-left-style:solid;border-left-width:3px;';
+      } else {
+        /* Dynamic BPR styling: derive colours from picklist metadata */
+        var s = buildBprChipStyle(ev.bprFieldValues);
+        if (s.bg)           { styleStr += 'background:'          + s.bg          + ';'; }
+        if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop   + ';border-top-style:solid;border-top-width:2px;'; }
+        if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
+        if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft  + ';border-left-style:solid;border-left-width:3px;'; }
+        if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight + ';border-right-style:solid;border-right-width:2px;'; }
+        if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
+        /* When no bg-colour is resolved but a left-border color exists, derive a tinted
+           background from the border colour to keep the chip visually distinct. */
+        if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
+      }
     } else {
       /* Fallback: use the event's manually chosen colour */
       var bg     = ev.color + '22';
@@ -1063,6 +1070,19 @@ $(function () {
   /** "HH:MM" from hour integer (clamps at 23:00) */
   function hourToTime(h) {
     return pad2(Math.min(h, 23)) + ':00';
+  }
+
+  /**
+   * Combine a date string ("YYYY-MM-DD") and a time string ("HH:MM")
+   * into a valid ISO-8601 datetime with the current user's timezone offset.
+   * Example: toIsoDt("2026-07-01", "15:00") → "2026-07-01T15:00:00+05:30"
+   */
+  function toIsoDt(dateStr, timeStr) {
+    var tzOffset = -new Date().getTimezoneOffset(); /* minutes ahead of UTC */
+    var sign     = tzOffset >= 0 ? '+' : '-';
+    var absOff   = Math.abs(tzOffset);
+    var tzStr    = sign + pad2(Math.floor(absOff / 60)) + ':' + pad2(absOff % 60);
+    return dateStr + 'T' + timeStr + ':00' + tzStr;
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -3730,7 +3750,9 @@ $(function () {
         }
         if (!isLeave) {
           /* Reset Leave Type selection when switching away from Leave */
-          $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val').text('Select\u2026');
+          $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
+               .text('Select\u2026')
+               .removeAttr('data-actual-val');
         }
       }
     });
@@ -3775,13 +3797,22 @@ $(function () {
 
         var recordData = {};
 
-        /* Start / End time fields – read API names from time cell metadata */
-        var startTime  = hourToTime(hour);
-        var endTime    = hour === 23 ? '23:59' : hourToTime(hour + 1);
-        var $sc        = $row.find('.bp-time-cell').eq(0);
-        var $ec        = $row.find('.bp-time-cell').eq(1);
-        recordData[$sc.data('api') || 'beatplanner__Date_Time_From'] = startTime;
-        recordData[$ec.data('api') || 'beatplanner__Date_Time_To']   = endTime;
+        /* Start / End time fields – build ISO-8601 datetimes from the row date + hour.
+           For Leave records, override with the full-day range (00:00:00 … 23:59:59). */
+        var isLeaveRecord = (attendVal && attendVal !== 'Select\u2026' &&
+                             attendVal.toLowerCase() === 'leave');
+        var startIso, endIso;
+        if (isLeaveRecord && date) {
+          startIso = toIsoDt(date, '00:00');
+          endIso   = toIsoDt(date, '23:59').replace('T23:59:00', 'T23:59:59');
+        } else {
+          startIso = date ? toIsoDt(date, hourToTime(hour))                             : hourToTime(hour);
+          endIso   = date ? toIsoDt(date, hour === 23 ? '23:59' : hourToTime(hour + 1)) : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+        }
+        var $sc = $row.find('.bp-time-cell').eq(0);
+        var $ec = $row.find('.bp-time-cell').eq(1);
+        recordData[$sc.data('api') || 'beatplanner__Date_Time_From'] = startIso;
+        recordData[$ec.data('api') || 'beatplanner__Date_Time_To']   = endIso;
 
         if (date) { recordData['beatplanner__Date'] = date; }
 
@@ -3818,7 +3849,7 @@ $(function () {
         if (attendVal && attendVal !== 'Select\u2026') {
           recordData[attendApi] = attendVal;
         }
-        if (leaveVal && leaveVal !== 'Select\u2026') {
+        if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') {
           recordData[leaveApi] = leaveVal;
         }
 
@@ -3877,13 +3908,29 @@ $(function () {
       /* Build the record data for beatplanner__Daily_Beat_Plans */
       var recordData = {};
 
-      /* Start / End time fields – read API names from time cell metadata */
-      var startTime   = hourToTime(hour);
-      var endTime     = hour === 23 ? '23:59' : hourToTime(hour + 1);
-      var $startCell  = $row.find('.bp-time-cell').eq(0);
-      var $endCell    = $row.find('.bp-time-cell').eq(1);
-      recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startTime;
-      recordData[$endCell.data('api')   || 'beatplanner__Date_Time_To']   = endTime;
+      /* Attendance / Leave Type (top-bar fields) – read first so we know if this is a Leave record
+         before building the datetime fields. */
+      var $attendWrap = $row.closest('.bp-plan-container').find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
+      var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+      var $leaveWrap  = $row.closest('.bp-plan-container').find('.bp-leave-type-field .bp-dd-wrap');
+      var leaveVal    = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+
+      /* Start / End time fields – build ISO-8601 datetimes from the row date + hour.
+         For Leave records, override with the full-day range (00:00:00 … 23:59:59). */
+      var isLeaveRecord = (attendVal && attendVal !== 'Select\u2026' &&
+                           attendVal.toLowerCase() === 'leave');
+      var startIso, endIso;
+      if (isLeaveRecord && date) {
+        startIso = toIsoDt(date, '00:00');
+        endIso   = toIsoDt(date, '23:59').replace('T23:59:00', 'T23:59:59');
+      } else {
+        startIso = date ? toIsoDt(date, hourToTime(hour))                             : hourToTime(hour);
+        endIso   = date ? toIsoDt(date, hour === 23 ? '23:59' : hourToTime(hour + 1)) : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+      }
+      var $startCell = $row.find('.bp-time-cell').eq(0);
+      var $endCell   = $row.find('.bp-time-cell').eq(1);
+      recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startIso;
+      recordData[$endCell.data('api')   || 'beatplanner__Date_Time_To']   = endIso;
 
       /* Date field */
       if (date) {
@@ -3926,17 +3973,13 @@ $(function () {
             }
           });
 
-      /* Attendance / Leave Type (top-bar fields) – read API names via data-api */
-      var $attendWrap = $row.closest('.bp-plan-container').find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
-      var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+      /* Attendance / Leave Type – include in payload and bprFieldValues */
       if (attendVal && attendVal !== 'Select\u2026') {
         var attendApi = $attendWrap.data('api') || 'beatplanner__Attendance';
         recordData[attendApi]     = attendVal;
         bprFieldValues[attendApi] = attendVal;
       }
-      var $leaveWrap = $row.closest('.bp-plan-container').find('.bp-leave-type-field .bp-dd-wrap');
-      var leaveVal   = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
-      if (leaveVal && leaveVal !== 'Select\u2026') {
+      if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') {
         var leaveApi = $leaveWrap.data('api') || 'beatplanner__Leave_Type';
         recordData[leaveApi]     = leaveVal;
         bprFieldValues[leaveApi] = leaveVal;
@@ -4524,6 +4567,35 @@ $(function () {
   }
 
   /**
+   * When Attendance = "Leave", resolve the background colour for the .evt-chip
+   * from the beatplanner__Leave_Type picklist metadata (fully metadata-driven).
+   *
+   * @param  {Object} fieldValues  Maps field API name → selected picklist actual value.
+   * @return {string}  CSS colour string (with leading '#') or empty string when not found.
+   */
+  function getLeaveTypeColor(fieldValues) {
+    if (!fieldValues || !bprPicklistFields || !bprPicklistFields.length) { return ''; }
+    var attendVal = fieldValues['beatplanner__Attendance'] || '';
+    if (attendVal.toLowerCase() !== 'leave') { return ''; }
+    var leaveTypeVal = fieldValues['beatplanner__Leave_Type'] || '';
+    if (!leaveTypeVal) { return ''; }
+    for (var i = 0; i < bprPicklistFields.length; i++) {
+      var f = bprPicklistFields[i];
+      if (f.api_name !== 'beatplanner__Leave_Type') { continue; }
+      for (var j = 0; j < f.options.length; j++) {
+        var opt = f.options[j];
+        if (opt.actual === leaveTypeVal || opt.display === leaveTypeVal) {
+          var colour = opt.colour || '';
+          if (colour && colour.charAt(0) !== '#') { colour = '#' + colour; }
+          return colour;
+        }
+      }
+      break;
+    }
+    return '';
+  }
+
+  /**
    * Apply BPR-driven dynamic styles to all .evt-chip elements currently in the DOM.
    * Each chip must carry a data-bpr-fields JSON attribute (set during renderChip)
    * for this to have any effect.
@@ -4535,6 +4607,16 @@ $(function () {
       var fieldValues;
       try { fieldValues = JSON.parse($chip.attr('data-bpr-fields') || '{}'); }
       catch (e) { return; }
+
+      /* When Attendance = Leave, use the Leave Type picklist color as the chip background. */
+      var leaveColor = getLeaveTypeColor(fieldValues);
+      if (leaveColor) {
+        $chip.attr('style',
+          'background:' + leaveColor + '22;border-left-color:' + leaveColor +
+          ';border-left-style:solid;border-left-width:3px;');
+        return;
+      }
+
       var s = buildBprChipStyle(fieldValues);
       var styleStr = '';
       if (s.bg)           { styleStr += 'background:' + s.bg + ';'; }
