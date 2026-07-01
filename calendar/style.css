@@ -694,6 +694,14 @@ input, select, textarea {
 .evt-chip:hover { filter: brightness(.92); }
 .evt-chip.evt-past { opacity: .5; }
 
+/* BPR-configured marker dot */
+.chip-marker {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .chip-name {
   flex: 1;
   white-space: nowrap;
@@ -1176,6 +1184,26 @@ input, select, textarea {
 .modal-x:hover {
   background: color-mix(in srgb, var(--border) 80%, transparent);
   color: var(--text-primary);
+}
+
+/* ── Modal horizontal initialization loader ── */
+.modal-init-loader {
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  flex-shrink: 0;
+}
+.modal-init-loader-bar {
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+  animation: modal-loader-slide 1.2s ease-in-out infinite;
+}
+@keyframes modal-loader-slide {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(250%); }
+  100% { transform: translateX(250%); }
 }
 
 .modal-body {

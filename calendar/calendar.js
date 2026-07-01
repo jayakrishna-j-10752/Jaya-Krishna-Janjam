@@ -401,13 +401,37 @@ $(function () {
   }
 
   function renderChip(ev, past) {
-    var bg     = ev.color + '22';
-    var border = ev.color;
-    var fg     = ev.color;
-    var pastCls = past ? ' evt-past' : '';
+    var pastCls  = past ? ' evt-past' : '';
+    var styleStr = '';
+    var markerHtml = '';
+
+    if (beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length &&
+        ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
+      /* Dynamic BPR styling: derive colours from picklist metadata */
+      var s = buildBprChipStyle(ev.bprFieldValues);
+      if (s.bg)           { styleStr += 'background:'          + s.bg          + ';'; }
+      if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop   + ';border-top-style:solid;border-top-width:2px;'; }
+      if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
+      if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft  + ';border-left-style:solid;border-left-width:3px;'; }
+      if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight + ';border-right-style:solid;border-right-width:2px;'; }
+      if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
+    } else {
+      /* Fallback: use the event's manually chosen colour */
+      var bg     = ev.color + '22';
+      var border = ev.color;
+      var fg     = ev.color;
+      styleStr = 'background:' + bg + ';border-left-color:' + border + ';color:' + fg + ';';
+    }
+
+    var bprAttr = (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length)
+      ? ' data-bpr-fields=\'' + escHtml(JSON.stringify(ev.bprFieldValues)) + '\''
+      : '';
+
     return '<div class="evt-chip' + pastCls + '" ' +
            '     data-evid="' + ev.id + '" data-date="' + ev.date + '"' +
-           '     style="background:' + bg + ';border-left-color:' + border + ';color:' + fg + '">' +
+           bprAttr +
+           '     style="' + styleStr + '">' +
+           markerHtml +
            '  <span class="chip-name">' + escHtml(ev.title) + '</span>' +
            '  <span class="chip-time">' + fmtTime(ev.startTime) + '</span>' +
            '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
@@ -1163,6 +1187,55 @@ $(function () {
     var heading = WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
     dom.modalHeading.text(heading);
 
+    /* ── Generate Month Year value for this date (e.g. "July 2026") ── */
+    var monthYear = MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+
+    /* ── Open the modal immediately; show loader and hide body/foot ── */
+    var $modalBody  = dom.modal.find('.modal-body');
+    var $modalFoot  = dom.modal.find('.modal-foot');
+    var $initLoader = $('#modalInitLoader');
+    dom.modal.addClass('modal-open');
+    $initLoader.show();
+    $modalBody.hide();
+    $modalFoot.hide();
+
+    /* ── Reset Monthly Beat Plan ID for this session ── */
+    monthlyBeatPlanId = null;
+
+    try {
+      /* ── COQL query: check if a Monthly Beat Plan record exists for this month ── */
+      var coqlConfig = {
+        select_query: "SELECT id FROM beatplanner__Monthly_Beat_Plans WHERE Name = '" + monthYear + "' LIMIT 1"
+      };
+      var coqlResp = await ZOHO.CRM.API.coql(coqlConfig);
+      console.log('Monthly Beat Plans COQL response', coqlResp);
+
+      var existingData = coqlResp && coqlResp.data && Array.isArray(coqlResp.data) && coqlResp.data.length > 0
+                           ? coqlResp.data
+                           : null;
+
+      if (existingData) {
+        /* Record already exists – reuse its ID */
+        monthlyBeatPlanId = existingData[0].id;
+        console.log('Reusing existing Monthly Beat Plan ID:', monthlyBeatPlanId);
+      } else {
+        /* No record found – create a new one */
+        var insertResp = await ZOHO.CRM.API.insertRecord({
+          Entity:   'beatplanner__Monthly_Beat_Plans',
+          APIData:  { Name: monthYear },
+          Trigger:  ['workflow']
+        });
+        console.log('Created Monthly Beat Plan', insertResp);
+        if (insertResp && insertResp.data && insertResp.data[0] && insertResp.data[0].details) {
+          monthlyBeatPlanId = insertResp.data[0].details.id;
+        }
+        console.log('New Monthly Beat Plan ID:', monthlyBeatPlanId);
+      }
+    } catch (err) {
+      console.error('Monthly Beat Plan init error:', err);
+    }
+
+    /* ── Build the picker content now that init is done ── */
     if (beatPlanHasRefs) {
       /* Ensure BPR picklist fields are loaded before building the table */
       if (bprPicklistFields === null) {
@@ -1193,13 +1266,16 @@ $(function () {
       dom.slotPickerGrid.html(html);
     }
 
+    /* ── Hide loader; reveal body and foot ── */
+    $initLoader.hide();
+    $modalBody.show();
+    $modalFoot.show();
+
     /* Show slot picker phase; hide form phase */
     dom.slotPickerSection.show();
     dom.eventFormSection.hide();
     dom.slotPickerFoot.show();
     dom.eventFormFoot.hide();
-
-    dom.modal.addClass('modal-open');
   }
 
   /**
@@ -2362,6 +2438,7 @@ $(function () {
   var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
   var bpDailyAllFields    = [];     /* all fields from beatplanner__Daily_Beat_Plans (including lookups) */
   var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
+  var monthlyBeatPlanId   = null;   /* ID of the beatplanner__Monthly_Beat_Plans record for the open modal's month */
 
   /* ── Filter Panel state ── */
   var modulePicklistMeta    = {};  /* {moduleName: [{api_name, field_label, options}]} – per-module picklist fields */
@@ -3644,6 +3721,116 @@ $(function () {
       $grid.find('.bp-mass-create-btn').toggle(anyChecked);
     });
 
+    /* ── Beat plan row: Save ── */
+    $(document).on('click', '#slotPickerGrid .bp-row-save', async function () {
+      var $btn = $(this);
+      var $row = $btn.closest('.bp-slot-row');
+      var date = $row.data('date') || '';
+      var hour = $row.data('hour');
+
+      /* Build the record data for beatplanner__Daily_Beat_Plans */
+      var recordData = {};
+
+      /* Start / End time fields */
+      var startTime = hourToTime(hour);
+      var endTime   = hour === 23 ? '23:59' : hourToTime(hour + 1);
+      recordData['beatplanner__Start_Time'] = startTime;
+      recordData['beatplanner__End_Time']   = endTime;
+
+      /* Date field */
+      if (date) {
+        recordData['beatplanner__Date'] = date;
+      }
+
+      /* Meetings For (picklist) */
+      var $mfWrap = $row.find('[data-field="meetings-for"]');
+      var $mfVal  = $mfWrap.find('.bp-dd-val');
+      var mfApi   = $mfVal.attr('data-selected-api') || '';
+      if (mfApi) {
+        recordData['beatplanner__Meetings_For'] = mfApi;
+      }
+
+      /* Meeting With (lookup field) */
+      var $mwWrap     = $row.find('[data-field="meeting-with"]');
+      var $mwVal      = $mwWrap.find('.bp-dd-val');
+      var mwId        = $mwVal.attr('data-selected-id') || '';
+      var mwLookupApi = $mwWrap.attr('data-lookup-api') || '';
+      if (mwId && mwLookupApi) {
+        recordData[mwLookupApi] = { id: mwId };
+      }
+
+      /* Dynamic picklist columns – also collect values for BPR chip styling */
+      var bprFieldValues = {};
+      $row.find('.bp-dd-wrap')
+          .not('[data-field="meetings-for"]')
+          .not('[data-field="meeting-with"]')
+          .each(function () {
+            var $wrap    = $(this);
+            var fieldApi = String($wrap.data('field') || '');
+            if (!fieldApi || fieldApi === 'attendance' || fieldApi === 'leave-type') { return; }
+            var $val     = $wrap.find('.bp-dd-val');
+            var actual   = $val.attr('data-actual-val') || $val.text() || '';
+            if (actual && actual !== 'Select\u2026') {
+              recordData[fieldApi]     = actual;
+              bprFieldValues[fieldApi] = actual;
+            }
+          });
+
+      /* Attendance / Leave Type (top-bar fields) */
+      var $attendWrap = $row.closest('.bp-plan-container').find('[data-field="attendance"]');
+      var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+      if (attendVal && attendVal !== 'Select\u2026') {
+        recordData['beatplanner__Attendance'] = attendVal;
+        bprFieldValues['beatplanner__Attendance'] = attendVal;
+      }
+      var $leaveWrap = $row.closest('.bp-plan-container').find('[data-field="leave-type"]');
+      var leaveVal   = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+      if (leaveVal && leaveVal !== 'Select\u2026') {
+        recordData['beatplanner__Leave_Type'] = leaveVal;
+        bprFieldValues['beatplanner__Leave_Type'] = leaveVal;
+      }
+
+      /* Link to the Monthly Beat Plan record resolved during modal init */
+      if (monthlyBeatPlanId) {
+        recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
+      }
+
+      /* Disable the save button while the API call is in progress */
+      $btn.prop('disabled', true);
+
+      try {
+        var resp = await ZOHO.CRM.API.insertRecord({
+          Entity:  'beatplanner__Daily_Beat_Plans',
+          APIData: recordData,
+          Trigger: ['workflow']
+        });
+        console.log('Daily Beat Plan saved', resp);
+
+        /* Also save as a calendar event so it appears on the grid with BPR styling */
+        var $mwValText = $mwWrap.find('.bp-dd-val').text() || '';
+        var newEv = {
+          id:             uid(),
+          title:          $mwValText || (mfApi || 'Beat Plan'),
+          date:           date,
+          startTime:      startTime,
+          endTime:        endTime,
+          color:          '#1565C0',
+          description:    '',
+          bprFieldValues: bprFieldValues
+        };
+        state.events.push(newEv);
+        saveEvents();
+        render();
+
+        showToast('Beat plan record saved.');
+      } catch (err) {
+        console.error('Failed to save Daily Beat Plan', err);
+        showToast('Failed to save beat plan record.');
+      } finally {
+        $btn.prop('disabled', false);
+      }
+    });
+
     /* ── Beat plan row: Copy ── */
     $(document).on('click', '#slotPickerGrid .bp-row-copy', function () {
       var $row  = $(this).closest('.bp-slot-row');
@@ -4115,6 +4302,87 @@ $(function () {
   /* Cached picklist fields from the CRM (fetched once) */
   var syePicklistFields  = null;
   var syeActiveSlot      = null;   /* slot name currently open in the picker */
+
+  /**
+   * Build a CSS style object for an .evt-chip using the configured slot assignments
+   * and the picklist colour codes from bprPicklistFields metadata.
+   *
+   * @param  {Object} fieldValues  Maps field API name → selected picklist actual value.
+   *                               e.g. { 'beatplanner__Status': 'Active', ... }
+   * @return {Object}  { bg, borderTop, borderBottom, borderLeft, borderRight, markerColor }
+   *                   Each value is a CSS colour string or empty string when not configured.
+   */
+  function buildBprChipStyle(fieldValues) {
+    var result = {
+      bg:          '',
+      borderTop:   '',
+      borderBottom:'',
+      borderLeft:  '',
+      borderRight: '',
+      markerColor: ''
+    };
+
+    if (!fieldValues || !bprPicklistFields || !bprPicklistFields.length) { return result; }
+
+    /* Build lookup map: api_name → options array */
+    var fieldMap = {};
+    bprPicklistFields.forEach(function (f) {
+      fieldMap[f.api_name] = f.options || [];
+    });
+
+    /* Slot → style property mapping */
+    var SLOT_TO_PROP = {
+      'bg-colour':     'bg',
+      'marker':        'markerColor',
+      'top-border':    'borderTop',
+      'bottom-border': 'borderBottom',
+      'left-border':   'borderLeft',
+      'right-border':  'borderRight'
+    };
+
+    Object.keys(SLOT_TO_PROP).forEach(function (slot) {
+      var assignment = syeSlotAssignments[slot];
+      if (!assignment || !assignment.api_name) { return; }
+      var selectedVal = fieldValues[assignment.api_name];
+      if (!selectedVal) { return; }
+      var options = fieldMap[assignment.api_name] || [];
+      for (var i = 0; i < options.length; i++) {
+        var opt = options[i];
+        if (opt.actual === selectedVal || opt.display === selectedVal) {
+          var colour = opt.colour || '';
+          if (colour && colour.charAt(0) !== '#') { colour = '#' + colour; }
+          if (colour) { result[SLOT_TO_PROP[slot]] = colour; }
+          break;
+        }
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Apply BPR-driven dynamic styles to all .evt-chip elements currently in the DOM.
+   * Each chip must carry a data-bpr-fields JSON attribute (set during renderChip)
+   * for this to have any effect.
+   */
+  function applyBprChipStyles() {
+    if (!beatPlanHasRefs || !bprPicklistFields || !bprPicklistFields.length) { return; }
+    $('.evt-chip[data-bpr-fields]').each(function () {
+      var $chip = $(this);
+      var fieldValues;
+      try { fieldValues = JSON.parse($chip.attr('data-bpr-fields') || '{}'); }
+      catch (e) { return; }
+      var s = buildBprChipStyle(fieldValues);
+      var styleStr = '';
+      if (s.bg)           { styleStr += 'background:' + s.bg + ';'; }
+      if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
+      if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
+      if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
+      if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
+      if (s.markerColor)  { $chip.find('.chip-marker').css('background', s.markerColor); }
+      if (styleStr)       { $chip.attr('style', ($chip.attr('style') || '') + styleStr); }
+    });
+  }
 
   /* Human-readable slot labels for the popup header */
   var SYE_SLOT_LABELS = {
@@ -5247,6 +5515,8 @@ $(function () {
     /* ── Restore remaining preferences (slots + legends) ── */
     if (savedRec) {
       restorePreferences(savedRec);
+      /* Apply BPR-driven chip styles now that slot assignments are restored */
+      applyBprChipStyles();
     }
 
     /* ── Render legends display strip from saved configuration ── */
