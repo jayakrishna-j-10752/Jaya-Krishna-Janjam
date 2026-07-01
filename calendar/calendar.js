@@ -1397,8 +1397,9 @@ $(function () {
                    '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
                    buildDdWrap(leaveTypeField.api_name, leaveTypeField.field_label, 'Select\u2026', buildOptList(leaveTypeField.options)) +
                    '</div>';
+      /* "Apply Leave" button – shown alongside the Leave Type dropdown */
+      attendBar += '<button class="bp-apply-leave-btn" type="button" style="display:none;">Apply Leave</button>';
     }
-    /* ── Filter button (shown only when Attendance = "Working") ── */
     attendBar += '<div class="bp-filter-action" style="display:none;">' +
                  '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
                  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
@@ -1494,7 +1495,7 @@ $(function () {
 
     tableHtml += '</tbody></table>';
 
-    return '<div class="bp-plan-container">' + attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
+    return '<div class="bp-plan-container" data-date="' + escHtml(date) + '">' + attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
   }
 
   /**
@@ -2480,6 +2481,7 @@ $(function () {
   var moduleRecordsMap    = {};     /* {apiName: [{id, name}]} pre-fetched for "Meeting With" */
   var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
   var bpDailyAllFields    = [];     /* all fields from beatplanner__Daily_Beat_Plans (including lookups) */
+  var bprStyleConfig      = null;   /* style slot → field API name, read directly from BPR record */
   var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
   var monthlyBeatPlanId   = null;   /* ID of the beatplanner__Monthly_Beat_Plans record for the open modal's month */
 
@@ -3733,7 +3735,7 @@ $(function () {
       $wrap.find('.bp-dd-val').text(label).attr('data-actual-val', actual);
       closeBpDropdown($wrap);
 
-      /* Attendance controls table / Leave Type visibility.
+      /* Attendance controls table / Leave Type / Apply Leave button visibility.
          Identify attendance dropdown by its position in the attend bar (not the leave-type field). */
       var isAttendanceDd = $wrap.closest('.bp-attend-bar').length > 0 &&
                            !$wrap.closest('.bp-leave-type-field').length;
@@ -3743,6 +3745,7 @@ $(function () {
         var isLeave   = (label || '').toLowerCase() === 'leave';
         $grid.find('.bp-slots-table').toggle(isWorking);
         $grid.find('.bp-leave-type-field').toggle(isLeave);
+        $grid.find('.bp-apply-leave-btn').toggle(isLeave);
         /* Show Filter button only when Working; hide and close panel otherwise */
         $grid.find('.bp-filter-action').toggle(isWorking);
         if (!isWorking) {
@@ -3816,12 +3819,14 @@ $(function () {
 
         if (date) { recordData['beatplanner__Date'] = date; }
 
-        /* Meetings For */
-        var $mfWrap    = $row.find('.bp-mf-wrap');
-        var $mfVal     = $mfWrap.find('.bp-dd-val');
-        var mfModApi   = $mfVal.attr('data-selected-api') || '';
-        var mfFieldApi = $mfWrap.data('api') || 'beatplanner__Meetings_For';
-        if (mfModApi) { recordData[mfFieldApi] = mfModApi; }
+        /* Meetings For – save the user-visible display text, not the module API name */
+        var $mfWrap      = $row.find('.bp-mf-wrap');
+        var $mfVal       = $mfWrap.find('.bp-dd-val');
+        var mfDisplayVal = $mfVal.text().trim() || '';
+        var mfFieldApi   = $mfWrap.data('api') || 'beatplanner__Meetings_For';
+        if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
+          recordData[mfFieldApi] = mfDisplayVal;
+        }
 
         /* Meeting With */
         var $mwWrap     = $row.find('.bp-mw-wrap');
@@ -3898,6 +3903,104 @@ $(function () {
       $btn.prop('disabled', false);
     });
 
+    /* ── Apply Leave button ── */
+    $(document).on('click', '#slotPickerGrid .bp-apply-leave-btn', async function () {
+      var $btn       = $(this);
+      var $container = $btn.closest('.bp-plan-container');
+      var date       = $container.data('date') || '';
+
+      /* Read shared attendance / leave-type values */
+      var $attendWrap = $container.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
+      var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+      var $leaveWrap  = $container.find('.bp-leave-type-field .bp-dd-wrap');
+      var leaveVal    = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+
+      /* Validation */
+      if (attendVal.toLowerCase() !== 'leave') {
+        showToast('Please set Attendance to "Leave" before applying leave.');
+        return;
+      }
+      if (!leaveVal || leaveVal === 'Select\u2026') {
+        showToast('Please select a Leave Type.');
+        return;
+      }
+      if (!date) {
+        showToast('Cannot determine the selected date.');
+        return;
+      }
+
+      /* Build full-day ISO-8601 datetimes */
+      var startIso = toIsoDt(date, '00:00');
+      var endIso   = toIsoDt(date, '23:59').replace('T23:59:00', 'T23:59:59');
+
+      /* Resolve field API names from metadata */
+      var startTimeApi = 'beatplanner__Date_Time_From';
+      var endTimeApi   = 'beatplanner__Date_Time_To';
+      bpDailyAllFields.forEach(function (f) {
+        var lbl = (f.field_label || '').toLowerCase();
+        if (lbl === 'start time') { startTimeApi = f.api_name || startTimeApi; }
+        if (lbl === 'end time')   { endTimeApi   = f.api_name || endTimeApi; }
+      });
+      var attendApi = $attendWrap.data('api') || 'beatplanner__Attendance';
+      var leaveApi  = $leaveWrap.data('api')  || 'beatplanner__Leave_Type';
+
+      /* Build record payload */
+      var bprFieldValues = {};
+      bprFieldValues[attendApi] = attendVal;
+      bprFieldValues[leaveApi]  = leaveVal;
+      bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+
+      var recordData = {};
+      recordData[startTimeApi] = startIso;
+      recordData[endTimeApi]   = endIso;
+      recordData['beatplanner__Date']           = date;
+      recordData[attendApi]                     = attendVal;
+      recordData[leaveApi]                      = leaveVal;
+      recordData['beatplanner__Managers_Approval'] = 'Pending';
+      recordData['Name'] = 'Leave \u2013 ' + leaveVal;
+
+      if (monthlyBeatPlanId) {
+        recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
+      }
+      var ownerId = $('#userProfile').attr('data-userid');
+      if (ownerId) { recordData['Owner'] = { id: ownerId }; }
+
+      $btn.prop('disabled', true);
+      try {
+        var resp = await ZOHO.CRM.API.insertRecord({
+          Entity:  'beatplanner__Daily_Beat_Plans',
+          APIData: recordData,
+          Trigger: ['workflow']
+        });
+        console.log('Leave record created', resp);
+
+        var newEv = {
+          id:             uid(),
+          title:          leaveVal,
+          date:           date,
+          startTime:      '00:00',
+          endTime:        '23:59',
+          color:          '#1565C0',
+          description:    '',
+          bprFieldValues: bprFieldValues
+        };
+
+        /* Update event ID with the CRM record ID */
+        var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+        if (crmId) { newEv.id = crmId; }
+
+        state.events.push(newEv);
+        saveEvents();
+        render();
+        showToast('Leave record created.');
+      } catch (err) {
+        console.error('Failed to create leave record', err);
+        showToast('Failed to create leave record.');
+      } finally {
+        $btn.prop('disabled', false);
+      }
+    });
+
     /* ── Beat plan row: Save ── */
     $(document).on('click', '#slotPickerGrid .bp-row-save', async function () {
       var $btn = $(this);
@@ -3939,13 +4042,15 @@ $(function () {
         recordData['beatplanner__Date'] = date;
       }
 
-      /* Meetings For (picklist) – use data-api from the wrap for the field key */
-      var $mfWrap    = $row.find('.bp-mf-wrap');
-      var $mfVal     = $mfWrap.find('.bp-dd-val');
-      var mfApi      = $mfVal.attr('data-selected-api') || '';
-      var mfFieldApi = $mfWrap.data('api') || 'beatplanner__Meetings_For';
-      if (mfApi) {
-        recordData[mfFieldApi] = mfApi;
+      /* Meetings For (picklist) – save the user-visible display text, not the module API name */
+      var $mfWrap      = $row.find('.bp-mf-wrap');
+      var $mfVal       = $mfWrap.find('.bp-dd-val');
+      var mfDisplayVal = $mfVal.text().trim() || '';
+      var mfApi        = $mfVal.attr('data-selected-api') || '';
+      var mfFieldApi   = $mfWrap.data('api') || 'beatplanner__Meetings_For';
+      if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
+        recordData[mfFieldApi]     = mfDisplayVal;
+        bprFieldValues[mfFieldApi] = mfDisplayVal;
       }
 
       /* Meeting With (lookup field) – data-api is set dynamically to the resolved lookup API */
@@ -4022,7 +4127,7 @@ $(function () {
         var $mwValText = $mwWrap.find('.bp-dd-val').text() || '';
         var newEv = {
           id:             uid(),
-          title:          $mwValText || (mfApi || 'Beat Plan'),
+          title:          $mwValText || (mfDisplayVal || 'Beat Plan'),
           date:           date,
           startTime:      startTime,
           endTime:        endTime,
@@ -4030,6 +4135,11 @@ $(function () {
           description:    '',
           bprFieldValues: bprFieldValues
         };
+
+        /* Update event ID with the CRM record ID returned in the response */
+        var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+        if (crmId) { newEv.id = crmId; }
+
         state.events.push(newEv);
         saveEvents();
         render();
@@ -4549,11 +4659,22 @@ $(function () {
     };
 
     Object.keys(SLOT_TO_PROP).forEach(function (slot) {
-      var assignment = syeSlotAssignments[slot];
-      if (!assignment || !assignment.api_name) { return; }
-      var selectedVal = fieldValues[assignment.api_name];
+      /* Use bprStyleConfig (read directly from BPR record) as the single source of truth.
+         Fall back to syeSlotAssignments only when bprStyleConfig is not yet available. */
+      var fieldApi = (bprStyleConfig && bprStyleConfig[slot]) ||
+                     (syeSlotAssignments[slot] && syeSlotAssignments[slot].api_name) || '';
+      if (!fieldApi) {
+        /* Field not configured for this slot – skip silently */
+        return;
+      }
+      if (!fieldMap[fieldApi]) {
+        /* Field not found in beatplanner__Daily_Beat_Plans metadata – skip with warning */
+        console.warn('BPR style: field "' + fieldApi + '" not found in Daily Beat Plans metadata (slot: ' + slot + ')');
+        return;
+      }
+      var selectedVal = fieldValues[fieldApi];
       if (!selectedVal) { return; }
-      var options = fieldMap[assignment.api_name] || [];
+      var options = fieldMap[fieldApi] || [];
       for (var i = 0; i < options.length; i++) {
         var opt = options[i];
         if (opt.actual === selectedVal || opt.display === selectedVal) {
@@ -4571,19 +4692,33 @@ $(function () {
   /**
    * When Attendance = "Leave", resolve the background colour for the .evt-chip
    * from the beatplanner__Leave_Type picklist metadata (fully metadata-driven).
+   * Field API names are resolved dynamically from bprPicklistFields by label.
    *
    * @param  {Object} fieldValues  Maps field API name → selected picklist actual value.
    * @return {string}  CSS colour string (with leading '#') or empty string when not found.
    */
   function getLeaveTypeColor(fieldValues) {
     if (!fieldValues || !bprPicklistFields || !bprPicklistFields.length) { return ''; }
-    var attendVal = fieldValues['beatplanner__Attendance'] || '';
+
+    /* Resolve attendance and leave-type field API names from metadata by label */
+    var attendanceApiName = '';
+    var leaveTypeApiName  = '';
+    for (var k = 0; k < bprPicklistFields.length; k++) {
+      var lbl = (bprPicklistFields[k].field_label || '').toLowerCase().trim();
+      if (lbl === 'attendance')  { attendanceApiName = bprPicklistFields[k].api_name; }
+      if (lbl === 'leave type')  { leaveTypeApiName  = bprPicklistFields[k].api_name; }
+      if (attendanceApiName && leaveTypeApiName) { break; }
+    }
+    if (!attendanceApiName || !leaveTypeApiName) { return ''; }
+
+    var attendVal    = fieldValues[attendanceApiName] || '';
     if (attendVal.toLowerCase() !== 'leave') { return ''; }
-    var leaveTypeVal = fieldValues['beatplanner__Leave_Type'] || '';
+    var leaveTypeVal = fieldValues[leaveTypeApiName] || '';
     if (!leaveTypeVal) { return ''; }
+
     for (var i = 0; i < bprPicklistFields.length; i++) {
       var f = bprPicklistFields[i];
-      if (f.api_name !== 'beatplanner__Leave_Type') { continue; }
+      if (f.api_name !== leaveTypeApiName) { continue; }
       for (var j = 0; j < f.options.length; j++) {
         var opt = f.options[j];
         if (opt.actual === leaveTypeVal || opt.display === leaveTypeVal) {
@@ -5611,12 +5746,13 @@ $(function () {
      renderLegChips can resolve slot keys correctly.
   ────────────────────────────────────────────────────────── */
   function restorePreferences(rec) {
-    /* ── Slot assignments (left-border is always fixed) ── */
+    /* ── Slot assignments (all slots, including left-border from BPR record) ── */
     var SLOT_RESTORE = {
       'bg-colour':     { labelField: 'beatplanner__Background_Colour_Field_Label_Name', apiField: 'beatplanner__Background_Colour_Field_Api_Name' },
       'marker':        { labelField: 'beatplanner__Marker_Field_Name',                  apiField: 'beatplanner__Marker_Field_API_Name' },
       'top-border':    { labelField: 'beatplanner__Top_Border_Field_Name',              apiField: 'beatplanner__Top_Border_Field_Api_Name' },
       'bottom-border': { labelField: 'beatplanner__Bottom_Border_Field_Name',           apiField: 'beatplanner__BottomBorder_Field_Api_Name' },
+      'left-border':   { labelField: 'beatplanner__Left_Border_Field_Name',             apiField: 'beatplanner__Left_Border_Field_Api_Name' },
       'right-border':  { labelField: 'beatplanner__Right_Border_Field_Name',            apiField: 'beatplanner__Right_Border_Field_Api_Name' }
     };
 
@@ -5628,6 +5764,13 @@ $(function () {
         $('.sye-slot[data-slot="' + slotKey + '"] .sye-slot-field').text(label);
         $('.sye-slot[data-slot="' + slotKey + '"] .sye-slot-clear').show();
       }
+    });
+
+    /* ── Populate bprStyleConfig: single source of truth for chip styling ── */
+    bprStyleConfig = {};
+    $.each(SLOT_RESTORE, function (slotKey, fields) {
+      var api = rec[fields.apiField] || '';
+      if (api) { bprStyleConfig[slotKey] = api; }
     });
 
     /* ── Legends: recreate chips directly from saved label / api data ── */
