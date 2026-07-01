@@ -4009,7 +4009,8 @@ $(function () {
       var hour = $row.data('hour');
 
       /* Build the record data for beatplanner__Daily_Beat_Plans */
-      var recordData = {};
+      var recordData     = {};
+      var bprFieldValues = {};
 
       /* Attendance / Leave Type (top-bar fields) – read first so we know if this is a Leave record
          before building the datetime fields. */
@@ -4064,7 +4065,6 @@ $(function () {
       }
 
       /* Dynamic picklist columns – also collect values for BPR chip styling */
-      var bprFieldValues = {};
       $row.find('.bp-dd-wrap')
           .not('.bp-mf-wrap')
           .not('.bp-mw-wrap')
