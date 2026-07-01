@@ -3927,6 +3927,8 @@ $(function () {
         startIso = date ? toIsoDt(date, hourToTime(hour))                             : hourToTime(hour);
         endIso   = date ? toIsoDt(date, hour === 23 ? '23:59' : hourToTime(hour + 1)) : (hour === 23 ? '23:59' : hourToTime(hour + 1));
       }
+      var startTime  = isLeaveRecord ? '00:00' : hourToTime(hour);
+      var endTime    = isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1));
       var $startCell = $row.find('.bp-time-cell').eq(0);
       var $endCell   = $row.find('.bp-time-cell').eq(1);
       recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startIso;
