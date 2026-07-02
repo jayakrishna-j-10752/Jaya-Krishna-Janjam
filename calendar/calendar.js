@@ -2144,28 +2144,6 @@ $(function () {
   }
 
   /* ──────────────────────────────────────────────────────────
-     SEED SAMPLE EVENTS (first visit only)
-  ────────────────────────────────────────────────────────── */
-
-  function seedSampleEvents() {
-    if (state.events.length > 0) return;
-    var dateWithOffset = function (offsetDays) {
-      var d = new Date();
-      d.setDate(d.getDate() + offsetDays);
-      return dateToStr(d);
-    };
-    var samples = [
-      { id: uid(), title: 'Team Stand-up',   date: dateWithOffset(0),  startTime: '09:00', endTime: '09:30', description: 'Daily sync with the team', color: '#1565C0' },
-      { id: uid(), title: 'Product Review',  date: dateWithOffset(0),  startTime: '11:00', endTime: '12:00', description: 'Q3 product roadmap review', color: '#2E7D32' },
-      { id: uid(), title: 'Client Call',     date: dateWithOffset(1),  startTime: '14:00', endTime: '15:00', description: 'Zoho CRM demo for Acme Corp', color: '#E65100' },
-      { id: uid(), title: 'Sprint Planning', date: dateWithOffset(2),  startTime: '10:00', endTime: '11:30', description: 'Sprint 22 planning session',  color: '#6A1B9A' },
-      { id: uid(), title: 'Design Review',   date: dateWithOffset(3),  startTime: '15:00', endTime: '16:00', description: 'UI/UX feedback round',        color: '#00838F' }
-    ];
-    state.events = samples;
-    saveEvents();
-  }
-
-  /* ──────────────────────────────────────────────────────────
      BOOTSTRAP
   ────────────────────────────────────────────────────────── */
 
@@ -3868,9 +3846,6 @@ $(function () {
     try { savedTheme = localStorage.getItem('zcrm_cal_theme') || 'light'; } catch (e) { /* ignore */ }
     setTheme(savedTheme);
 
-    /* Seed sample events for first-time visitors */
-    seedSampleEvents();
-
     /* On mobile, start in week view */
     enforceMobileView();
 
@@ -4310,12 +4285,59 @@ $(function () {
         }
 
         try {
-          await ZOHO.CRM.API.insertRecord({
+          var massResp = await ZOHO.CRM.API.insertRecord({
             Entity:  'beatplanner__Daily_Beat_Plans',
             APIData: recordData,
             Trigger: ['workflow']
           });
           created++;
+
+          /* Build bprFieldValues for this row so the chip gets metadata-driven styling */
+          var massBprFieldValues = {};
+          if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
+            massBprFieldValues[mfFieldApi] = mfDisplayVal;
+          }
+          $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+            var $wrap    = $(this);
+            var fieldApi = String($wrap.data('api') || '');
+            if (!fieldApi) { return; }
+            var $val   = $wrap.find('.bp-dd-val');
+            var actual = $val.attr('data-actual-val') || '';
+            if (actual && actual !== 'Select\u2026') {
+              massBprFieldValues[fieldApi] = actual;
+            }
+          });
+          if (attendVal && attendVal !== 'Select\u2026') {
+            massBprFieldValues[attendApi] = attendVal;
+          }
+          if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') {
+            massBprFieldValues[leaveApi] = leaveVal;
+          }
+          massBprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+
+          var $massMwWrap   = $row.find('.bp-mw-wrap');
+          var $massMwAvatar = $massMwWrap.find('.bp-rec-avatar');
+          var massStartTime = isLeaveRecord ? '00:00' : hourToTime(hour);
+          var massEndTime   = isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+
+          var massEv = {
+            id:             uid(),
+            title:          mwName || (mfDisplayVal || 'Beat Plan'),
+            date:           date,
+            startTime:      massStartTime,
+            endTime:        massEndTime,
+            color:          '#1565C0',
+            description:    '',
+            bprFieldValues: massBprFieldValues,
+            mwAvatarImgSrc: $massMwAvatar.find('img').attr('src') || $massMwAvatar.attr('data-img-src') || '',
+            mwAvatarText:   $massMwAvatar.text() || '',
+            mwPhotoId:      $massMwAvatar.attr('data-photo-id') || ''
+          };
+
+          var massCrmId = massResp && massResp.data && massResp.data[0] && massResp.data[0].details && massResp.data[0].details.id;
+          if (massCrmId) { massEv.id = massCrmId; }
+
+          state.events.push(massEv);
         } catch (err) {
           console.error('Bulk create failed for row', hour, err);
           failed++;
@@ -4326,6 +4348,7 @@ $(function () {
       $grid.find('.bp-row-cb').prop('checked', false);
       $btn.hide();
 
+      saveEvents();
       render();
 
       if (failed > 0) {
@@ -6370,6 +6393,12 @@ $(function () {
          background so they are ready before the user first opens the slot picker. */
       await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
 
+      /* Restore style-slot preferences and apply BPR-driven chip styles immediately
+         after picklist metadata is loaded, so bprStyleConfig is always set before
+         any user interaction can trigger event rendering. */
+      restorePreferences(savedRec);
+      applyBprChipStyles();
+
       /* Pre-fetch picklist metadata for ALL modules so the Filter panel opens instantly. */
       fetchAllModulePicklistMeta();
     }
@@ -6377,13 +6406,6 @@ $(function () {
     var response = await zrc.get('/crm/v8/settings/modules');
     console.log(response);
     populateMfModules(response);
-
-    /* ── Restore remaining preferences (slots + legends) ── */
-    if (savedRec) {
-      restorePreferences(savedRec);
-      /* Apply BPR-driven chip styles now that slot assignments are restored */
-      applyBprChipStyles();
-    }
 
     /* ── Render legends display strip from saved configuration ── */
     if (hasRecords && savedRec) {
