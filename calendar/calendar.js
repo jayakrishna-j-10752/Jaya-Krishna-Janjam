@@ -393,43 +393,58 @@ $(function () {
            '</div>';
   }
 
-  function renderChip(ev, past) {
-    var pastCls  = past ? ' evt-past' : '';
-    var styleStr = '';
+  /**
+   * Compute metadata-driven style strings shared by both .evt-chip (renderChip)
+   * and .time-event (renderTimeEvent).
+   *
+   * @param  {Object} ev  Event object with ev.color and optionally ev.bprFieldValues.
+   * @return {Object}  { styleStr, markerHtml }
+   *                   styleStr   – CSS property declarations (without positioning).
+   *                   markerHtml – HTML string for the .chip-marker span, or ''.
+   */
+  function buildBprEventStyles(ev) {
+    var styleStr   = '';
     var markerHtml = '';
 
     if (beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length &&
         ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
-      /* When Attendance = Leave, use the Leave Type picklist color as the chip background,
+      /* When Attendance = Leave, use the Leave Type picklist color as the background,
          and the Managers Approval color as the left border (fully metadata-driven). */
       var leaveColor = getLeaveTypeColor(ev.bprFieldValues);
       if (leaveColor) {
-        var leaveChipStyle = buildBprChipStyle(ev.bprFieldValues);
-        var leaveBorderLeft = leaveChipStyle.borderLeft || leaveColor;
+        var leaveStyle      = buildBprChipStyle(ev.bprFieldValues);
+        var leaveBorderLeft = leaveStyle.borderLeft || leaveColor;
         styleStr = 'background:' + leaveColor + ';border-left-color:' + leaveBorderLeft +
                    ';border-left-style:solid;border-left-width:3px;';
-        if (leaveChipStyle.markerColor) {
-          markerHtml = '<span class="chip-marker" style="background:' + escHtml(leaveChipStyle.markerColor) + ';" aria-hidden="true"></span>';
+        if (leaveStyle.markerColor) {
+          markerHtml = '<span class="chip-marker" style="background:' + escHtml(leaveStyle.markerColor) + ';" aria-hidden="true"></span>';
         }
       } else {
         /* Dynamic BPR styling: derive colours from picklist metadata */
         var s = buildBprChipStyle(ev.bprFieldValues);
-        if (s.bg)           { styleStr += 'background:'          + s.bg          + ';'; }
-        if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop   + ';border-top-style:solid;border-top-width:2px;'; }
+        if (s.bg)           { styleStr += 'background:'          + s.bg           + ';'; }
+        if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
         if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
-        if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft  + ';border-left-style:solid;border-left-width:3px;'; }
-        if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight + ';border-right-style:solid;border-right-width:2px;'; }
+        if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
+        if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
         if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
         /* When no bg-colour is resolved but a left-border color exists, derive a tinted
-           background from the border colour to keep the chip visually distinct. */
+           background from the border colour to keep the event visually distinct. */
         if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
       }
     } else {
-      /* Fallback: use the event's manually chosen colour (background + border only, no text override) */
+      /* Fallback: use the event's manually chosen colour (background + border only) */
       var bg     = ev.color + '22';
       var border = ev.color;
       styleStr = 'background:' + bg + ';border-left-color:' + border + ';border-left-style:solid;border-left-width:3px;';
     }
+
+    return { styleStr: styleStr, markerHtml: markerHtml };
+  }
+
+  function renderChip(ev, past) {
+    var pastCls   = past ? ' evt-past' : '';
+    var evtStyles = buildBprEventStyles(ev);
 
     var bprAttr = (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length)
       ? ' data-bpr-fields="' + escHtml(JSON.stringify(ev.bprFieldValues)) + '"'
@@ -438,8 +453,8 @@ $(function () {
     return '<div class="evt-chip' + pastCls + '" ' +
            '     data-evid="' + ev.id + '" data-date="' + ev.date + '"' +
            bprAttr +
-           '     style="' + styleStr + '">' +
-           markerHtml +
+           '     style="' + evtStyles.styleStr + '">' +
+           evtStyles.markerHtml +
            '  <span class="chip-name">' + escHtml(ev.title) + '</span>' +
            '  <span class="chip-time">' + fmtTime(ev.startTime) + '</span>' +
            '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
@@ -722,9 +737,20 @@ $(function () {
     var height    = (dur / 60) * SLOT_PX;
     var pastCls   = past ? ' evt-past' : '';
 
+    /* Reuse the shared metadata-driven styling pipeline (same as .evt-chip) */
+    var evtStyles = buildBprEventStyles(ev);
+    var posStyle  = 'top:' + top + 'px;height:' + height + 'px;';
+
+    var bprAttr = (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length)
+      ? ' data-bpr-fields="' + escHtml(JSON.stringify(ev.bprFieldValues)) + '"'
+      : '';
+
     return '<div class="time-event' + pastCls + '"' +
            '     data-evid="' + ev.id + '" data-date="' + ds + '"' +
-           '     style="top:' + top + 'px;height:' + height + 'px;background:' + ev.color + '">' +
+           bprAttr +
+           '     data-te-pos="' + posStyle + '"' +
+           '     style="' + posStyle + evtStyles.styleStr + '">' +
+           evtStyles.markerHtml +
            '  <div class="te-title">' + escHtml(ev.title) + '</div>' +
            '  <div class="te-time">' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime) + '</div>' +
            '  <button class="te-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
@@ -5149,26 +5175,26 @@ $(function () {
   }
 
   /**
-   * Apply BPR-driven dynamic styles to all .evt-chip elements currently in the DOM.
-   * Each chip must carry a data-bpr-fields JSON attribute (set during renderChip)
-   * for this to have any effect.
-   * Also restores the .chip-marker element and approval status indicator if they
-   * were missing because metadata had not loaded when the chip was first rendered.
+   * Apply BPR-driven dynamic styles to all .evt-chip and .time-event elements
+   * currently in the DOM that carry a data-bpr-fields JSON attribute.
+   * Also restores the .chip-marker element if it was missing because metadata
+   * had not loaded when the element was first rendered.
    */
   function applyBprChipStyles() {
     if (!beatPlanHasRefs || !bprPicklistFields || !bprPicklistFields.length) { return; }
-    $('.evt-chip[data-bpr-fields]').each(function () {
-      var $chip = $(this);
+
+    /* ── Shared inner helper: resolve BPR styles and apply them to one element ── */
+    function applyToElement($el, posPrefix) {
       var fieldValues;
-      try { fieldValues = JSON.parse($chip.attr('data-bpr-fields') || '{}'); }
+      try { fieldValues = JSON.parse($el.attr('data-bpr-fields') || '{}'); }
       catch (e) { return; }
 
-      var styleStr = '';
-      var s = buildBprChipStyle(fieldValues);
-
-      /* When Attendance = Leave, use the Leave Type picklist color as the chip background
-         and the Managers Approval color as the left border (fully metadata-driven). */
+      var styleStr   = '';
+      var s          = buildBprChipStyle(fieldValues);
       var leaveColor = getLeaveTypeColor(fieldValues);
+
+      /* When Attendance = Leave, use the Leave Type picklist color as the background
+         and the Managers Approval color as the left border (fully metadata-driven). */
       if (leaveColor) {
         var leaveBorderLeft = s.borderLeft || leaveColor;
         styleStr = 'background:' + leaveColor + ';border-left-color:' + leaveBorderLeft +
@@ -5179,24 +5205,35 @@ $(function () {
         if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
         if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
         if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
-        /* When no bg-colour is resolved but a left-border color exists, derive a tinted
-           background from the border colour to keep the chip visually distinct. */
+        /* When no bg-colour is resolved but a left-border color exists, derive a tinted background. */
         if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
       }
 
-      /* Always replace the chip style so any stale fallback colour: override is cleared */
-      $chip.attr('style', styleStr || '');
+      /* Always replace the element style so any stale fallback colour is cleared.
+         For .time-event, posPrefix preserves the top/height positioning values. */
+      $el.attr('style', posPrefix + (styleStr || ''));
 
       /* ── Restore .chip-marker if it was not rendered on initial load ── */
       if (s.markerColor) {
-        var $marker = $chip.find('.chip-marker');
+        var $marker = $el.find('.chip-marker');
         if (!$marker.length) {
-          $chip.find('.chip-name').before('<span class="chip-marker" aria-hidden="true"></span>');
-          $marker = $chip.find('.chip-marker');
+          /* Insert before .chip-name (evt-chip) or .te-title (time-event) */
+          $el.find('.chip-name, .te-title').first()
+             .before('<span class="chip-marker" aria-hidden="true"></span>');
+          $marker = $el.find('.chip-marker');
         }
         $marker.css('background', s.markerColor);
       }
+    }
 
+    $('.evt-chip[data-bpr-fields]').each(function () {
+      applyToElement($(this), '');
+    });
+
+    $('.time-event[data-bpr-fields]').each(function () {
+      var $te       = $(this);
+      var posPrefix = $te.attr('data-te-pos') || '';
+      applyToElement($te, posPrefix);
     });
   }
 
