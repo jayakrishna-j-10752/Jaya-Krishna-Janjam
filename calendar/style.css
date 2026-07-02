@@ -717,23 +717,6 @@ input, select, textarea {
 }
 
 /* Approval status badge on event chip */
-.chip-status {
-  font-size: 9px;
-  font-weight: 700;
-  border-radius: 3px;
-  padding: 1px 3px;
-  flex-shrink: 0;
-  line-height: 1.4;
-}
-.chip-status--approved {
-  background: rgba(46, 125, 50, 0.2);
-  color: #2e7d32 !important;
-}
-.chip-status--rejected {
-  background: rgba(198, 40, 40, 0.2);
-  color: #c62828 !important;
-}
-
 /* Copy icon visible on chip hover */
 .chip-copy-btn {
   position: absolute;

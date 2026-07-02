@@ -406,7 +406,7 @@ $(function () {
       if (leaveColor) {
         var leaveChipStyle = buildBprChipStyle(ev.bprFieldValues);
         var leaveBorderLeft = leaveChipStyle.borderLeft || leaveColor;
-        styleStr = 'background:' + leaveColor + '22;border-left-color:' + leaveBorderLeft +
+        styleStr = 'background:' + leaveColor + ';border-left-color:' + leaveBorderLeft +
                    ';border-left-style:solid;border-left-width:3px;';
         if (leaveChipStyle.markerColor) {
           markerHtml = '<span class="chip-marker" style="background:' + escHtml(leaveChipStyle.markerColor) + ';" aria-hidden="true"></span>';
@@ -435,22 +435,12 @@ $(function () {
       ? ' data-bpr-fields="' + escHtml(JSON.stringify(ev.bprFieldValues)) + '"'
       : '';
 
-    /* Approval status indicator */
-    var approvalVal = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
-    var statusHtml  = '';
-    if (approvalVal === 'Approved') {
-      statusHtml = '<span class="chip-status chip-status--approved" aria-label="Approved">&#10004;</span>';
-    } else if (approvalVal === 'Rejected') {
-      statusHtml = '<span class="chip-status chip-status--rejected" aria-label="Rejected">&#10006;</span>';
-    }
-
     return '<div class="evt-chip' + pastCls + '" ' +
            '     data-evid="' + ev.id + '" data-date="' + ev.date + '"' +
            bprAttr +
            '     style="' + styleStr + '">' +
            markerHtml +
            '  <span class="chip-name">' + escHtml(ev.title) + '</span>' +
-           statusHtml +
            '  <span class="chip-time">' + fmtTime(ev.startTime) + '</span>' +
            '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
            '</div>';
@@ -1367,8 +1357,8 @@ $(function () {
       if (leaveColor) {
         var leaveHcStyle = buildBprChipStyle(ev.bprFieldValues);
         var leaveBorderLeft = leaveHcStyle.borderLeft || leaveColor;
-        cardStyle        = 'background:' + leaveColor + '22;border-left:3px solid ' + leaveBorderLeft + ';';
-        arrowBg          = leaveColor + '22';
+        cardStyle        = 'background:' + leaveColor + ';border-left:3px solid ' + leaveBorderLeft + ';';
+        arrowBg          = leaveColor;
         arrowBorderColor = leaveBorderLeft;
         markerColor      = leaveHcStyle.markerColor || '';
       } else {
@@ -5181,7 +5171,7 @@ $(function () {
       var leaveColor = getLeaveTypeColor(fieldValues);
       if (leaveColor) {
         var leaveBorderLeft = s.borderLeft || leaveColor;
-        styleStr = 'background:' + leaveColor + '22;border-left-color:' + leaveBorderLeft +
+        styleStr = 'background:' + leaveColor + ';border-left-color:' + leaveBorderLeft +
                    ';border-left-style:solid;border-left-width:3px;';
       } else {
         if (s.bg)           { styleStr += 'background:' + s.bg + ';'; }
@@ -5207,14 +5197,6 @@ $(function () {
         $marker.css('background', s.markerColor);
       }
 
-      /* ── Restore / update approval status indicator ── */
-      var approvalVal = fieldValues['beatplanner__Managers_Approval'] || '';
-      $chip.find('.chip-status').remove();
-      if (approvalVal === 'Approved') {
-        $chip.find('.chip-time').before('<span class="chip-status chip-status--approved" aria-label="Approved">&#10004;</span>');
-      } else if (approvalVal === 'Rejected') {
-        $chip.find('.chip-time').before('<span class="chip-status chip-status--rejected" aria-label="Rejected">&#10006;</span>');
-      }
     });
   }
 
