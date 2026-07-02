@@ -4246,6 +4246,12 @@ $(function () {
         if (mwId && mwLookupApi) {
           recordData[mwLookupApi] = { id: mwId };
         }
+        /* Include all other module lookup fields as empty strings */
+        beatPlanModulesList.forEach(function (mod) {
+          if (mod.api && mod.api !== mwLookupApi) {
+            recordData[mod.api] = '';
+          }
+        });
 
         /* Dynamic picklist columns */
         $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
@@ -4520,6 +4526,13 @@ $(function () {
       if (mwId && mwLookupApi) {
         recordData[mwLookupApi] = { id: mwId };
       }
+      /* Include all other module lookup fields as empty strings so the payload
+         always contains every Meetings For module field, not just the selected one */
+      beatPlanModulesList.forEach(function (mod) {
+        if (mod.api && mod.api !== mwLookupApi) {
+          recordData[mod.api] = '';
+        }
+      });
 
       /* Dynamic picklist columns – also collect values for BPR chip styling */
       $row.find('.bp-dd-wrap')
