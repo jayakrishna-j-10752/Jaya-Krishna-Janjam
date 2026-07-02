@@ -400,11 +400,17 @@ $(function () {
 
     if (beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length &&
         ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
-      /* When Attendance = Leave, use the Leave Type picklist color as the chip background. */
+      /* When Attendance = Leave, use the Leave Type picklist color as the chip background,
+         and the Managers Approval color as the left border (fully metadata-driven). */
       var leaveColor = getLeaveTypeColor(ev.bprFieldValues);
       if (leaveColor) {
-        styleStr = 'background:' + leaveColor + '22;border-left-color:' + leaveColor +
+        var leaveChipStyle = buildBprChipStyle(ev.bprFieldValues);
+        var leaveBorderLeft = leaveChipStyle.borderLeft || leaveColor;
+        styleStr = 'background:' + leaveColor + '22;border-left-color:' + leaveBorderLeft +
                    ';border-left-style:solid;border-left-width:3px;';
+        if (leaveChipStyle.markerColor) {
+          markerHtml = '<span class="chip-marker" style="background:' + escHtml(leaveChipStyle.markerColor) + ';" aria-hidden="true"></span>';
+        }
       } else {
         /* Dynamic BPR styling: derive colours from picklist metadata */
         var s = buildBprChipStyle(ev.bprFieldValues);
@@ -419,16 +425,24 @@ $(function () {
         if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
       }
     } else {
-      /* Fallback: use the event's manually chosen colour */
+      /* Fallback: use the event's manually chosen colour (background + border only, no text override) */
       var bg     = ev.color + '22';
       var border = ev.color;
-      var fg     = ev.color;
-      styleStr = 'background:' + bg + ';border-left-color:' + border + ';color:' + fg + ';';
+      styleStr = 'background:' + bg + ';border-left-color:' + border + ';border-left-style:solid;border-left-width:3px;';
     }
 
     var bprAttr = (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length)
       ? ' data-bpr-fields="' + escHtml(JSON.stringify(ev.bprFieldValues)) + '"'
       : '';
+
+    /* Approval status indicator */
+    var approvalVal = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+    var statusHtml  = '';
+    if (approvalVal === 'Approved') {
+      statusHtml = '<span class="chip-status chip-status--approved" aria-label="Approved">&#10004;</span>';
+    } else if (approvalVal === 'Rejected') {
+      statusHtml = '<span class="chip-status chip-status--rejected" aria-label="Rejected">&#10006;</span>';
+    }
 
     return '<div class="evt-chip' + pastCls + '" ' +
            '     data-evid="' + ev.id + '" data-date="' + ev.date + '"' +
@@ -436,6 +450,7 @@ $(function () {
            '     style="' + styleStr + '">' +
            markerHtml +
            '  <span class="chip-name">' + escHtml(ev.title) + '</span>' +
+           statusHtml +
            '  <span class="chip-time">' + fmtTime(ev.startTime) + '</span>' +
            '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
            '</div>';
@@ -1191,13 +1206,15 @@ $(function () {
    * @param {boolean} showPaste  – whether to show the Paste button
    */
   function buildEventActionsHtml(evid, showPaste) {
-    var pasteStyle = showPaste ? '' : 'display:none;';
+    var pasteBtn = showPaste
+      ? '<button class="hc-act hc-act-paste"   data-evid="' + evid + '" title="Paste">'   + SVG.paste + '</button>'
+      : '';
     return '<div class="hc-actions">' +
       '<button class="hc-act hc-act-edit"    data-evid="' + evid + '" title="Edit">'    + SVG.edit    + '</button>' +
       '<button class="hc-act hc-act-approve" data-evid="' + evid + '" title="Approve">' + SVG.approve + '</button>' +
       '<button class="hc-act hc-act-reject"  data-evid="' + evid + '" title="Reject">'  + SVG.reject  + '</button>' +
       '<button class="hc-act hc-act-copy"    data-evid="' + evid + '" title="Copy">'    + SVG.copy    + '</button>' +
-      '<button class="hc-act hc-act-paste"   data-evid="' + evid + '" title="Paste" style="' + pasteStyle + '">' + SVG.paste + '</button>' +
+      pasteBtn +
       '<button class="hc-act hc-act-delete"  data-evid="' + evid + '" title="Delete">'  + SVG.trash   + '</button>' +
       '</div>';
   }
@@ -1348,9 +1365,12 @@ $(function () {
         beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length) {
       var leaveColor = getLeaveTypeColor(ev.bprFieldValues);
       if (leaveColor) {
-        cardStyle        = 'background:' + leaveColor + '22;border-left:3px solid ' + leaveColor + ';';
+        var leaveHcStyle = buildBprChipStyle(ev.bprFieldValues);
+        var leaveBorderLeft = leaveHcStyle.borderLeft || leaveColor;
+        cardStyle        = 'background:' + leaveColor + '22;border-left:3px solid ' + leaveBorderLeft + ';';
         arrowBg          = leaveColor + '22';
-        arrowBorderColor = leaveColor;
+        arrowBorderColor = leaveBorderLeft;
+        markerColor      = leaveHcStyle.markerColor || '';
       } else {
         var s = buildBprChipStyle(ev.bprFieldValues);
         if (s.bg)           { cardStyle += 'background:' + s.bg + ';';                                     arrowBg = s.bg; }
@@ -1455,11 +1475,39 @@ $(function () {
     }
 
     var arrowCss = { left: arrowL + 'px', top: arrowT + 'px' };
-    /* The arrow background always matches the card surface (not the header tint)
-       so the card side of the rotated square blends invisibly into the card.
-       The border color is set to the event accent color for clear visibility. */
-    if (style.arrowBorderColor) { arrowCss['border-color'] = style.arrowBorderColor; }
+    /* The arrow background matches the card surface so the inner half blends into the card.
+       The border color is always set (event accent colour, or card bg, or a strong default)
+       to ensure the outer triangle tip is clearly visible in both Light and Dark themes. */
+    arrowCss['background']    = style.arrowBg || 'var(--surface)';
+    arrowCss['border-color']  = style.arrowBorderColor || style.arrowBg || 'var(--border-strong)';
     dom.hoverArrow.css(arrowCss).addClass('hc-arrow-visible');
+
+    /* ── Disable state-changing actions when event is already Approved or Rejected ── */
+    var approvalVal = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+    if (approvalVal === 'Approved' || approvalVal === 'Rejected') {
+      $card.find('.hc-act-approve, .hc-act-reject, .hc-act-delete').prop('disabled', true);
+    }
+
+    /* ── Load Meeting With avatar asynchronously if not yet cached ── */
+    if (!ev.mwAvatarImgSrc && ev.mwPhotoId) {
+      var $hcAvatar = $card.find('.hc-mw-avatar');
+      var evPhotoId = ev.mwPhotoId;
+      ZOHO.CRM.API.getFile({ id: evPhotoId })
+        .then(function (resp) {
+          if (resp && $hcAvatar.length) {
+            var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+            var reader  = new FileReader();
+            reader.onloadend = function () {
+              var dataUrl = reader.result;
+              ev.mwAvatarImgSrc = dataUrl;
+              saveEvents();
+              $hcAvatar.html('<img src="' + dataUrl + '" alt="' + escHtml(ev.title) + '">');
+            };
+            reader.readAsDataURL(imgBlob);
+          }
+        })
+        .catch(function () { /* keep initials fallback */ });
+    }
   }
 
   /**
@@ -1891,8 +1939,14 @@ $(function () {
       var canPaste    = !!(state.clipboard && isValid(ev.date));
       var actionsHtml = buildEventActionsHtml(ev.id, canPaste);
 
+      /* Disable state-changing actions when event is already Approved or Rejected */
+      var evApprovalVal = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+      var disableActionsAttr = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected')
+        ? ' data-approval-locked="1"'
+        : '';
+
       listHtml +=
-        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '">' +
+        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '"' + disableActionsAttr + '>' +
         '  <div class="hc-head" style="' + escHtml(style.cardStyle) + '">' +
         '    <div class="hc-head-top">' + markerHtml +
         '      <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
@@ -1904,6 +1958,10 @@ $(function () {
     });
 
     dom.demList.html(listHtml);
+    /* Apply disabled state to action buttons for locked events */
+    dom.demList.find('.dem-card[data-approval-locked="1"]')
+               .find('.hc-act-approve, .hc-act-reject, .hc-act-delete')
+               .prop('disabled', true);
     dom.dayEventsModal.addClass('dem-open');
   }
 
@@ -4054,6 +4112,7 @@ $(function () {
       $avatar.text(buildRecordInitials(label))
              .removeClass('bp-rec-avatar--show')
              .removeAttr('data-img-src')
+             .attr('data-photo-id', photoId || '')  /* store for later retrieval at save time */
              .addClass('bp-rec-avatar--show');
 
       closeBpDropdown($wrap);
@@ -4485,8 +4544,11 @@ $(function () {
         /* Also save as a calendar event so it appears on the grid with BPR styling */
         var $mwValText     = $mwWrap.find('.bp-dd-val').text() || '';
         var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
-        var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || '';
+        /* Use the data-img-src attribute as a reliable fallback for the img src,
+           since the async photo load may finish after the img element is replaced. */
+        var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '';
         var mwAvatarText   = $mwAvatar.text() || '';
+        var mwPhotoId      = $mwAvatar.attr('data-photo-id') || '';
         var newEv = {
           id:             uid(),
           title:          $mwValText || (mfDisplayVal || 'Beat Plan'),
@@ -4497,7 +4559,8 @@ $(function () {
           description:    '',
           bprFieldValues: bprFieldValues,
           mwAvatarImgSrc: mwAvatarImgSrc,
-          mwAvatarText:   mwAvatarText
+          mwAvatarText:   mwAvatarText,
+          mwPhotoId:      mwPhotoId
         };
 
         /* Update event ID with the CRM record ID returned in the response */
@@ -4539,7 +4602,8 @@ $(function () {
         id:           $mwVal.attr('data-selected-id') || '',
         lookupApi:    $mwWrap.attr('data-api') || '',
         avatarText:   $mwAvatar.text(),
-        avatarImgSrc: $mwAvatar.find('img').attr('src') || '',
+        avatarImgSrc: $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '',
+        avatarPhotoId: $mwAvatar.attr('data-photo-id') || '',
         avatarShow:   $mwAvatar.hasClass('bp-rec-avatar--show')
       };
 
@@ -4614,14 +4678,17 @@ $(function () {
 
       /* Restore avatar */
       var $mwAvatar = $mwWrap.find('.bp-rec-avatar');
-      $mwAvatar.removeClass('bp-rec-avatar--show').removeAttr('data-img-src').html('');
+      $mwAvatar.removeClass('bp-rec-avatar--show').removeAttr('data-img-src').removeAttr('data-photo-id').html('');
       if (mwData.avatarShow) {
         if (mwData.avatarImgSrc) {
           $mwAvatar.html('<img src="' + escHtml(mwData.avatarImgSrc) + '">')
                    .attr('data-img-src', mwData.avatarImgSrc)
+                   .attr('data-photo-id', mwData.avatarPhotoId || '')
                    .addClass('bp-rec-avatar--show');
         } else if (mwData.avatarText) {
-          $mwAvatar.text(mwData.avatarText).addClass('bp-rec-avatar--show');
+          $mwAvatar.text(mwData.avatarText)
+                   .attr('data-photo-id', mwData.avatarPhotoId || '')
+                   .addClass('bp-rec-avatar--show');
         }
       }
 
@@ -5095,6 +5162,8 @@ $(function () {
    * Apply BPR-driven dynamic styles to all .evt-chip elements currently in the DOM.
    * Each chip must carry a data-bpr-fields JSON attribute (set during renderChip)
    * for this to have any effect.
+   * Also restores the .chip-marker element and approval status indicator if they
+   * were missing because metadata had not loaded when the chip was first rendered.
    */
   function applyBprChipStyles() {
     if (!beatPlanHasRefs || !bprPicklistFields || !bprPicklistFields.length) { return; }
@@ -5104,27 +5173,48 @@ $(function () {
       try { fieldValues = JSON.parse($chip.attr('data-bpr-fields') || '{}'); }
       catch (e) { return; }
 
-      /* When Attendance = Leave, use the Leave Type picklist color as the chip background. */
+      var styleStr = '';
+      var s = buildBprChipStyle(fieldValues);
+
+      /* When Attendance = Leave, use the Leave Type picklist color as the chip background
+         and the Managers Approval color as the left border (fully metadata-driven). */
       var leaveColor = getLeaveTypeColor(fieldValues);
       if (leaveColor) {
-        $chip.attr('style',
-          'background:' + leaveColor + '22;border-left-color:' + leaveColor +
-          ';border-left-style:solid;border-left-width:3px;');
-        return;
+        var leaveBorderLeft = s.borderLeft || leaveColor;
+        styleStr = 'background:' + leaveColor + '22;border-left-color:' + leaveBorderLeft +
+                   ';border-left-style:solid;border-left-width:3px;';
+      } else {
+        if (s.bg)           { styleStr += 'background:' + s.bg + ';'; }
+        if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
+        if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
+        if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
+        if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
+        /* When no bg-colour is resolved but a left-border color exists, derive a tinted
+           background from the border colour to keep the chip visually distinct. */
+        if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
       }
 
-      var s = buildBprChipStyle(fieldValues);
-      var styleStr = '';
-      if (s.bg)           { styleStr += 'background:' + s.bg + ';'; }
-      if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
-      if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
-      if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
-      if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
-      /* When no bg-colour is resolved but a left-border color exists, derive a tinted
-         background from the border colour to keep the chip visually distinct. */
-      if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
-      if (s.markerColor)  { $chip.find('.chip-marker').css('background', s.markerColor); }
-      if (styleStr)       { $chip.attr('style', ($chip.attr('style') || '') + styleStr); }
+      /* Always replace the chip style so any stale fallback colour: override is cleared */
+      $chip.attr('style', styleStr || '');
+
+      /* ── Restore .chip-marker if it was not rendered on initial load ── */
+      if (s.markerColor) {
+        var $marker = $chip.find('.chip-marker');
+        if (!$marker.length) {
+          $chip.find('.chip-name').before('<span class="chip-marker" aria-hidden="true"></span>');
+          $marker = $chip.find('.chip-marker');
+        }
+        $marker.css('background', s.markerColor);
+      }
+
+      /* ── Restore / update approval status indicator ── */
+      var approvalVal = fieldValues['beatplanner__Managers_Approval'] || '';
+      $chip.find('.chip-status').remove();
+      if (approvalVal === 'Approved') {
+        $chip.find('.chip-time').before('<span class="chip-status chip-status--approved" aria-label="Approved">&#10004;</span>');
+      } else if (approvalVal === 'Rejected') {
+        $chip.find('.chip-time').before('<span class="chip-status chip-status--rejected" aria-label="Rejected">&#10006;</span>');
+      }
     });
   }
 

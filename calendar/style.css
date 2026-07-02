@@ -707,13 +707,31 @@ input, select, textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
 }
 .chip-time {
   font-size: 10px;
   opacity: .8;
   flex-shrink: 0;
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
+}
+
+/* Approval status badge on event chip */
+.chip-status {
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 3px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+.chip-status--approved {
+  background: rgba(46, 125, 50, 0.2);
+  color: #2e7d32 !important;
+}
+.chip-status--rejected {
+  background: rgba(198, 40, 40, 0.2);
+  color: #c62828 !important;
 }
 
 /* Copy icon visible on chip hover */
@@ -1502,6 +1520,12 @@ input, select, textarea {
 .hc-act-approve:hover        { color: #2e7d32; }
 .hc-act-reject:hover         { color: #c62828; }
 .hc-act-delete:hover         { color: #c62828; }
+/* Disabled state for action buttons (after Approval / Rejection) */
+.hc-act[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+  cursor: not-allowed;
+}
 
 /* ══════════════════════════════════════════════════════════
    TIME SLOT PICKER MENU
