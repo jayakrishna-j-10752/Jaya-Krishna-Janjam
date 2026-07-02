@@ -1390,6 +1390,143 @@ input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════════════════
+   HOVER PREVIEW CARD
+══════════════════════════════════════════════════════════ */
+.evt-hover-card {
+  position: fixed;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 910;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px) scale(.99);
+  transition: opacity .15s, transform .15s;
+}
+.evt-hover-card.hc-visible {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+
+/* ── Hover card header ── */
+.hc-head {
+  padding: 11px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+}
+.hc-head-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.hc-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hc-head-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* ── Hover card body ── */
+.hc-body {
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* ── Generic field row ── */
+.hc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.hc-row-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--text-muted);
+}
+.hc-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.hc-row-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .045em;
+}
+.hc-row-val {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* ── Meeting With row ── */
+.hc-mw-row {
+  align-items: center;
+}
+.hc-mw-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--accent, #1565C0) 18%, var(--surface-2));
+  color: var(--accent, #1565C0);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.hc-mw-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+.hc-mw-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.hc-mw-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════
    TIME SLOT PICKER MENU
 ══════════════════════════════════════════════════════════ */
 .slot-menu {

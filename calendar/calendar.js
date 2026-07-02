@@ -166,7 +166,9 @@ $(function () {
     dayEventsPopup: $('#dayEventsPopup'),
     depDate:        $('#depDate'),
     depList:        $('#depList'),
-    depClose:       $('#depClose')
+    depClose:       $('#depClose'),
+
+    hoverCard:      $('#evtHoverCard')
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -1189,6 +1191,215 @@ $(function () {
   function closePopup() {
     state.activePopup = null;
     dom.popup.removeClass('popup-open');
+    hideHoverCard();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     HOVER PREVIEW CARD
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Render all detail fields for an event into $container.
+   * Shared between the hover preview card and any future event view.
+   *
+   * @param {Object} ev          – event data object from state.events
+   * @param {jQuery} $container  – jQuery element to fill with field rows
+   */
+  function renderEventDetails(ev, $container) {
+    var isBeatPlan = !!(ev.bprFieldValues && Object.keys(ev.bprFieldValues).length);
+    var html = '';
+
+    if (isBeatPlan) {
+      /* ── Detect Leave event ── */
+      var isLeave           = false;
+      var attendanceApiName = '';
+      if (bprPicklistFields) {
+        for (var k = 0; k < bprPicklistFields.length; k++) {
+          var lbl = (bprPicklistFields[k].field_label || '').toLowerCase().trim();
+          if (lbl === 'attendance') {
+            attendanceApiName = bprPicklistFields[k].api_name;
+            var aVal = ev.bprFieldValues[attendanceApiName] || '';
+            if (aVal.toLowerCase() === 'leave') { isLeave = true; }
+            break;
+          }
+        }
+      }
+
+      /* ── Meeting With (avatar + name) – non-Leave records only ── */
+      if (!isLeave && ev.title) {
+        var initials = buildRecordInitials(ev.title);
+        html += '<div class="hc-row hc-mw-row">' +
+                '  <div class="hc-mw-avatar">' + escHtml(initials) + '</div>' +
+                '  <div class="hc-mw-info">' +
+                '    <span class="hc-row-label">Meeting With</span>' +
+                '    <span class="hc-mw-name">' + escHtml(ev.title) + '</span>' +
+                '  </div>' +
+                '</div>';
+      }
+
+      /* ── Time ── */
+      html += '<div class="hc-row">' +
+              '  <svg class="hc-row-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4l2.5 2.5"/></svg>' +
+              '  <div class="hc-row-info">' +
+              '    <span class="hc-row-label">Time</span>' +
+              '    <span class="hc-row-val">' + escHtml(fmtTime(ev.startTime) + ' \u2013 ' + fmtTime(ev.endTime)) + '</span>' +
+              '  </div>' +
+              '</div>';
+
+      /* ── Build field-label lookup (bpDailyAllFields + bprPicklistFields) ── */
+      var fieldLabelMap = {};
+      if (bpDailyAllFields && bpDailyAllFields.length) {
+        bpDailyAllFields.forEach(function (f) {
+          if (f.api_name && f.field_label) { fieldLabelMap[f.api_name] = f.field_label; }
+        });
+      }
+      if (bprPicklistFields && bprPicklistFields.length) {
+        bprPicklistFields.forEach(function (f) {
+          if (f.api_name && f.field_label) { fieldLabelMap[f.api_name] = f.field_label; }
+        });
+      }
+
+      /* ── Order: follow bprPicklistFields sequence, then any remaining keys ── */
+      var orderedApis = [];
+      if (bprPicklistFields && bprPicklistFields.length) {
+        bprPicklistFields.forEach(function (f) {
+          if (ev.bprFieldValues.hasOwnProperty(f.api_name)) {
+            orderedApis.push(f.api_name);
+          }
+        });
+      }
+      Object.keys(ev.bprFieldValues).forEach(function (api) {
+        if (orderedApis.indexOf(api) === -1) { orderedApis.push(api); }
+      });
+
+      orderedApis.forEach(function (api) {
+        var val = ev.bprFieldValues[api];
+        if (!val || val === 'Select\u2026') { return; }
+        var label = fieldLabelMap[api] || api;
+        html += '<div class="hc-row">' +
+                '  <svg class="hc-row-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 8.5h4M5 11h5"/></svg>' +
+                '  <div class="hc-row-info">' +
+                '    <span class="hc-row-label">' + escHtml(label) + '</span>' +
+                '    <span class="hc-row-val">' + escHtml(val) + '</span>' +
+                '  </div>' +
+                '</div>';
+      });
+
+    } else {
+      /* ── Standard (non-beat-plan) event ── */
+      html += '<div class="hc-row">' +
+              '  <svg class="hc-row-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4l2.5 2.5"/></svg>' +
+              '  <div class="hc-row-info">' +
+              '    <span class="hc-row-label">Time</span>' +
+              '    <span class="hc-row-val">' + escHtml(fmtTime(ev.startTime) + ' \u2013 ' + fmtTime(ev.endTime)) + '</span>' +
+              '  </div>' +
+              '</div>';
+      if (ev.description) {
+        html += '<div class="hc-row">' +
+                '  <svg class="hc-row-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11M2.5 6.5h8M2.5 9.5h9M2.5 12.5h6"/></svg>' +
+                '  <div class="hc-row-info">' +
+                '    <span class="hc-row-label">Description</span>' +
+                '    <span class="hc-row-val">' + escHtml(ev.description) + '</span>' +
+                '  </div>' +
+                '</div>';
+      }
+    }
+
+    $container.html(html);
+  }
+
+  /**
+   * Compute header style and marker colour for the hover card,
+   * mirroring the BPR-driven styling applied to the .evt-chip.
+   */
+  function buildHoverCardHeaderStyle(ev) {
+    var headerStyle = '';
+    var markerColor = '';
+
+    if (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length &&
+        beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length) {
+      var leaveColor = getLeaveTypeColor(ev.bprFieldValues);
+      if (leaveColor) {
+        headerStyle = 'background:' + leaveColor + '22;border-left:3px solid ' + leaveColor + ';';
+      } else {
+        var s = buildBprChipStyle(ev.bprFieldValues);
+        if (s.bg)           { headerStyle += 'background:' + s.bg + ';'; }
+        if (s.borderTop)    { headerStyle += 'border-top:2px solid '    + s.borderTop    + ';'; }
+        if (s.borderBottom) { headerStyle += 'border-bottom:2px solid ' + s.borderBottom + ';'; }
+        if (s.borderLeft)   { headerStyle += 'border-left:3px solid '   + s.borderLeft   + ';'; }
+        if (s.borderRight)  { headerStyle += 'border-right:2px solid '  + s.borderRight  + ';'; }
+        if (!s.bg && s.borderLeft) { headerStyle += 'background:' + s.borderLeft + '22;'; }
+        markerColor = s.markerColor || '';
+      }
+    } else {
+      /* Fallback: use the event's manually chosen colour */
+      headerStyle = 'background:' + ev.color + '22;border-left:3px solid ' + ev.color + ';';
+    }
+
+    return { headerStyle: headerStyle, markerColor: markerColor };
+  }
+
+  /**
+   * Show the hover preview card for the given event near $chip.
+   */
+  function showHoverCard(ev, $chip) {
+    clearTimeout(hoverTimer);
+    hoverActiveId = ev.id;
+
+    var $card  = dom.hoverCard;
+    var style  = buildHoverCardHeaderStyle(ev);
+
+    /* ── Header ── */
+    var markerHtml = style.markerColor
+      ? '<span class="hc-marker" style="background:' + escHtml(style.markerColor) + ';" aria-hidden="true"></span>'
+      : '';
+
+    var headerHtml =
+      '<div class="hc-head" style="' + style.headerStyle + '">' +
+      '  <div class="hc-head-top">' + markerHtml +
+      '    <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
+      '  </div>' +
+      '</div>';
+
+    /* ── Body ── */
+    var $body = $('<div class="hc-body"></div>');
+    renderEventDetails(ev, $body);
+
+    $card.empty().append(headerHtml).append($body[0]);
+
+    /* ── Smart viewport-aware positioning ── */
+    /* Temporarily place offscreen to measure dimensions */
+    $card.css({ left: '-9999px', top: '-9999px' })
+         .attr('aria-hidden', 'false')
+         .addClass('hc-visible');
+
+    var cardW = $card[0].offsetWidth  || 300;
+    var cardH = $card[0].offsetHeight || 200;
+    var rect  = $chip[0].getBoundingClientRect();
+    var vw    = window.innerWidth;
+    var vh    = window.innerHeight;
+    var GAP   = 8;
+
+    /* Prefer right of chip; fall back to left */
+    var left = rect.right + GAP;
+    if (left + cardW > vw - GAP) { left = rect.left - cardW - GAP; }
+    left = Math.max(GAP, Math.min(left, vw - cardW - GAP));
+
+    /* Prefer top-aligned with chip; push up if overflowing bottom */
+    var top = rect.top;
+    if (top + cardH > vh - GAP) { top = vh - cardH - GAP; }
+    top = Math.max(GAP, top);
+
+    $card.css({ left: left + 'px', top: top + 'px' });
+  }
+
+  /**
+   * Hide the hover preview card.
+   */
+  function hideHoverCard() {
+    clearTimeout(hoverTimer);
+    hoverActiveId = null;
+    dom.hoverCard.removeClass('hc-visible').attr('aria-hidden', 'true');
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -2490,6 +2701,10 @@ $(function () {
   var activeModuleFilters   = {};  /* {moduleName: {fieldApiName: ['val1','val2']}} – currently applied filter selections */
   var filteredModuleRecords = {};  /* {moduleName: [{id, name, photo_id}]} – records matching active filters */
 
+  /* ── Hover preview card state ── */
+  var hoverTimer    = null;  /* debounce timer – delays hiding the hover card */
+  var hoverActiveId = null;  /* event id of the currently-visible hover card */
+
   /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
   var mfColors = (function () {
     try { return JSON.parse(localStorage.getItem('zcrm_mf_colors') || '{}'); }
@@ -3556,6 +3771,22 @@ $(function () {
 
     /* Popup controls */
     dom.paClose.on('click',  closePopup);
+
+    /* Hover preview card – show on mouseenter, hide on mouseleave with debounce */
+    dom.canvas.on('mouseenter.hovercard', '.evt-chip', function () {
+      clearTimeout(hoverTimer);
+      var ev = findEvent($(this).data('evid'));
+      if (ev) { showHoverCard(ev, $(this)); }
+    });
+    dom.canvas.on('mouseleave.hovercard', '.evt-chip', function () {
+      hoverTimer = setTimeout(hideHoverCard, 150);
+    });
+    dom.hoverCard.on('mouseenter', function () {
+      clearTimeout(hoverTimer);
+    });
+    dom.hoverCard.on('mouseleave', function () {
+      hideHoverCard();
+    });
 
     /* Day events popup controls */
     dom.depClose.on('click', closeDayEventsPopup);
