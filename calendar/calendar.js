@@ -168,7 +168,8 @@ $(function () {
     depList:        $('#depList'),
     depClose:       $('#depClose'),
 
-    hoverCard:      $('#evtHoverCard')
+    hoverCard:      $('#evtHoverCard'),
+    hoverArrow:     $('#hcArrow')
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -1228,8 +1229,16 @@ $(function () {
       /* ── Meeting With (avatar + name) – non-Leave records only ── */
       if (!isLeave && ev.title) {
         var initials = buildRecordInitials(ev.title);
+        var avatarInner;
+        if (ev.mwAvatarImgSrc) {
+          avatarInner = '<img src="' + escHtml(ev.mwAvatarImgSrc) + '" alt="' + escHtml(ev.title) + '">';
+        } else if (ev.mwAvatarText) {
+          avatarInner = escHtml(ev.mwAvatarText);
+        } else {
+          avatarInner = escHtml(initials);
+        }
         html += '<div class="hc-row hc-mw-row">' +
-                '  <div class="hc-mw-avatar">' + escHtml(initials) + '</div>' +
+                '  <div class="hc-mw-avatar">' + avatarInner + '</div>' +
                 '  <div class="hc-mw-info">' +
                 '    <span class="hc-row-label">Meeting With</span>' +
                 '    <span class="hc-mw-name">' + escHtml(ev.title) + '</span>' +
@@ -1391,6 +1400,35 @@ $(function () {
     top = Math.max(GAP, top);
 
     $card.css({ left: left + 'px', top: top + 'px' });
+
+    /* ── Arrow positioning ── */
+    /* The arrow is a 12×12 rotated square (z-index 909, below card z-index 910).
+       The card's background covers the inner half so only the outer tip is visible. */
+    var ARROW  = 6; /* half of 12px */
+    var chipCX = rect.left + rect.width  / 2;
+    var chipCY = rect.top  + rect.height / 2;
+    var arrowL, arrowT;
+
+    if (left >= rect.right - 1) {
+      /* Card is to the right → arrow on left edge, pointing left toward chip */
+      arrowL = left - ARROW;
+      arrowT = Math.max(top + ARROW, Math.min(chipCY - ARROW, top + cardH - ARROW * 3));
+    } else if (left + cardW <= rect.left + 1) {
+      /* Card is to the left → arrow on right edge, pointing right toward chip */
+      arrowL = left + cardW - ARROW;
+      arrowT = Math.max(top + ARROW, Math.min(chipCY - ARROW, top + cardH - ARROW * 3));
+    } else if (top >= rect.bottom - 1) {
+      /* Card is below → arrow on top edge, pointing up toward chip */
+      arrowL = Math.max(left + ARROW, Math.min(chipCX - ARROW, left + cardW - ARROW * 3));
+      arrowT = top - ARROW;
+    } else {
+      /* Card is above → arrow on bottom edge, pointing down toward chip */
+      arrowL = Math.max(left + ARROW, Math.min(chipCX - ARROW, left + cardW - ARROW * 3));
+      arrowT = top + cardH - ARROW;
+    }
+
+    dom.hoverArrow.css({ left: arrowL + 'px', top: arrowT + 'px' })
+                  .addClass('hc-arrow-visible');
   }
 
   /**
@@ -1400,6 +1438,7 @@ $(function () {
     clearTimeout(hoverTimer);
     hoverActiveId = null;
     dom.hoverCard.removeClass('hc-visible').attr('aria-hidden', 'true');
+    dom.hoverArrow.removeClass('hc-arrow-visible');
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -4355,7 +4394,10 @@ $(function () {
         console.log('Daily Beat Plan saved', resp);
 
         /* Also save as a calendar event so it appears on the grid with BPR styling */
-        var $mwValText = $mwWrap.find('.bp-dd-val').text() || '';
+        var $mwValText     = $mwWrap.find('.bp-dd-val').text() || '';
+        var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
+        var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || '';
+        var mwAvatarText   = $mwAvatar.text() || '';
         var newEv = {
           id:             uid(),
           title:          $mwValText || (mfDisplayVal || 'Beat Plan'),
@@ -4364,7 +4406,9 @@ $(function () {
           endTime:        endTime,
           color:          '#1565C0',
           description:    '',
-          bprFieldValues: bprFieldValues
+          bprFieldValues: bprFieldValues,
+          mwAvatarImgSrc: mwAvatarImgSrc,
+          mwAvatarText:   mwAvatarText
         };
 
         /* Update event ID with the CRM record ID returned in the response */

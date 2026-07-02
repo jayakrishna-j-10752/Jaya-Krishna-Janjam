@@ -1414,6 +1414,23 @@ input, select, textarea {
   transform: translateY(0) scale(1);
 }
 
+/* ── Hover card arrow ── */
+.hc-arrow-el {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+  z-index: 909;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s;
+}
+.hc-arrow-el.hc-arrow-visible {
+  opacity: 1;
+}
+
 /* ── Hover card header ── */
 .hc-head {
   padding: 11px 14px 10px;
