@@ -707,11 +707,13 @@ input, select, textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text-primary);
 }
 .chip-time {
   font-size: 10px;
   opacity: .8;
   flex-shrink: 0;
+  color: var(--text-primary);
 }
 
 /* Copy icon visible on chip hover */
@@ -1345,7 +1347,8 @@ input, select, textarea {
   width: 12px;
   height: 12px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: 1px 1px 3px rgba(0,0,0,.12);
   transform: rotate(45deg);
   z-index: 909;
   opacity: 0;
@@ -1495,6 +1498,7 @@ input, select, textarea {
   pointer-events: none;
 }
 .hc-act:hover                { background: rgba(0,0,0,.08); color: var(--text-primary); }
+.hc-act-edit:hover           { color: var(--z-blue, #1565C0); }
 .hc-act-approve:hover        { color: #2e7d32; }
 .hc-act-reject:hover         { color: #c62828; }
 .hc-act-delete:hover         { color: #c62828; }

@@ -1184,7 +1184,7 @@ $(function () {
   }
 
   /**
-   * Build the HTML for event action buttons (Approve, Reject, Copy, Paste, Delete).
+   * Build the HTML for event action buttons (Edit, Approve, Reject, Copy, Paste, Delete).
    * Shared between the hover card and the day events modal cards.
    *
    * @param {string}  evid       – event id
@@ -1193,6 +1193,7 @@ $(function () {
   function buildEventActionsHtml(evid, showPaste) {
     var pasteStyle = showPaste ? '' : 'display:none;';
     return '<div class="hc-actions">' +
+      '<button class="hc-act hc-act-edit"    data-evid="' + evid + '" title="Edit">'    + SVG.edit    + '</button>' +
       '<button class="hc-act hc-act-approve" data-evid="' + evid + '" title="Approve">' + SVG.approve + '</button>' +
       '<button class="hc-act hc-act-reject"  data-evid="' + evid + '" title="Reject">'  + SVG.reject  + '</button>' +
       '<button class="hc-act hc-act-copy"    data-evid="' + evid + '" title="Copy">'    + SVG.copy    + '</button>' +
@@ -1328,12 +1329,12 @@ $(function () {
   }
 
   /**
-   * Compute metadata-driven styling for an event card (hover card or day events modal card),
+   * Compute metadata-driven styling for an event card header (.hc-head),
    * mirroring the BPR-driven styling applied to the .evt-chip.
    *
    * Returns:
-   *   cardStyle       – full inline-style string to apply to the card element
-   *   arrowBg         – resolved background CSS color for the hover arrow
+   *   cardStyle       – full inline-style string to apply to the .hc-head element
+   *   arrowBg         – resolved background CSS color for the hover arrow (unused, kept for compat)
    *   arrowBorderColor– resolved border CSS color for the hover arrow
    *   markerColor     – dot marker color (or empty string)
    */
@@ -1380,16 +1381,13 @@ $(function () {
     var $card  = dom.hoverCard;
     var style  = buildHoverCardHeaderStyle(ev);
 
-    /* Apply metadata-driven styling to the entire card */
-    $card.attr('style', style.cardStyle);
-
-    /* ── Header ── */
+    /* ── Header ── Apply metadata-driven styling only to .hc-head */
     var markerHtml = style.markerColor
       ? '<span class="hc-marker" style="background:' + escHtml(style.markerColor) + ';" aria-hidden="true"></span>'
       : '';
 
     var headerHtml =
-      '<div class="hc-head">' +
+      '<div class="hc-head" style="' + escHtml(style.cardStyle) + '">' +
       '  <div class="hc-head-top">' + markerHtml +
       '    <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
       '  </div>' +
@@ -1399,9 +1397,8 @@ $(function () {
     var $body = $('<div class="hc-body"></div>');
     renderEventDetails(ev, $body);
 
-    /* ── Actions ── */
-    var canPaste = !!(state.clipboard && isValid(ev.date));
-    var actionsHtml = buildEventActionsHtml(ev.id, canPaste);
+    /* ── Actions ── Paste button is never shown inside the hover card */
+    var actionsHtml = buildEventActionsHtml(ev.id, false);
 
     $card.empty().append(headerHtml).append($body[0]).append(actionsHtml);
 
@@ -1458,8 +1455,10 @@ $(function () {
     }
 
     var arrowCss = { left: arrowL + 'px', top: arrowT + 'px' };
-    if (style.arrowBg)          { arrowCss['background']    = style.arrowBg; }
-    if (style.arrowBorderColor) { arrowCss['border-color']  = style.arrowBorderColor; }
+    /* The arrow background always matches the card surface (not the header tint)
+       so the card side of the rotated square blends invisibly into the card.
+       The border color is set to the event accent color for clear visibility. */
+    if (style.arrowBorderColor) { arrowCss['border-color'] = style.arrowBorderColor; }
     dom.hoverArrow.css(arrowCss).addClass('hc-arrow-visible');
   }
 
@@ -1469,7 +1468,7 @@ $(function () {
   function hideHoverCard() {
     clearTimeout(hoverTimer);
     hoverActiveId = null;
-    dom.hoverCard.removeClass('hc-visible').attr('aria-hidden', 'true').removeAttr('style');
+    dom.hoverCard.removeClass('hc-visible').attr('aria-hidden', 'true');
     dom.hoverArrow.removeClass('hc-arrow-visible').css({ background: '', 'border-color': '' });
   }
 
@@ -1893,8 +1892,8 @@ $(function () {
       var actionsHtml = buildEventActionsHtml(ev.id, canPaste);
 
       listHtml +=
-        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '" style="' + style.cardStyle + '">' +
-        '  <div class="hc-head">' +
+        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '">' +
+        '  <div class="hc-head" style="' + escHtml(style.cardStyle) + '">' +
         '    <div class="hc-head-top">' + markerHtml +
         '      <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
         '    </div>' +
@@ -3863,6 +3862,12 @@ $(function () {
     });
 
     /* ── Action buttons: hover card ── */
+    dom.hoverCard.on('click', '.hc-act-edit', function (e) {
+      e.stopPropagation();
+      var ev = findEvent($(this).data('evid'));
+      hideHoverCard();
+      if (ev) { openModal(ev.date, ev.startTime, ev.endTime, ev); }
+    });
     dom.hoverCard.on('click', '.hc-act-approve', function (e) {
       e.stopPropagation();
       var evid = $(this).data('evid');
@@ -3900,6 +3905,12 @@ $(function () {
     });
 
     /* ── Action buttons: day events modal cards ── */
+    dom.dayEventsModal.on('click', '.hc-act-edit', function (e) {
+      e.stopPropagation();
+      var ev = findEvent($(this).data('evid'));
+      closeDayEventsModal();
+      if (ev) { openModal(ev.date, ev.startTime, ev.endTime, ev); }
+    });
     dom.dayEventsModal.on('click', '.hc-act-approve', function (e) {
       e.stopPropagation();
       doApprove($(this).data('evid'));
@@ -4052,11 +4063,17 @@ $(function () {
         ZOHO.CRM.API.getFile({ id: photoId })
           .then(function (resp) {
             if (resp) {
-              var imgBlob = new Blob([resp], { type: "image/jpeg" });
-              var url = URL.createObjectURL(imgBlob);
-              $avatar
-                .html('<img src="' + url + '">')
-                .attr("data-img-src", url);
+              /* Convert to a data URL so the src remains valid across page reloads
+                 (Blob URLs are revoked when the session ends). */
+              var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+              var reader  = new FileReader();
+              reader.onloadend = function () {
+                var dataUrl = reader.result;
+                $avatar
+                  .html('<img src="' + dataUrl + '">')
+                  .attr('data-img-src', dataUrl);
+              };
+              reader.readAsDataURL(imgBlob);
             }
           })
           .catch(function () {
