@@ -1314,82 +1314,6 @@ input, select, textarea {
 .btn-ghost:hover { border-color: var(--z-blue); color: var(--z-blue); }
 
 /* ══════════════════════════════════════════════════════════
-   EVENT DETAIL POPUP
-══════════════════════════════════════════════════════════ */
-.evt-popup {
-  position: fixed;
-  width: 300px;
-  max-width: calc(100vw - 16px);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  z-index: 900;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px);
-  transition: opacity .15s, transform .15s;
-}
-.evt-popup.popup-open {
-  opacity: 1;
-  pointer-events: all;
-  transform: translateY(0);
-}
-
-.popup-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 11px 13px;
-  border-bottom: 1px solid var(--border);
-}
-.popup-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.popup-title {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.popup-acts { display: flex; gap: 1px; margin-left: auto; flex-shrink: 0; }
-.popup-act {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .12s, color .12s;
-}
-.popup-act svg {
-  width: 15px;
-  height: 15px;
-  pointer-events: none;
-}
-.popup-act:hover { background: var(--surface-2); color: var(--text-primary); }
-
-.popup-body {
-  padding: 11px 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.popup-row {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  min-height: 18px;
-}
-
-/* ══════════════════════════════════════════════════════════
    HOVER PREVIEW CARD
 ══════════════════════════════════════════════════════════ */
 .evt-hover-card {
@@ -1415,6 +1339,7 @@ input, select, textarea {
 }
 
 /* ── Hover card arrow ── */
+/* background and border-color are set dynamically via JS to match the card */
 .hc-arrow-el {
   position: fixed;
   width: 12px;
@@ -1542,6 +1467,37 @@ input, select, textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Hover card & day-events card action buttons ── */
+.hc-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  border-top: 1px solid rgba(0,0,0,.08);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  flex-wrap: wrap;
+}
+.hc-act {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s, color .12s;
+  flex-shrink: 0;
+}
+.hc-act svg {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.hc-act:hover                { background: rgba(0,0,0,.08); color: var(--text-primary); }
+.hc-act-approve:hover        { color: #2e7d32; }
+.hc-act-reject:hover         { color: #c62828; }
+.hc-act-delete:hover         { color: #c62828; }
 
 /* ══════════════════════════════════════════════════════════
    TIME SLOT PICKER MENU
@@ -2906,7 +2862,6 @@ input, select, textarea {
   .modal-body { padding: 14px 16px; }
   .modal-foot { padding: 12px 16px; }
 
-  .evt-popup { width: 260px; }
   .toast { font-size: 12px; padding: 9px 18px; }
 
   .meetings-bar { padding: 6px 10px; }
@@ -2917,50 +2872,61 @@ input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════════════════
-   DAY EVENTS POPUP (all events for a month cell)
+   DAY EVENTS MODAL
 ══════════════════════════════════════════════════════════ */
-.day-events-popup {
+.day-events-modal-overlay {
   position: fixed;
-  width: 280px;
-  max-height: 340px;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s;
+}
+.day-events-modal-overlay.dem-open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.day-events-modal-box {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  z-index: 950;
+  box-shadow: var(--shadow-lg);
+  width: min(500px, calc(100vw - 32px));
+  max-height: min(80vh, 620px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px) scale(.97);
-  transition: opacity .15s, transform .15s;
+  transform: translateY(-6px) scale(.98);
+  transition: transform .15s;
 }
-.day-events-popup.dep-open {
-  opacity: 1;
-  pointer-events: all;
+.day-events-modal-overlay.dem-open .day-events-modal-box {
   transform: translateY(0) scale(1);
 }
 
-.dep-head {
+.dem-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 13px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
   flex-shrink: 0;
 }
-.dep-date {
-  font-size: 13px;
+.dem-date {
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
 }
-.dep-close {
-  width: 24px;
-  height: 24px;
+.dem-close {
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -2968,59 +2934,37 @@ input, select, textarea {
   transition: background .12s, color .12s;
   line-height: 1;
 }
-.dep-close:hover {
+.dem-close:hover {
   background: color-mix(in srgb, var(--border) 80%, transparent);
   color: var(--text-primary);
 }
 
-.dep-list {
+.dem-list {
   overflow-y: auto;
-  padding: 8px 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 12px;
 }
-.dep-list:empty::after {
+.dem-list:empty::after {
   content: 'No events on this day.';
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
-  padding: 6px 2px;
+  padding: 4px 2px;
 }
 
-.dep-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 9px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  background: var(--surface-2);
-  border-left: 3px solid transparent;
-  transition: filter .12s;
-}
-.dep-item:hover { filter: brightness(.93); }
-
-.dep-item-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dep-item-info {
-  flex: 1;
-  min-width: 0;
-}
-.dep-item-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
+/* Each event card in the day events modal */
+.dem-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  text-overflow: ellipsis;
+  background: var(--surface);
 }
-.dep-item-time {
-  font-size: 11px;
-  color: var(--text-secondary);
+.dem-card .hc-head {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.dem-card .hc-actions {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 /* ══════════════════════════════════════════════════════════

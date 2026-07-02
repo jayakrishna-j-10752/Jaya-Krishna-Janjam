@@ -112,7 +112,6 @@ $(function () {
     clipboardSource:   null,           // 'cell' (day-level copy) | 'chip' (single-event copy)
     theme:             'light',
     editId:            null,           // id of event being edited (null = create)
-    activePopup:       null,           // event id shown in popup (or null)
     selectedColor:     '#1565C0',
     mobileDaySelected: null            // selected day string (YYYY-MM-DD) in mobile week view
   };
@@ -148,25 +147,14 @@ $(function () {
     fDesc:        $('#fDesc'),
     colorRow:     $('#colorRow'),
 
-    popup:        $('#evtPopup'),
-    popupDot:     $('#popupDot'),
-    popupTitle:   $('#popupTitle'),
-    popupWhen:    $('#popupWhen'),
-    popupDesc:    $('#popupDesc'),
-    paCopy:       $('#paCopy'),
-    paPaste:      $('#paPaste'),
-    paEdit:       $('#paEdit'),
-    paDelete:     $('#paDelete'),
-    paClose:      $('#paClose'),
-
     slotMenu:     $('#slotMenu'),
 
     toast:        $('#toast'),
 
-    dayEventsPopup: $('#dayEventsPopup'),
-    depDate:        $('#depDate'),
-    depList:        $('#depList'),
-    depClose:       $('#depClose'),
+    dayEventsModal: $('#dayEventsModal'),
+    demDate:        $('#demDate'),
+    demList:        $('#demList'),
+    demClose:       $('#demClose'),
 
     hoverCard:      $('#evtHoverCard'),
     hoverArrow:     $('#hcArrow')
@@ -280,13 +268,15 @@ $(function () {
      SVG ICON TEMPLATES
   ────────────────────────────────────────────────────────── */
   var SVG = {
-    add:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>',
-    copy:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="7" height="8" rx="1.25"/><path d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v6A1.5 1.5 0 0 0 3.5 12H5"/></svg>',
-    paste: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="13" rx="1.5"/><path d="M6 2v2h4V2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>',
-    trash: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5"/><rect x="3.5" y="4.5" width="9" height="9" rx="1.25"/><line x1="6.5" y1="7" x2="6.5" y2="11"/><line x1="9.5" y1="7" x2="9.5" y2="11"/></svg>',
-    edit:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg>',
-    close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>',
-    save:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 13.5H3a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5h7.5l3 3V13a.5.5 0 0 1-.5.5z"/><rect x="5" y="9" width="6" height="4.5" rx=".5"/><rect x="5.5" y="2.5" width="4" height="3" rx=".5"/></svg>'
+    add:     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>',
+    copy:    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="7" height="8" rx="1.25"/><path d="M10 6V4.5A1.5 1.5 0 0 0 8.5 3h-5A1.5 1.5 0 0 0 2 4.5v6A1.5 1.5 0 0 0 3.5 12H5"/></svg>',
+    paste:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="13" rx="1.5"/><path d="M6 2v2h4V2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>',
+    trash:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11M6 4.5V3h4v1.5"/><rect x="3.5" y="4.5" width="9" height="9" rx="1.25"/><line x1="6.5" y1="7" x2="6.5" y2="11"/><line x1="9.5" y1="7" x2="9.5" y2="11"/></svg>',
+    edit:    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-9 9L2 14l.38-2.62 9.12-9z"/></svg>',
+    close:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>',
+    save:    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 13.5H3a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5h7.5l3 3V13a.5.5 0 0 1-.5.5z"/><rect x="5" y="9" width="6" height="4.5" rx=".5"/><rect x="5.5" y="2.5" width="4" height="3" rx=".5"/></svg>',
+    approve: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7-7"/></svg>',
+    reject:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><line x1="5.5" y1="5.5" x2="10.5" y2="10.5"/><line x1="10.5" y1="5.5" x2="5.5" y2="10.5"/></svg>'
   };
 
   /* ──────────────────────────────────────────────────────────
@@ -300,7 +290,7 @@ $(function () {
     updateTodayBtn();
     closePopup();
     closeSlotPicker();
-    closeDayEventsPopup();
+    closeDayEventsModal();
 
     if (state.view === 'month') {
       renderMonth();
@@ -861,15 +851,10 @@ $(function () {
       e.stopPropagation();
       doCopy($(this).data('evid'));
     });
-    dom.canvas.on('click.calview', '.evt-chip', function (e) {
-      if (!$(e.target).closest('.chip-copy-btn').length) {
-        showPopup($(this).data('evid'), e);
-      }
-    });
-    /* Clicking the "+N more" chip opens the day events popup */
+    /* Clicking the "+N more" chip opens the day events modal */
     dom.canvas.on('click.calview', '.more-chip', function (e) {
       e.stopPropagation();
-      showDayEventsPopup($(this).data('date'), e);
+      showDayEventsModal($(this).data('date'));
     });
   }
 
@@ -1063,11 +1048,6 @@ $(function () {
       e.stopPropagation();
       doCopy($(this).data('evid'));
     });
-    dom.canvas.on('click.calview', '.time-event', function (e) {
-      if (!$(e.target).closest('.te-copy-btn').length) {
-        showPopup($(this).data('evid'), e);
-      }
-    });
   }
 
   /** "HH:MM" from hour integer (clamps at 23:00) */
@@ -1161,37 +1141,67 @@ $(function () {
 
   /* ──────────────────────────────────────────────────────────
      EVENT POPUP
+  /* ──────────────────────────────────────────────────────────
+     APPROVE / REJECT
   ────────────────────────────────────────────────────────── */
 
-  function showPopup(evid, mouseEvt) {
+  async function doApprove(evid) {
     var ev = findEvent(evid);
     if (!ev) return;
+    try {
+      await ZOHO.CRM.API.updateRecord({
+        Entity:  'beatplanner__Daily_Beat_Plans',
+        APIData: { id: evid, beatplanner__Managers_Approval: 'Approved' },
+        Trigger: ['workflow']
+      });
+      if (ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Approved'; }
+      saveEvents();
+      render();
+      showToast('Record approved.');
+    } catch (err) {
+      console.error('Approve failed', err);
+      showToast('Failed to approve record.');
+    }
+  }
 
-    state.activePopup = evid;
-    dom.popupDot.css('background', ev.color);
-    dom.popupTitle.text(ev.title);
-    dom.popupWhen.text(ev.date + '  ·  ' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime));
-    dom.popupDesc.text(ev.description || '');
+  async function doReject(evid) {
+    var ev = findEvent(evid);
+    if (!ev) return;
+    try {
+      await ZOHO.CRM.API.updateRecord({
+        Entity:  'beatplanner__Daily_Beat_Plans',
+        APIData: { id: evid, beatplanner__Managers_Approval: 'Rejected' },
+        Trigger: ['workflow']
+      });
+      if (ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Rejected'; }
+      saveEvents();
+      render();
+      showToast('Record rejected.');
+    } catch (err) {
+      console.error('Reject failed', err);
+      showToast('Failed to reject record.');
+    }
+  }
 
-    /* Show paste button only when clipboard has content for a valid (non-past) date */
-    dom.paPaste.toggle(!!(state.clipboard && isValid(ev.date)));
-
-    /* Position near mouse, keeping inside viewport */
-    var x = mouseEvt.clientX + 12;
-    var y = mouseEvt.clientY + 8;
-    var pw = dom.popup[0].offsetWidth || 300;
-    var ph = dom.popup[0].offsetHeight || 140;
-    if (x + pw > window.innerWidth  - 8) x = mouseEvt.clientX - pw - 8;
-    if (y + ph > window.innerHeight - 8) y = mouseEvt.clientY - ph - 8;
-    x = Math.max(4, Math.min(x, window.innerWidth  - pw - 4));
-    y = Math.max(4, Math.min(y, window.innerHeight - ph - 4));
-    dom.popup.css({ left: x + 'px', top: y + 'px' })
-             .addClass('popup-open');
+  /**
+   * Build the HTML for event action buttons (Approve, Reject, Copy, Paste, Delete).
+   * Shared between the hover card and the day events modal cards.
+   *
+   * @param {string}  evid       – event id
+   * @param {boolean} showPaste  – whether to show the Paste button
+   */
+  function buildEventActionsHtml(evid, showPaste) {
+    var pasteStyle = showPaste ? '' : 'display:none;';
+    return '<div class="hc-actions">' +
+      '<button class="hc-act hc-act-approve" data-evid="' + evid + '" title="Approve">' + SVG.approve + '</button>' +
+      '<button class="hc-act hc-act-reject"  data-evid="' + evid + '" title="Reject">'  + SVG.reject  + '</button>' +
+      '<button class="hc-act hc-act-copy"    data-evid="' + evid + '" title="Copy">'    + SVG.copy    + '</button>' +
+      '<button class="hc-act hc-act-paste"   data-evid="' + evid + '" title="Paste" style="' + pasteStyle + '">' + SVG.paste + '</button>' +
+      '<button class="hc-act hc-act-delete"  data-evid="' + evid + '" title="Delete">'  + SVG.trash   + '</button>' +
+      '</div>';
   }
 
   function closePopup() {
-    state.activePopup = null;
-    dom.popup.removeClass('popup-open');
     hideHoverCard();
   }
 
@@ -1318,34 +1328,46 @@ $(function () {
   }
 
   /**
-   * Compute header style and marker colour for the hover card,
+   * Compute metadata-driven styling for an event card (hover card or day events modal card),
    * mirroring the BPR-driven styling applied to the .evt-chip.
+   *
+   * Returns:
+   *   cardStyle       – full inline-style string to apply to the card element
+   *   arrowBg         – resolved background CSS color for the hover arrow
+   *   arrowBorderColor– resolved border CSS color for the hover arrow
+   *   markerColor     – dot marker color (or empty string)
    */
   function buildHoverCardHeaderStyle(ev) {
-    var headerStyle = '';
-    var markerColor = '';
+    var cardStyle        = '';
+    var arrowBg          = '';
+    var arrowBorderColor = '';
+    var markerColor      = '';
 
     if (ev.bprFieldValues && Object.keys(ev.bprFieldValues).length &&
         beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length) {
       var leaveColor = getLeaveTypeColor(ev.bprFieldValues);
       if (leaveColor) {
-        headerStyle = 'background:' + leaveColor + '22;border-left:3px solid ' + leaveColor + ';';
+        cardStyle        = 'background:' + leaveColor + '22;border-left:3px solid ' + leaveColor + ';';
+        arrowBg          = leaveColor + '22';
+        arrowBorderColor = leaveColor;
       } else {
         var s = buildBprChipStyle(ev.bprFieldValues);
-        if (s.bg)           { headerStyle += 'background:' + s.bg + ';'; }
-        if (s.borderTop)    { headerStyle += 'border-top:2px solid '    + s.borderTop    + ';'; }
-        if (s.borderBottom) { headerStyle += 'border-bottom:2px solid ' + s.borderBottom + ';'; }
-        if (s.borderLeft)   { headerStyle += 'border-left:3px solid '   + s.borderLeft   + ';'; }
-        if (s.borderRight)  { headerStyle += 'border-right:2px solid '  + s.borderRight  + ';'; }
-        if (!s.bg && s.borderLeft) { headerStyle += 'background:' + s.borderLeft + '22;'; }
+        if (s.bg)           { cardStyle += 'background:' + s.bg + ';';                                     arrowBg = s.bg; }
+        if (s.borderTop)    { cardStyle += 'border-top:2px solid '    + s.borderTop    + ';'; }
+        if (s.borderBottom) { cardStyle += 'border-bottom:2px solid ' + s.borderBottom + ';'; }
+        if (s.borderLeft)   { cardStyle += 'border-left:3px solid '   + s.borderLeft   + ';';              arrowBorderColor = s.borderLeft; }
+        if (s.borderRight)  { cardStyle += 'border-right:2px solid '  + s.borderRight  + ';'; }
+        if (!s.bg && s.borderLeft) { cardStyle += 'background:' + s.borderLeft + '22;';                    arrowBg = s.borderLeft + '22'; }
         markerColor = s.markerColor || '';
       }
     } else {
       /* Fallback: use the event's manually chosen colour */
-      headerStyle = 'background:' + ev.color + '22;border-left:3px solid ' + ev.color + ';';
+      cardStyle        = 'background:' + ev.color + '22;border-left:3px solid ' + ev.color + ';';
+      arrowBg          = ev.color + '22';
+      arrowBorderColor = ev.color;
     }
 
-    return { headerStyle: headerStyle, markerColor: markerColor };
+    return { cardStyle: cardStyle, arrowBg: arrowBg, arrowBorderColor: arrowBorderColor, markerColor: markerColor };
   }
 
   /**
@@ -1358,13 +1380,16 @@ $(function () {
     var $card  = dom.hoverCard;
     var style  = buildHoverCardHeaderStyle(ev);
 
+    /* Apply metadata-driven styling to the entire card */
+    $card.attr('style', style.cardStyle);
+
     /* ── Header ── */
     var markerHtml = style.markerColor
       ? '<span class="hc-marker" style="background:' + escHtml(style.markerColor) + ';" aria-hidden="true"></span>'
       : '';
 
     var headerHtml =
-      '<div class="hc-head" style="' + style.headerStyle + '">' +
+      '<div class="hc-head">' +
       '  <div class="hc-head-top">' + markerHtml +
       '    <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
       '  </div>' +
@@ -1374,7 +1399,11 @@ $(function () {
     var $body = $('<div class="hc-body"></div>');
     renderEventDetails(ev, $body);
 
-    $card.empty().append(headerHtml).append($body[0]);
+    /* ── Actions ── */
+    var canPaste = !!(state.clipboard && isValid(ev.date));
+    var actionsHtml = buildEventActionsHtml(ev.id, canPaste);
+
+    $card.empty().append(headerHtml).append($body[0]).append(actionsHtml);
 
     /* ── Smart viewport-aware positioning ── */
     /* Temporarily place offscreen to measure dimensions */
@@ -1401,9 +1430,10 @@ $(function () {
 
     $card.css({ left: left + 'px', top: top + 'px' });
 
-    /* ── Arrow positioning ── */
+    /* ── Arrow positioning + matching style ── */
     /* The arrow is a 12×12 rotated square (z-index 909, below card z-index 910).
-       The card's background covers the inner half so only the outer tip is visible. */
+       The card's background covers the inner half so only the outer tip is visible.
+       Background and border-color are set dynamically to match the card. */
     var ARROW  = 6; /* half of 12px */
     var chipCX = rect.left + rect.width  / 2;
     var chipCY = rect.top  + rect.height / 2;
@@ -1427,8 +1457,10 @@ $(function () {
       arrowT = top + cardH - ARROW;
     }
 
-    dom.hoverArrow.css({ left: arrowL + 'px', top: arrowT + 'px' })
-                  .addClass('hc-arrow-visible');
+    var arrowCss = { left: arrowL + 'px', top: arrowT + 'px' };
+    if (style.arrowBg)          { arrowCss['background']    = style.arrowBg; }
+    if (style.arrowBorderColor) { arrowCss['border-color']  = style.arrowBorderColor; }
+    dom.hoverArrow.css(arrowCss).addClass('hc-arrow-visible');
   }
 
   /**
@@ -1437,8 +1469,8 @@ $(function () {
   function hideHoverCard() {
     clearTimeout(hoverTimer);
     hoverActiveId = null;
-    dom.hoverCard.removeClass('hc-visible').attr('aria-hidden', 'true');
-    dom.hoverArrow.removeClass('hc-arrow-visible');
+    dom.hoverCard.removeClass('hc-visible').attr('aria-hidden', 'true').removeAttr('style');
+    dom.hoverArrow.removeClass('hc-arrow-visible').css({ background: '', 'border-color': '' });
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -1832,46 +1864,52 @@ $(function () {
     }, 250);
   }
 
-  function showDayEventsPopup(ds, mouseEvt) {
+  /**
+   * Build and show the day events modal for a given date string.
+   * Each event is rendered as a full card using the same layout as the hover card.
+   */
+  function showDayEventsModal(ds) {
     var evts = eventsOn(ds);
 
     /* Build date label */
     var parts = ds.split('-');
     var d     = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    dom.depDate.text(WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
+    dom.demDate.text(WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
 
-    /* Build event list */
+    /* Build full event card list */
     var listHtml = '';
-    if (evts.length === 0) {
-      listHtml = '';
-    } else {
-      evts.forEach(function (ev) {
-        listHtml +=
-          '<div class="dep-item" data-evid="' + ev.id + '"' +
-          '     style="border-left-color:' + ev.color + ';background:' + ev.color + '18">' +
-          '  <span class="dep-item-dot" style="background:' + ev.color + '"></span>' +
-          '  <div class="dep-item-info">' +
-          '    <div class="dep-item-title">' + escHtml(ev.title) + '</div>' +
-          '    <div class="dep-item-time">' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime) + '</div>' +
-          '  </div>' +
-          '</div>';
-      });
-    }
-    dom.depList.html(listHtml);
+    evts.forEach(function (ev) {
+      var style      = buildHoverCardHeaderStyle(ev);
+      var markerHtml = style.markerColor
+        ? '<span class="hc-marker" style="background:' + escHtml(style.markerColor) + ';" aria-hidden="true"></span>'
+        : '';
 
-    /* Position near mouse, keeping inside viewport */
-    var pw = 280, ph = Math.min(evts.length * 56 + 48, 340);
-    var x  = mouseEvt.clientX + 12;
-    var y  = mouseEvt.clientY + 8;
-    if (x + pw > window.innerWidth  - 8) x = mouseEvt.clientX - pw - 8;
-    if (y + ph > window.innerHeight - 8) y = mouseEvt.clientY - ph - 8;
-    dom.dayEventsPopup
-      .css({ left: Math.max(4, x) + 'px', top: Math.max(4, y) + 'px' })
-      .addClass('dep-open');
+      /* Render details into a detached element to reuse renderEventDetails */
+      var $detailsContainer = $('<div class="hc-body"></div>');
+      renderEventDetails(ev, $detailsContainer);
+      var detailsHtml = $detailsContainer[0].outerHTML;
+
+      var canPaste    = !!(state.clipboard && isValid(ev.date));
+      var actionsHtml = buildEventActionsHtml(ev.id, canPaste);
+
+      listHtml +=
+        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '" style="' + style.cardStyle + '">' +
+        '  <div class="hc-head">' +
+        '    <div class="hc-head-top">' + markerHtml +
+        '      <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
+        '    </div>' +
+        '  </div>' +
+        detailsHtml +
+        actionsHtml +
+        '</div>';
+    });
+
+    dom.demList.html(listHtml);
+    dom.dayEventsModal.addClass('dem-open');
   }
 
-  function closeDayEventsPopup() {
-    dom.dayEventsPopup.removeClass('dep-open');
+  function closeDayEventsModal() {
+    dom.dayEventsModal.removeClass('dem-open');
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -3808,9 +3846,6 @@ $(function () {
     /* Color picker */
     attachColorPicker();
 
-    /* Popup controls */
-    dom.paClose.on('click',  closePopup);
-
     /* Hover preview card – show on mouseenter, hide on mouseleave with debounce */
     dom.canvas.on('mouseenter.hovercard', '.evt-chip', function () {
       clearTimeout(hoverTimer);
@@ -3827,28 +3862,65 @@ $(function () {
       hideHoverCard();
     });
 
-    /* Day events popup controls */
-    dom.depClose.on('click', closeDayEventsPopup);
-    dom.dayEventsPopup.on('click', '.dep-item', function (e) {
+    /* ── Action buttons: hover card ── */
+    dom.hoverCard.on('click', '.hc-act-approve', function (e) {
+      e.stopPropagation();
       var evid = $(this).data('evid');
-      closeDayEventsPopup();
-      showPopup(evid, e);
+      hideHoverCard();
+      doApprove(evid);
+    });
+    dom.hoverCard.on('click', '.hc-act-reject', function (e) {
+      e.stopPropagation();
+      var evid = $(this).data('evid');
+      hideHoverCard();
+      doReject(evid);
+    });
+    dom.hoverCard.on('click', '.hc-act-copy', function (e) {
+      e.stopPropagation();
+      doCopy($(this).data('evid'));
+      hideHoverCard();
+    });
+    dom.hoverCard.on('click', '.hc-act-paste', function (e) {
+      e.stopPropagation();
+      var ev = findEvent($(this).data('evid'));
+      if (ev && state.clipboard && isValid(ev.date)) { doPaste(ev.date); }
+      hideHoverCard();
+    });
+    dom.hoverCard.on('click', '.hc-act-delete', function (e) {
+      e.stopPropagation();
+      var evid = $(this).data('evid');
+      if (window.confirm('Delete this event?')) { deleteEvent(evid); }
+      hideHoverCard();
     });
 
-    dom.paCopy.on('click',   function () {
-      if (state.activePopup) { doCopy(state.activePopup); closePopup(); }
+    /* ── Day events modal controls ── */
+    dom.demClose.on('click', closeDayEventsModal);
+    dom.dayEventsModal.on('click', function (e) {
+      if (e.target === this) { closeDayEventsModal(); }
     });
-    dom.paPaste.on('click',  function () {
-      var ev = findEvent(state.activePopup);
-      if (ev && state.clipboard && isValid(ev.date)) { doPaste(ev.date); closePopup(); }
+
+    /* ── Action buttons: day events modal cards ── */
+    dom.dayEventsModal.on('click', '.hc-act-approve', function (e) {
+      e.stopPropagation();
+      doApprove($(this).data('evid'));
     });
-    dom.paEdit.on('click',   function () {
-      var ev = findEvent(state.activePopup);
-      if (ev) { closePopup(); openModal(ev.date, ev.startTime, ev.endTime, ev); }
+    dom.dayEventsModal.on('click', '.hc-act-reject', function (e) {
+      e.stopPropagation();
+      doReject($(this).data('evid'));
     });
-    dom.paDelete.on('click', function () {
-      var evid = state.activePopup;
-      if (evid && window.confirm('Delete this event?')) { deleteEvent(evid); }
+    dom.dayEventsModal.on('click', '.hc-act-copy', function (e) {
+      e.stopPropagation();
+      doCopy($(this).data('evid'));
+    });
+    dom.dayEventsModal.on('click', '.hc-act-paste', function (e) {
+      e.stopPropagation();
+      var ev = findEvent($(this).data('evid'));
+      if (ev && state.clipboard && isValid(ev.date)) { doPaste(ev.date); closeDayEventsModal(); }
+    });
+    dom.dayEventsModal.on('click', '.hc-act-delete', function (e) {
+      e.stopPropagation();
+      var evid = $(this).data('evid');
+      if (window.confirm('Delete this event?')) { deleteEvent(evid); closeDayEventsModal(); }
     });
 
     /* Time slot picker – item click inside modal */
@@ -4755,17 +4827,12 @@ $(function () {
       }
     });
 
-    /* Close popup when clicking outside */
+    /* Close hover card when clicking outside */
     $(document).on('click', function (e) {
-      if (!$(e.target).closest('#evtPopup').length &&
+      if (!$(e.target).closest('#evtHoverCard').length &&
           !$(e.target).closest('.evt-chip').length &&
           !$(e.target).closest('.time-event').length) {
-        closePopup();
-      }
-      if (!$(e.target).closest('#dayEventsPopup').length &&
-          !$(e.target).closest('.m-cell').length &&
-          !$(e.target).closest('.more-chip').length) {
-        closeDayEventsPopup();
+        hideHoverCard();
       }
     });
 
@@ -4773,7 +4840,7 @@ $(function () {
     $(document).on('keydown', function (e) {
       if (dom.modal.hasClass('modal-open')) return; /* modal captures input */
       switch (e.key) {
-        case 'Escape':     closePopup(); closeSlotPicker(); break;
+        case 'Escape':     hideHoverCard(); closeDayEventsModal(); closeSlotPicker(); break;
         case 'ArrowLeft':  navigate(-1); break;
         case 'ArrowRight': navigate(1);  break;
         case 't':          goToday();    break;
