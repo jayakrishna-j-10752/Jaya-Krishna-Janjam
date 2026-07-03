@@ -7504,6 +7504,9 @@ $(function () {
 
   /* setupSave – confirm the current legend selection and persist to CRM */
   $(document).on('click', '#setupSave', async function () {
+    /* ── Show full-widget loader immediately ── */
+    $('#widgetLoaderOverlay').show();
+
     closeLegDropdown();
     $('#legendBar').hide();
 
@@ -7578,13 +7581,13 @@ $(function () {
       console.error('Failed to save Beat Plan Reference:', err);
     }
 
-    /* ── Re-render legends display with the newly saved configuration ── */
-    renderLegendsDisplay(legApiNames).catch(function (e) {
-      console.error('Legend render error:', e);
-    });
+    /* ── Signal that the next page load is a post-save reload so the
+       loader is shown again immediately during re-initialization ── */
+    try { sessionStorage.setItem('bp_post_save_reload', '1'); } catch (e) { /* ignore */ }
 
-    /* ── Transition to main calendar view ── */
-    showMainContent();
+    /* ── Reload the widget so all components are rebuilt using the
+       latest configuration fetched fresh from the API ── */
+    location.reload();
   });
 
   /* setupCancel – discard the legend selection and hide the bar */
@@ -7704,6 +7707,15 @@ $(function () {
   ────────────────────────────────────────────────────────── */
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
+
+    /* ── Show loader if this is a post-save reload so users never see
+       stale legend values while fresh API data is being fetched ── */
+    try {
+      if (sessionStorage.getItem('bp_post_save_reload')) {
+        sessionStorage.removeItem('bp_post_save_reload');
+        $('#widgetLoaderOverlay').show();
+      }
+    } catch (e) { /* ignore */ }
 
     /* ── Step 1: Get the logged-in user and populate #userProfile immediately ── */
     var currentUserResp = await ZOHO.CRM.CONFIG.getCurrentUser();
@@ -7853,6 +7865,10 @@ $(function () {
           });
       });
     }
+
+    /* ── Hide the loader now that all critical initialization is complete
+       and #legendsDisplay reflects the latest API data ── */
+    $('#widgetLoaderOverlay').hide();
   });
   ZOHO.embeddedApp.init();
 

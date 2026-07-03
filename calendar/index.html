@@ -608,6 +608,31 @@
   </div>
 
 
+  <!-- ══════════════════════ WIDGET LOADER OVERLAY ══════════════════════ -->
+  <div class="widget-loader-overlay" id="widgetLoaderOverlay" style="display:none;" role="status" aria-live="polite" aria-label="Loading">
+    <div class="widget-loader-box">
+      <div class="widget-loader-icon">
+        <!-- Calendar outline -->
+        <svg class="wl-calendar-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Calendar body -->
+          <rect x="8" y="14" width="64" height="58" rx="7" ry="7" stroke="#3a82f7" stroke-width="4.5" fill="#f0f6ff"/>
+          <!-- Top bar / header -->
+          <rect x="8" y="14" width="64" height="20" rx="7" ry="7" fill="#3a82f7"/>
+          <rect x="8" y="26" width="64" height="8" fill="#3a82f7"/>
+          <!-- Page ring left -->
+          <rect x="24" y="8" width="6" height="16" rx="3" fill="#3a82f7"/>
+          <!-- Page ring right -->
+          <rect x="50" y="8" width="6" height="16" rx="3" fill="#3a82f7"/>
+        </svg>
+        <!-- Spinning reload arrow (centered over calendar) -->
+        <svg class="wl-spinner-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M18 6 A12 12 0 1 1 6.7 24.5" stroke="#3a82f7" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+          <polyline points="6,18 6.7,24.5 13,22" stroke="#3a82f7" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════════════ IMAGE PREVIEW OVERLAY ══════════════════════ -->
   <div class="img-preview-overlay" id="imgPreviewOverlay" role="dialog" aria-modal="true" aria-label="Image preview">
     <div class="img-preview-backdrop"></div>
