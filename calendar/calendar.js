@@ -1355,10 +1355,8 @@ $(function () {
     var ev = findEvent(evid);
     if (!ev) return;
     try {
-      await ZOHO.CRM.API.updateRecord({
-        Entity:  'beatplanner__Daily_Beat_Plans',
-        APIData: { id: evid, beatplanner__Managers_Approval: 'Approved' },
-        Trigger: ['workflow']
+      await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+        data: [{ id: evid, beatplanner__Managers_Approval: 'Approved' }]
       });
       if (ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Approved'; }
       saveEvents();
@@ -1374,10 +1372,8 @@ $(function () {
     var ev = findEvent(evid);
     if (!ev) return;
     try {
-      await ZOHO.CRM.API.updateRecord({
-        Entity:  'beatplanner__Daily_Beat_Plans',
-        APIData: { id: evid, beatplanner__Managers_Approval: 'Rejected' },
-        Trigger: ['workflow']
+      await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+        data: [{ id: evid, beatplanner__Managers_Approval: 'Rejected' }]
       });
       if (ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Rejected'; }
       saveEvents();
@@ -5654,10 +5650,8 @@ $(function () {
         }
 
         try {
-          await ZOHO.CRM.API.updateRecord({
-            Entity:  'beatplanner__Daily_Beat_Plans',
-            APIData: Object.assign({ id: editId }, recordData),
-            Trigger: ['workflow']
+          await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+            data: [Object.assign({ id: editId }, recordData)]
           });
           console.log('Daily Beat Plan updated', editId);
 
@@ -6050,10 +6044,8 @@ $(function () {
       }
 
       try {
-        await ZOHO.CRM.API.updateRecord({
-          Entity:  'beatplanner__Daily_Beat_Plans',
-          APIData: Object.assign({ id: editId }, recordData),
-          Trigger: ['workflow']
+        await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+          data: [Object.assign({ id: editId }, recordData)]
         });
 
         /* Update in-memory event */
@@ -6143,6 +6135,9 @@ $(function () {
       $btn.prop('disabled', true);
       var updated = 0;
       var failed  = 0;
+
+      /* Build batch items: collect payload + metadata for every checked row */
+      var batchItems = [];
 
       for (var ri = 0; ri < $checkedRows.length; ri++) {
         var $row   = $($checkedRows[ri]);
@@ -6238,31 +6233,53 @@ $(function () {
           }
         }
 
+        batchItems.push({
+          $row:           $row,
+          $mwWrap:        $mwWrap,
+          editId:         editId,
+          recordData:     Object.assign({ id: editId }, recordData),
+          bprFieldValues: bprFieldValues,
+          currentVals:    currentVals,
+          mwName:         mwName,
+          mfDisplayVal:   mfDisplayVal
+        });
+      }
+
+      /* Send all records in a single batch PUT request */
+      if (batchItems.length > 0) {
         try {
-          await ZOHO.CRM.API.updateRecord({
-            Entity:  'beatplanner__Daily_Beat_Plans',
-            APIData: Object.assign({ id: editId }, recordData),
-            Trigger: ['workflow']
+          var batchResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+            data: batchItems.map(function (item) { return item.recordData; })
           });
+          var batchResults = (batchResp && batchResp.data && batchResp.data.data) ? batchResp.data.data : [];
 
-          /* Update in-memory event */
-          var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
-          if (evIdx !== -1) {
-            var updEv2          = state.events[evIdx];
-            updEv2.title          = mwName || (mfDisplayVal || 'Beat Plan');
-            updEv2.bprFieldValues = bprFieldValues;
-            var $mwAvatar2        = $mwWrap.find('.bp-rec-avatar');
-            updEv2.mwAvatarImgSrc = $mwAvatar2.find('img').attr('src') || $mwAvatar2.attr('data-img-src') || '';
-            updEv2.mwAvatarText   = $mwAvatar2.text() || '';
-            updEv2.mwPhotoId      = $mwAvatar2.attr('data-photo-id') || '';
+          for (var bi = 0; bi < batchItems.length; bi++) {
+            var item   = batchItems[bi];
+            var result = batchResults[bi] || {};
+            if (result.status === 'success') {
+              /* Update in-memory event */
+              var evIdx = state.events.findIndex(function (e) { return e.id === item.editId; });
+              if (evIdx !== -1) {
+                var updEv2          = state.events[evIdx];
+                updEv2.title          = item.mwName || (item.mfDisplayVal || 'Beat Plan');
+                updEv2.bprFieldValues = item.bprFieldValues;
+                var $mwAvatar2        = item.$mwWrap.find('.bp-rec-avatar');
+                updEv2.mwAvatarImgSrc = $mwAvatar2.find('img').attr('src') || $mwAvatar2.attr('data-img-src') || '';
+                updEv2.mwAvatarText   = $mwAvatar2.text() || '';
+                updEv2.mwPhotoId      = $mwAvatar2.attr('data-photo-id') || '';
+              }
+
+              /* Update the row's stored original-vals for future comparisons */
+              item.$row.attr('data-original-vals', JSON.stringify(item.currentVals));
+              updated++;
+            } else {
+              console.error('Mass update failed for record', item.editId, result);
+              failed++;
+            }
           }
-
-          /* Update the row's stored original-vals for future comparisons */
-          $row.attr('data-original-vals', JSON.stringify(currentVals));
-          updated++;
         } catch (err) {
-          console.error('Mass update failed for record', editId, err);
-          failed++;
+          console.error('Mass update batch request failed', err);
+          failed = batchItems.length;
         }
       }
 
