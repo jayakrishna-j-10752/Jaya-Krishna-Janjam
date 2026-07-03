@@ -4580,6 +4580,8 @@ input, select, textarea {
   width: 36px;
   min-width: 36px;
   padding: 8px 6px;
+  text-align: center;
+  vertical-align: middle;
 }
 .bp-cb-cell {
   padding: 0 6px;

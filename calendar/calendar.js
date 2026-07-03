@@ -403,8 +403,10 @@ $(function () {
    *                   markerHtml – HTML string for the .chip-marker span, or ''.
    */
   function buildBprEventStyles(ev) {
-    var styleStr   = '';
-    var markerHtml = '';
+    var styleStr      = '';
+    var bgStr         = '';
+    var borderLeftStr = '';
+    var markerHtml    = '';
 
     if (beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length &&
         ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
@@ -414,32 +416,38 @@ $(function () {
       if (leaveColor) {
         var leaveStyle      = buildBprChipStyle(ev.bprFieldValues);
         var leaveBorderLeft = leaveStyle.borderLeft || leaveColor;
-        styleStr = 'background:' + leaveColor + ';border-left-color:' + leaveBorderLeft +
-                   ';border-left-style:solid;border-left-width:3px;';
+        bgStr         = 'background:' + leaveColor + ';';
+        borderLeftStr = 'border-left-color:' + leaveBorderLeft + ';border-left-style:solid;border-left-width:3px;';
+        styleStr      = bgStr + borderLeftStr;
         if (leaveStyle.markerColor) {
           markerHtml = '<span class="chip-marker" style="background:' + escHtml(leaveStyle.markerColor) + ';" aria-hidden="true"></span>';
         }
       } else {
         /* Dynamic BPR styling: derive colours from picklist metadata */
         var s = buildBprChipStyle(ev.bprFieldValues);
-        if (s.bg)           { styleStr += 'background:'          + s.bg           + ';'; }
+        if (s.bg)           { bgStr += 'background:' + s.bg + ';'; styleStr += bgStr; }
         if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
         if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
-        if (s.borderLeft)   { styleStr += 'border-left-color:'   + s.borderLeft   + ';border-left-style:solid;border-left-width:3px;'; }
+        if (s.borderLeft)   {
+          borderLeftStr  = 'border-left-color:' + s.borderLeft + ';border-left-style:solid;border-left-width:3px;';
+          styleStr      += borderLeftStr;
+        }
         if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
         if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
         /* When no bg-colour is resolved but a left-border color exists, derive a tinted
            background from the border colour to keep the event visually distinct. */
-        if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
+        if (!s.bg && s.borderLeft) { bgStr = 'background:' + s.borderLeft + '22;'; styleStr += bgStr; }
       }
     } else {
       /* Fallback: use the event's manually chosen colour (background + border only) */
       var bg     = ev.color + '22';
       var border = ev.color;
-      styleStr = 'background:' + bg + ';border-left-color:' + border + ';border-left-style:solid;border-left-width:3px;';
+      bgStr         = 'background:' + bg + ';';
+      borderLeftStr = 'border-left-color:' + border + ';border-left-style:solid;border-left-width:3px;';
+      styleStr      = bgStr + borderLeftStr;
     }
 
-    return { styleStr: styleStr, markerHtml: markerHtml };
+    return { styleStr: styleStr, markerHtml: markerHtml, bgStr: bgStr, borderLeftStr: borderLeftStr };
   }
 
   function renderChip(ev, past) {
@@ -2152,7 +2160,9 @@ $(function () {
     var avatarInitials = existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '';
     var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
 
-    /* Apply the same metadata-driven styling as the .evt-chip being edited */
+    /* Apply the same metadata-driven styling as the .evt-chip being edited.
+       With border-collapse:separate, border-* on <tr> does not render — so the
+       background is applied to the <tr> and the left border to the first <td>. */
     var editRowStyles = buildBprEventStyles(ev);
 
     tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
@@ -2160,10 +2170,13 @@ $(function () {
                  ' data-edit-id="' + escHtml(ev.id) + '"' +
                  ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
                  ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
-                 (editRowStyles.styleStr ? ' style="' + escHtml(editRowStyles.styleStr) + '"' : '') + '>';
+                 (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
 
-    /* Checkbox cell – hidden/disabled in edit mode */
-    tableHtml += '<td class="bp-cb-cell"><input type="checkbox" class="bp-row-cb" aria-label="Select row" disabled style="visibility:hidden;"></td>';
+    /* Checkbox cell – hidden/disabled in edit mode; carries the left border that
+       matches the .evt-chip since border-left on <tr> is unreliable with separate. */
+    tableHtml += '<td class="bp-cb-cell"' +
+                 (editRowStyles.borderLeftStr ? ' style="' + escHtml(editRowStyles.borderLeftStr) + '"' : '') +
+                 '><input type="checkbox" class="bp-row-cb" aria-label="Select row" disabled style="visibility:hidden;"></td>';
 
     /* Time cells */
     tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
@@ -2326,6 +2339,53 @@ $(function () {
       dom.slotPickerFoot.hide();
       dom.eventFormFoot.show();
     }, 250);
+  }
+
+  /**
+   * Refresh the event display for a single date in the current view without
+   * closing the slot picker or triggering a full render. Called after a new
+   * Beat Plan row is saved so the .evt-chip appears immediately.
+   *
+   * @param {string} ds  Date string "YYYY-MM-DD".
+   */
+  function refreshCalendarCell(ds) {
+    var past = isPast(ds);
+
+    if (state.view === 'month') {
+      var $cell = dom.canvas.find('.m-cell[data-date="' + ds + '"]');
+      if (!$cell.length) { return; }
+      var evts    = eventsOn(ds);
+      var maxShow = 3;
+      var chips   = '';
+      evts.slice(0, maxShow).forEach(function (ev) {
+        chips += renderChip(ev, past);
+      });
+      $cell.find('.cell-events').html(chips);
+      /* Sync the "+N more" chip that follows the cell */
+      var $more = $cell.find('.more-chip');
+      if (evts.length > maxShow) {
+        var moreHtml = '<div class="more-chip" data-date="' + ds + '">+' + (evts.length - maxShow) + ' more</div>';
+        if ($more.length) { $more.replaceWith(moreHtml); } else { $cell.append(moreHtml); }
+      } else {
+        $more.remove();
+      }
+
+    } else if (state.view === 'week') {
+      var $col = dom.canvas.find('.week-day-col[data-date="' + ds + '"]');
+      if (!$col.length) { return; }
+      $col.find('.time-event').remove();
+      eventsOn(ds).forEach(function (ev) {
+        $col.append(renderTimeEvent(ev, ds));
+      });
+
+    } else if (state.view === 'day') {
+      var $grid = dom.canvas.find('.day-grid');
+      if (!$grid.length) { return; }
+      $grid.find('.time-event').remove();
+      eventsOn(ds).forEach(function (ev) {
+        $grid.append(renderTimeEvent(ev, ds));
+      });
+    }
   }
 
   /**
@@ -5111,6 +5171,11 @@ $(function () {
           /* Remove only the saved row; keep the modal open so users can
              continue creating additional events without reopening the dialog. */
           $row.remove();
+
+          /* Immediately render the new event chip in the calendar without
+             closing the modal — render() would close the slot picker, so
+             we use a targeted cell refresh instead. */
+          refreshCalendarCell(date);
 
           showToast('Beat plan record saved.');
         } catch (err) {
