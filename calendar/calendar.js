@@ -1198,6 +1198,42 @@ $(function () {
       : count + ' events pasted on ' + ds + '.');
 
     /* Persist each pasted Beat Plan event to beatplanner__Daily_Beat_Plans */
+
+    /* ── Resolve the Monthly Beat Plan for the target month (once for all pasted events) ── */
+    var pasteMonthlyBeatPlanId = null;
+    var pasteHasBprEvents = newEvs.some(function (e) {
+      return e.bprFieldValues && Object.keys(e.bprFieldValues).length;
+    });
+    if (pasteHasBprEvents) {
+      var pasteParts     = ds.split('-');
+      var pasteDate      = new Date(parseInt(pasteParts[0], 10), parseInt(pasteParts[1], 10) - 1, parseInt(pasteParts[2], 10));
+      var pasteMonthYear = MONTHS[pasteDate.getMonth()] + ' ' + pasteDate.getFullYear();
+      try {
+        var mCoqlResp = await ZOHO.CRM.API.coql({
+          select_query: "SELECT id FROM beatplanner__Monthly_Beat_Plans WHERE Name = '" + pasteMonthYear + "' LIMIT 1"
+        });
+        var mExisting = mCoqlResp && mCoqlResp.data && Array.isArray(mCoqlResp.data) && mCoqlResp.data.length > 0
+                          ? mCoqlResp.data : null;
+        if (mExisting) {
+          pasteMonthlyBeatPlanId = mExisting[0].id;
+          console.log('Paste: reusing Monthly Beat Plan ID:', pasteMonthlyBeatPlanId);
+        } else {
+          var mInsertResp = await ZOHO.CRM.API.insertRecord({
+            Entity:  'beatplanner__Monthly_Beat_Plans',
+            APIData: { Name: pasteMonthYear },
+            Trigger: ['workflow']
+          });
+          console.log('Paste: created Monthly Beat Plan', mInsertResp);
+          if (mInsertResp && mInsertResp.data && mInsertResp.data[0] && mInsertResp.data[0].details) {
+            pasteMonthlyBeatPlanId = mInsertResp.data[0].details.id;
+          }
+          console.log('Paste: new Monthly Beat Plan ID:', pasteMonthlyBeatPlanId);
+        }
+      } catch (mErr) {
+        console.error('Failed to resolve Monthly Beat Plan for paste', mErr);
+      }
+    }
+
     for (var i = 0; i < newEvs.length; i++) {
       var ev = newEvs[i];
       if (!ev.bprFieldValues || !Object.keys(ev.bprFieldValues).length) { continue; }
@@ -1227,6 +1263,11 @@ $(function () {
       recordData['beatplanner__Date_Time_To']   = toIsoDt(ds, ev.endTime);
       recordData['beatplanner__Date']           = ds;
 
+      /* Associate with the correct Monthly Beat Plan for the target month */
+      if (pasteMonthlyBeatPlanId) {
+        recordData['beatplanner__Month'] = { id: pasteMonthlyBeatPlanId };
+      }
+
       /* Mandatory Name field */
       recordData['Name'] = 'Meeting With ' + (ev.title || '');
 
@@ -1247,10 +1288,13 @@ $(function () {
         /* Update the in-memory event id with the real CRM record id */
         var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
         if (crmId) {
+          var oldId = ev.id;
           var evIdx = state.events.indexOf(ev);
           if (evIdx !== -1) { state.events[evIdx].id = crmId; }
           ev.id = crmId;
           saveEvents();
+          /* Sync all rendered DOM elements that still carry the temporary ID */
+          $('[data-evid="' + oldId + '"]').attr('data-evid', crmId);
         }
       } catch (err) {
         console.error('Failed to persist pasted event to CRM', err);
