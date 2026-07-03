@@ -1851,7 +1851,7 @@ $(function () {
     /* ── Table header (hidden until Attendance = "Working") ── */
     var tableHtml = '<table class="bp-slots-table" style="display:none;">';
     tableHtml += '<thead><tr>';
-    tableHtml += '<th class="bp-th bp-cb-th"></th>';
+    tableHtml += '<th class="bp-th bp-cb-th"><input type="checkbox" class="bp-select-all-cb" aria-label="Select all rows"></th>';
     tableHtml += '<th class="bp-th">Date Time From</th>';
     tableHtml += '<th class="bp-th">Date Time To</th>';
     tableHtml += '<th class="bp-th">Meetings For</th>';
@@ -2152,11 +2152,15 @@ $(function () {
     var avatarInitials = existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '';
     var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
 
+    /* Apply the same metadata-driven styling as the .evt-chip being edited */
+    var editRowStyles = buildBprEventStyles(ev);
+
     tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                  ' data-date="' + escHtml(date) + '"' +
                  ' data-edit-id="' + escHtml(ev.id) + '"' +
                  ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
-                 ' data-end-time="' + escHtml(ev.endTime || '') + '">';
+                 ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                 (editRowStyles.styleStr ? ' style="' + escHtml(editRowStyles.styleStr) + '"' : '') + '>';
 
     /* Checkbox cell – hidden/disabled in edit mode */
     tableHtml += '<td class="bp-cb-cell"><input type="checkbox" class="bp-row-cb" aria-label="Select row" disabled style="visibility:hidden;"></td>';
@@ -4570,11 +4574,26 @@ $(function () {
       }
     });
 
-    /* Row checkbox → show/hide Mass Create button */
+    /* Row checkbox → show/hide Mass Create button + sync Select-All header checkbox */
     $(document).on('change', '#slotPickerGrid .bp-row-cb', function () {
-      var $grid    = $('#slotPickerGrid');
-      var anyChecked = $grid.find('.bp-row-cb:checked').length > 0;
+      var $grid      = $('#slotPickerGrid');
+      var $allCbs    = $grid.find('.bp-row-cb:not(:disabled)');
+      var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
+      var anyChecked = checkedCnt > 0;
       $grid.find('.bp-mass-create-btn').toggle(anyChecked);
+      var $selectAll = $grid.find('.bp-select-all-cb');
+      if ($selectAll.length) {
+        $selectAll.prop('indeterminate', anyChecked && checkedCnt < $allCbs.length);
+        $selectAll.prop('checked', checkedCnt === $allCbs.length && $allCbs.length > 0);
+      }
+    });
+
+    /* Select-All header checkbox → check/uncheck all row checkboxes */
+    $(document).on('change', '#slotPickerGrid .bp-select-all-cb', function () {
+      var $grid    = $('#slotPickerGrid');
+      var checked  = $(this).is(':checked');
+      $grid.find('.bp-row-cb:not(:disabled)').prop('checked', checked);
+      $grid.find('.bp-mass-create-btn').toggle(checked);
     });
 
     /* ── Bulk Create Daily Beat Plans ── */
@@ -4751,8 +4770,9 @@ $(function () {
         }
       }
 
-      /* Uncheck all processed rows and hide the Mass Create button */
+      /* Uncheck all processed rows, reset Select-All header checkbox, and hide the Mass Create button */
       $grid.find('.bp-row-cb').prop('checked', false);
+      $grid.find('.bp-select-all-cb').prop('checked', false).prop('indeterminate', false);
       $btn.hide();
 
       saveEvents();
@@ -5087,7 +5107,10 @@ $(function () {
 
           state.events.push(newEv);
           saveEvents();
-          render();
+
+          /* Remove only the saved row; keep the modal open so users can
+             continue creating additional events without reopening the dialog. */
+          $row.remove();
 
           showToast('Beat plan record saved.');
         } catch (err) {
