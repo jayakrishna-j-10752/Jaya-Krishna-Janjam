@@ -2181,11 +2181,31 @@ $(function () {
     var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
     var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
 
+    /* Collect original field values for change detection on save */
+    var originalVals = {
+      mf:     existingMfVal,
+      mfApi:  existingMfApi,
+      mwId:   existingMwId,
+      attend: existingAttend,
+      leave:  existingLeave
+    };
+    tablePicklistCols.forEach(function (f) {
+      var rawVal    = crmRecord ? (crmRecord[f.api_name] || '') : '';
+      var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+      if (actualVal) { originalVals[f.api_name] = actualVal; }
+    });
+
+    /* Disable approve/reject/delete when the record is already Approved or Rejected */
+    var evApprovalVal   = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+    var approvalLocked  = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+    var lockedAttr      = approvalLocked ? ' disabled' : '';
+
     tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                  ' data-date="' + escHtml(date) + '"' +
                  ' data-edit-id="' + escHtml(ev.id) + '"' +
                  ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
                  ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                 ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '"' +
                  (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
 
     /* Checkbox cell – hidden in edit mode; carries left + top + bottom borders and
@@ -2262,9 +2282,13 @@ $(function () {
                    '</td>';
     });
 
-    /* ── Actions column: Update button only (no copy/paste in edit mode) ── */
+    /* ── Actions column: Update, Copy, Delete, Approve, Reject ── */
     tableHtml += '<td class="bp-action-cell"' + (actCellStyle ? ' style="' + escHtml(actCellStyle) + '"' : '') + '>' +
-                 '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
+                 '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
+                 '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
+                 '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
+                 '<button class="bp-row-action bp-row-approve" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                 '<button class="bp-row-action bp-row-reject"  type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
                  '</td>';
 
     tableHtml += '</tr>';
@@ -5093,13 +5117,47 @@ $(function () {
       $btn.prop('disabled', true);
 
       if (editId) {
-        /* ── EDIT MODE: call updateRecord, preserve Managers Approval ── */
+        /* ── EDIT MODE: compare current values against originals to detect changes ── */
+        var origValsStr = $row.attr('data-original-vals') || '{}';
+        var origVals;
+        try { origVals = JSON.parse(origValsStr); } catch (e) { origVals = {}; }
+
+        /* Build current values snapshot using the same keys as originalVals */
+        var currentVals = {
+          mf:     (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') ? mfDisplayVal : '',
+          mfApi:  mfApi,
+          mwId:   mwId,
+          attend: (attendVal && attendVal !== 'Select\u2026') ? attendVal : '',
+          leave:  (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') ? leaveVal : ''
+        };
+        $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+          var fieldApi = String($(this).data('api') || '');
+          if (!fieldApi) { return; }
+          var $v   = $(this).find('.bp-dd-val');
+          var actual = $v.attr('data-actual-val') || $v.text() || '';
+          if (actual && actual !== 'Select\u2026') { currentVals[fieldApi] = actual; }
+        });
+
+        /* Check whether any editable field has changed */
+        var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
+        var hasChanges = allKeys.some(function (k) {
+          return (origVals[k] || '') !== (currentVals[k] || '');
+        });
+
         var existingEv       = findEvent(editId);
         var existingApproval = (existingEv && existingEv.bprFieldValues)
           ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
           : '';
-        if (existingApproval) {
-          bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
+
+        if (hasChanges) {
+          /* Fields changed – reset approval workflow back to Pending */
+          recordData['beatplanner__Managers_Approval'] = 'Pending';
+          bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+        } else {
+          /* No changes – preserve existing approval status */
+          if (existingApproval) {
+            bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
+          }
         }
 
         try {
@@ -5136,6 +5194,17 @@ $(function () {
 
       } else {
         /* ── CREATE MODE: call insertRecord, default Managers Approval to Pending ── */
+
+        /* Conflict check – prevent creating a record when a meeting already occupies
+           an overlapping time slot on the same date. */
+        var hasTimeOverlap = state.events.some(function (e) {
+          return e.date === date && e.startTime < endTime && e.endTime > startTime;
+        });
+        if (hasTimeOverlap) {
+          showToast('A meeting already exists within the selected time interval for this date.');
+          $btn.prop('disabled', false);
+          return;
+        }
 
         /* Link to the Monthly Beat Plan record resolved during modal init */
         if (monthlyBeatPlanId) {
@@ -5330,6 +5399,25 @@ $(function () {
           $val.removeAttr('data-actual-val');
         }
       });
+    });
+
+    /* ── Beat plan edit row: Delete ── */
+    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-delete', function () {
+      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+      if (!editId) { return; }
+      if (window.confirm('Delete this event?')) { deleteEvent(editId); }
+    });
+
+    /* ── Beat plan edit row: Approve ── */
+    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-approve', function () {
+      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+      if (editId) { doApprove(editId); }
+    });
+
+    /* ── Beat plan edit row: Reject ── */
+    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-reject', function () {
+      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+      if (editId) { doReject(editId); }
     });
 
     /* Close beat plan dropdowns when clicking anywhere outside */
