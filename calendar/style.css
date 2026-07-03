@@ -708,6 +708,11 @@ input, select, textarea {
   margin-right: 4px;
   margin-bottom: 1px; /* nudge down to optically centre with the title text in line-height */
 }
+/* Inside the edit row checkbox cell (table layout) the marker also needs inline-block */
+.bp-edit-row .chip-marker {
+  display: inline-block;
+  vertical-align: middle;
+}
 
 .chip-name {
   flex: 1;

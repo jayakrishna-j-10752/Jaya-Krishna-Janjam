@@ -403,10 +403,13 @@ $(function () {
    *                   markerHtml – HTML string for the .chip-marker span, or ''.
    */
   function buildBprEventStyles(ev) {
-    var styleStr      = '';
-    var bgStr         = '';
-    var borderLeftStr = '';
-    var markerHtml    = '';
+    var styleStr        = '';
+    var bgStr           = '';
+    var borderLeftStr   = '';
+    var borderTopStr    = '';
+    var borderBottomStr = '';
+    var borderRightStr  = '';
+    var markerHtml      = '';
 
     if (beatPlanHasRefs && bprPicklistFields && bprPicklistFields.length &&
         ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
@@ -425,14 +428,14 @@ $(function () {
       } else {
         /* Dynamic BPR styling: derive colours from picklist metadata */
         var s = buildBprChipStyle(ev.bprFieldValues);
-        if (s.bg)           { bgStr += 'background:' + s.bg + ';'; styleStr += bgStr; }
-        if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
-        if (s.borderBottom) { styleStr += 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;'; }
+        if (s.bg)           { bgStr         += 'background:'          + s.bg         + ';';                                                                    styleStr += bgStr; }
+        if (s.borderTop)    { borderTopStr    = 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;';                      styleStr += borderTopStr; }
+        if (s.borderBottom) { borderBottomStr = 'border-bottom-color:' + s.borderBottom + ';border-bottom-style:solid;border-bottom-width:2px;';                styleStr += borderBottomStr; }
         if (s.borderLeft)   {
-          borderLeftStr  = 'border-left-color:' + s.borderLeft + ';border-left-style:solid;border-left-width:3px;';
-          styleStr      += borderLeftStr;
+          borderLeftStr = 'border-left-color:' + s.borderLeft + ';border-left-style:solid;border-left-width:3px;';
+          styleStr     += borderLeftStr;
         }
-        if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
+        if (s.borderRight)  { borderRightStr  = 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;';                  styleStr += borderRightStr; }
         if (s.markerColor)  { markerHtml = '<span class="chip-marker" style="background:' + escHtml(s.markerColor) + ';" aria-hidden="true"></span>'; }
         /* When no bg-colour is resolved but a left-border color exists, derive a tinted
            background from the border colour to keep the event visually distinct. */
@@ -447,7 +450,15 @@ $(function () {
       styleStr      = bgStr + borderLeftStr;
     }
 
-    return { styleStr: styleStr, markerHtml: markerHtml, bgStr: bgStr, borderLeftStr: borderLeftStr };
+    return {
+      styleStr:        styleStr,
+      markerHtml:      markerHtml,
+      bgStr:           bgStr,
+      borderLeftStr:   borderLeftStr,
+      borderTopStr:    borderTopStr,
+      borderBottomStr: borderBottomStr,
+      borderRightStr:  borderRightStr
+    };
   }
 
   function renderChip(ev, past) {
@@ -2161,9 +2172,14 @@ $(function () {
     var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
 
     /* Apply the same metadata-driven styling as the .evt-chip being edited.
-       With border-collapse:separate, border-* on <tr> does not render — so the
-       background is applied to the <tr> and the left border to the first <td>. */
+       With border-collapse:separate, border-* on <tr> does not render — the
+       background is applied to the <tr>; all border sides go to individual <td>s:
+       left + top + bottom borders on the first cell, top + bottom on middle cells,
+       and top + bottom + right on the last cell. */
     var editRowStyles = buildBprEventStyles(ev);
+    var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
+    var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
+    var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
 
     tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                  ' data-date="' + escHtml(date) + '"' +
@@ -2172,18 +2188,19 @@ $(function () {
                  ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
                  (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
 
-    /* Checkbox cell – hidden/disabled in edit mode; carries the left border that
-       matches the .evt-chip since border-left on <tr> is unreliable with separate. */
+    /* Checkbox cell – hidden in edit mode; carries left + top + bottom borders and
+       the chip-marker (status dot) so the edit row mirrors the full .evt-chip appearance. */
     tableHtml += '<td class="bp-cb-cell"' +
-                 (editRowStyles.borderLeftStr ? ' style="' + escHtml(editRowStyles.borderLeftStr) + '"' : '') +
-                 '><input type="checkbox" class="bp-row-cb" aria-label="Select row" disabled style="visibility:hidden;"></td>';
+                 (cbCellStyle ? ' style="' + escHtml(cbCellStyle) + '"' : '') +
+                 '>' + editRowStyles.markerHtml +
+                 '<input type="checkbox" class="bp-row-cb" aria-label="Select row" disabled style="visibility:hidden;"></td>';
 
     /* Time cells */
-    tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
-    tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(endTimeApi)   + '" data-label="' + escHtml(endTimeLbl)   + '">' + endLbl   + '</td>';
+    tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + ' data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
+    tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + ' data-api="' + escHtml(endTimeApi)   + '" data-label="' + escHtml(endTimeLbl)   + '">' + endLbl   + '</td>';
 
     /* ── Meetings For dropdown (pre-selected) ── */
-    tableHtml += '<td class="bp-dd-cell">' +
+    tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
                  '<div class="bp-dd-wrap bp-mf-wrap" data-row="edit" data-api="' + escHtml(mfFieldApi) + '" data-label="' + escHtml(mfFieldLabel) + '">' +
                  '<div class="bp-dd-trigger" tabindex="0">' +
                  '<span class="bp-dd-val"' +
@@ -2198,7 +2215,7 @@ $(function () {
                  '</td>';
 
     /* ── Meeting With dropdown (pre-selected, with avatar) ── */
-    tableHtml += '<td class="bp-dd-cell">' +
+    tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
                  '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
                  '<div class="bp-dd-trigger" tabindex="0">' +
                  '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
@@ -2229,7 +2246,7 @@ $(function () {
         });
       }
 
-      tableHtml += '<td class="bp-dd-cell">' +
+      tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
                    '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-dd-val"' +
@@ -2246,7 +2263,7 @@ $(function () {
     });
 
     /* ── Actions column: Update button only (no copy/paste in edit mode) ── */
-    tableHtml += '<td class="bp-action-cell">' +
+    tableHtml += '<td class="bp-action-cell"' + (actCellStyle ? ' style="' + escHtml(actCellStyle) + '"' : '') + '>' +
                  '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
                  '</td>';
 
