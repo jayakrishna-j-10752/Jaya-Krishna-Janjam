@@ -1324,8 +1324,10 @@ $(function () {
           if (evIdx !== -1) { state.events[evIdx].id = crmId; }
           ev.id = crmId;
           saveEvents();
-          /* Sync all rendered DOM elements that still carry the temporary ID */
-          $('[data-evid="' + oldId + '"]').attr('data-evid', crmId);
+          /* Sync all rendered DOM elements that still carry the temporary ID.
+             Also update jQuery's internal data cache so subsequent .data('evid')
+             calls (e.g. in the hover-card mouseenter handler) return the new ID. */
+          $('[data-evid="' + oldId + '"]').attr('data-evid', crmId).data('evid', crmId);
         }
       } catch (err) {
         console.error('Failed to persist pasted event to CRM', err);
@@ -6088,8 +6090,8 @@ $(function () {
 
       $btn.prop('disabled', true);
       try {
-        await zrc.delete({
-          Entity: 'beatplanner__Daily_Beat_Plans',
+        await ZOHO.CRM.API.deleteRecord({
+          Entity:   'beatplanner__Daily_Beat_Plans',
           RecordID: editId
         });
       } catch (delErr) {
@@ -6302,7 +6304,7 @@ $(function () {
         if (!delId) { continue; }
 
         try {
-          await zrc.delete({
+          await ZOHO.CRM.API.deleteRecord({
             Entity:   'beatplanner__Daily_Beat_Plans',
             RecordID: delId
           });
