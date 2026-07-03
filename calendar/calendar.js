@@ -6775,7 +6775,7 @@ $(function () {
    *
    * @param {string[]} legApiNames - Array of Daily Beat Plans field API names to render.
    */
-  async function renderLegendsDisplay(legApiNames) {
+  async function renderLegendsDisplay(legApiNames, mfModuleLabels) {
     var $container = $('#legendsDisplay');
 
     /* No legend fields configured → hide the strip and return */
@@ -6799,6 +6799,14 @@ $(function () {
       fieldMap[f.api_name] = f;
     });
 
+    /* Build a normalised set of selected module labels for Meetings For filtering */
+    var mfLabelSet = {};
+    if (mfModuleLabels && mfModuleLabels.length) {
+      mfModuleLabels.forEach(function (l) {
+        if (l) { mfLabelSet[l.trim().toLowerCase()] = true; }
+      });
+    }
+
     /* Build legend group HTML for each configured API name */
     var groupsHtml = '';
     legApiNames.forEach(function (apiName) {
@@ -6808,12 +6816,22 @@ $(function () {
       var field = fieldMap[apiName];
       if (!field || !field.options || !field.options.length) { return; }
 
+      /* Determine if this is the Meetings For field so we can filter to selected modules */
+      var isMeetingsForField = apiName.toLowerCase().indexOf('meetings_for') !== -1;
+
       /* Heading for this legend group */
       var titleHtml = '<span class="legends-group-title">' + escHtml(field.field_label || apiName) + '</span>';
 
       /* One item per picklist value */
       var itemsHtml = '';
       field.options.forEach(function (opt) {
+        /* Skip the blank "-None-" placeholder — it is not a meaningful legend entry */
+        if (opt.display === '-None-' || opt.actual === '-None-') { return; }
+
+        /* For the Meetings For field, only show modules the user has actually selected */
+        if (isMeetingsForField && Object.keys(mfLabelSet).length &&
+            !mfLabelSet[opt.display.trim().toLowerCase()]) { return; }
+
         var colour = opt.colour || '#BDBDBD';
         /* Ensure colour starts with # for inline CSS */
         if (colour && colour.charAt(0) !== '#') { colour = '#' + colour; }
@@ -6823,6 +6841,8 @@ $(function () {
             '<span class="legend-item-label">' + escHtml(opt.display) + '</span>' +
           '</span>';
       });
+
+      if (!itemsHtml) { return; }
 
       groupsHtml +=
         '<div class="legends-group">' +
@@ -7834,8 +7854,9 @@ $(function () {
 
     /* ── Render legends display strip from saved configuration ── */
     if (hasRecords && savedRec) {
-      var savedLegApiNames = (savedRec['beatplanner__Legends_Field_Api_Name'] || '').split(',').filter(Boolean);
-      renderLegendsDisplay(savedLegApiNames).catch(function (e) {
+      var savedLegApiNames  = (savedRec['beatplanner__Legends_Field_Api_Name']  || '').split(',').filter(Boolean);
+      var savedMfModLabels  = (savedRec['beatplanner__Meetings_For_Modules']    || '').split(',').filter(Boolean);
+      renderLegendsDisplay(savedLegApiNames, savedMfModLabels).catch(function (e) {
         console.error('Legend render error:', e);
       });
     }
