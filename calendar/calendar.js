@@ -1157,7 +1157,7 @@ $(function () {
    * @param {string}  ds    – target date string YYYY-MM-DD
    * @param {number?} hour  – optional hour (0-23); if omitted keeps original times
    */
-  function doPaste(ds, hour) {
+  async function doPaste(ds, hour) {
     if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
     if (!isValid(ds))     { showToast('Cannot paste on a past date.'); return; }
 
@@ -1173,13 +1173,22 @@ $(function () {
       return;
     }
 
-    var count = state.clipboard.length;
-    state.clipboard.forEach(function (clipEv) {
+    var count       = state.clipboard.length;
+    var clipCopy    = state.clipboard.slice(); /* snapshot before any async mutation */
+    var newEvs      = [];
+
+    clipCopy.forEach(function (clipEv) {
       var ev = Object.assign({}, clipEv, { id: uid(), date: ds });
       if (hour !== undefined) {
         ev.startTime = hourToTime(hour);
         ev.endTime   = hourToTime(Math.min(hour + 1, 23));
       }
+      /* Always reset approval status for the pasted copy */
+      if (ev.bprFieldValues) {
+        ev.bprFieldValues = Object.assign({}, ev.bprFieldValues);
+        ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+      }
+      newEvs.push(ev);
       state.events.push(ev);
     });
     saveEvents();
@@ -1187,6 +1196,67 @@ $(function () {
     showToast(count === 1
       ? 'Event pasted on ' + ds + '.'
       : count + ' events pasted on ' + ds + '.');
+
+    /* Persist each pasted Beat Plan event to beatplanner__Daily_Beat_Plans */
+    for (var i = 0; i < newEvs.length; i++) {
+      var ev = newEvs[i];
+      if (!ev.bprFieldValues || !Object.keys(ev.bprFieldValues).length) { continue; }
+
+      var recordData = {};
+
+      /* Copy all picklist field values, excluding Managers Approval (reset below) */
+      Object.keys(ev.bprFieldValues).forEach(function (key) {
+        if (key !== 'beatplanner__Managers_Approval') {
+          recordData[key] = ev.bprFieldValues[key];
+        }
+      });
+
+      /* Meeting With lookup (stored on the event if created via the form) */
+      if (ev.mwRecordId && ev.mwLookupApi) {
+        recordData[ev.mwLookupApi] = { id: ev.mwRecordId };
+      }
+      /* Clear all other module lookup fields so the record is not left with stale references */
+      beatPlanModulesList.forEach(function (mod) {
+        if (mod.api && mod.api !== (ev.mwLookupApi || '')) {
+          recordData[mod.api] = '';
+        }
+      });
+
+      /* Date / time fields */
+      recordData['beatplanner__Date_Time_From'] = toIsoDt(ds, ev.startTime);
+      recordData['beatplanner__Date_Time_To']   = toIsoDt(ds, ev.endTime);
+      recordData['beatplanner__Date']           = ds;
+
+      /* Mandatory Name field */
+      recordData['Name'] = 'Meeting With ' + (ev.title || '');
+
+      /* New record always starts as Pending */
+      recordData['beatplanner__Managers_Approval'] = 'Pending';
+
+      /* Assign to the active user */
+      var ownerId = $('#userProfile').attr('data-userid');
+      if (ownerId) { recordData['Owner'] = { id: ownerId }; }
+
+      try {
+        var resp = await ZOHO.CRM.API.insertRecord({
+          Entity:  'beatplanner__Daily_Beat_Plans',
+          APIData: recordData,
+          Trigger: ['workflow']
+        });
+        console.log('Pasted Beat Plan record saved', resp);
+        /* Update the in-memory event id with the real CRM record id */
+        var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+        if (crmId) {
+          var evIdx = state.events.indexOf(ev);
+          if (evIdx !== -1) { state.events[evIdx].id = crmId; }
+          ev.id = crmId;
+          saveEvents();
+        }
+      } catch (err) {
+        console.error('Failed to persist pasted event to CRM', err);
+        showToast('Failed to save pasted event to CRM.');
+      }
+    }
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -2890,7 +2960,24 @@ $(function () {
     showToast(state.editId ? 'Event updated.' : 'Event created.');
   }
 
-  function deleteEvent(evid) {
+  async function deleteEvent(evid) {
+    var ev = findEvent(evid);
+
+    /* Delete from CRM when this is a Beat Plan record (has bprFieldValues) */
+    if (ev && ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
+      try {
+        await ZOHO.CRM.API.deleteRecord({
+          Entity:   'beatplanner__Daily_Beat_Plans',
+          RecordID: evid
+        });
+        console.log('CRM record deleted', evid);
+      } catch (err) {
+        console.error('Failed to delete CRM record', err);
+        showToast('Failed to delete record from CRM.');
+        return;
+      }
+    }
+
     state.events = state.events.filter(function (e) { return e.id !== evid; });
     /* Also remove from clipboard if that event was the source */
     if (state.clipboard) {
@@ -4713,6 +4800,15 @@ $(function () {
     dom.canvas.on('mouseleave.hovercard', '.evt-chip', function () {
       hoverTimer = setTimeout(hideHoverCard, 150);
     });
+    /* Hover preview card – also show for .time-event elements in Week and Day views */
+    dom.canvas.on('mouseenter.hovercard', '.time-event', function () {
+      clearTimeout(hoverTimer);
+      var ev = findEvent($(this).data('evid'));
+      if (ev) { showHoverCard(ev, $(this)); }
+    });
+    dom.canvas.on('mouseleave.hovercard', '.time-event', function () {
+      hoverTimer = setTimeout(hideHoverCard, 150);
+    });
     dom.hoverCard.on('mouseenter', function () {
       clearTimeout(hoverTimer);
     });
@@ -5167,7 +5263,9 @@ $(function () {
             bprFieldValues: massBprFieldValues,
             mwAvatarImgSrc: $massMwAvatar.find('img').attr('src') || $massMwAvatar.attr('data-img-src') || '',
             mwAvatarText:   $massMwAvatar.text() || '',
-            mwPhotoId:      $massMwAvatar.attr('data-photo-id') || ''
+            mwPhotoId:      $massMwAvatar.attr('data-photo-id') || '',
+            mwRecordId:     mwId,
+            mwLookupApi:    mwLookupApi
           };
 
           var massCrmId = massResp && massResp.data && massResp.data[0] && massResp.data[0].details && massResp.data[0].details.id;
@@ -5553,7 +5651,9 @@ $(function () {
             bprFieldValues: bprFieldValues,
             mwAvatarImgSrc: mwAvatarImgSrc,
             mwAvatarText:   mwAvatarText,
-            mwPhotoId:      mwPhotoId
+            mwPhotoId:      mwPhotoId,
+            mwRecordId:     mwId,
+            mwLookupApi:    mwLookupApi
           };
 
           /* Update event ID with the CRM record ID returned in the response */

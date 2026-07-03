@@ -719,13 +719,13 @@ input, select, textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-primary) !important;
+  color: #fff !important;
 }
 .chip-time {
   font-size: 10px;
   opacity: .8;
   flex-shrink: 0;
-  color: var(--text-primary) !important;
+  color: #fff !important;
 }
 
 /* Approval status badge on event chip */
@@ -1393,7 +1393,7 @@ input, select, textarea {
 .hc-head-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #fff;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4785,6 +4785,14 @@ input, select, textarea {
 .bp-row-paste:hover { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
 .bp-row-paste:disabled { opacity: 0.38; cursor: not-allowed; }
 .bp-row-paste:disabled:hover { background: none; color: var(--text-secondary); border-color: transparent; }
+
+/* ── Edit row: white text and icon colours for readability on accent backgrounds ── */
+.bp-edit-row .bp-time-cell {
+  color: #fff;
+}
+.bp-edit-row .bp-row-action {
+  color: #fff;
+}
 
 /* ══════════════════════════════════════════════════════════
    LEGENDS DISPLAY STRIP
