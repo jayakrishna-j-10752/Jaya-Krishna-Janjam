@@ -1234,6 +1234,9 @@ $(function () {
       }
     }
 
+    /* ── Build all record payloads first; send them in a single batch request ── */
+    var pastePayloads = []; /* [{ ev, recordData }] */
+
     for (var i = 0; i < newEvs.length; i++) {
       var ev = newEvs[i];
       if (!ev.bprFieldValues || !Object.keys(ev.bprFieldValues).length) { continue; }
@@ -1309,25 +1312,35 @@ $(function () {
       var ownerId = $('#userProfile').attr('data-userid');
       if (ownerId) { recordData['Owner'] = { id: ownerId }; }
 
+      pastePayloads.push({ ev: ev, recordData: recordData });
+    }
+
+    /* Single batch request for all pasted Beat Plan records */
+    if (pastePayloads.length > 0) {
       try {
-        var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
-        console.log('Pasted Beat Plan record saved', resp);
-        /* Update the in-memory event id with the real CRM record id */
-        var crmId = resp && resp.data && resp.data.data && resp.data.data[0] && resp.data.data[0].details && resp.data.data[0].details.id;
-        if (crmId) {
-          var oldId = ev.id;
-          var evIdx = state.events.indexOf(ev);
-          if (evIdx !== -1) { state.events[evIdx].id = crmId; }
-          ev.id = crmId;
-          saveEvents();
-          /* Sync all rendered DOM elements that still carry the temporary ID.
-             Also update jQuery's internal data cache so subsequent .data('evid')
-             calls (e.g. in the hover-card mouseenter handler) return the new ID. */
-          $('[data-evid="' + oldId + '"]').attr('data-evid', crmId).data('evid', crmId);
-        }
+        var pasteResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', {
+          data: pastePayloads.map(function (p) { return p.recordData; })
+        });
+        console.log('Pasted Beat Plan records saved', pasteResp);
+        var pasteRespItems = (pasteResp && pasteResp.data && pasteResp.data.data) || [];
+        pastePayloads.forEach(function (p, idx) {
+          var item  = pasteRespItems[idx];
+          var crmId = item && item.details && item.details.id;
+          if (crmId) {
+            var oldId = p.ev.id;
+            var evIdx = state.events.indexOf(p.ev);
+            if (evIdx !== -1) { state.events[evIdx].id = crmId; }
+            p.ev.id = crmId;
+            /* Sync all rendered DOM elements that still carry the temporary ID.
+               Also update jQuery's internal data cache so subsequent .data('evid')
+               calls (e.g. in the hover-card mouseenter handler) return the new ID. */
+            $('[data-evid="' + oldId + '"]').attr('data-evid', crmId).data('evid', crmId);
+          }
+        });
+        saveEvents();
       } catch (err) {
-        console.error('Failed to persist pasted event to CRM', err);
-        showToast('Failed to save pasted event to CRM.');
+        console.error('Failed to persist pasted events to CRM', err);
+        showToast('Failed to save pasted events to CRM.');
       }
     }
   }
@@ -5198,6 +5211,9 @@ $(function () {
       var created = 0;
       var failed  = 0;
 
+      /* ── Build all record payloads and event metadata; send in a single batch request ── */
+      var massPayloads = []; /* [{ recordData, massEv }] */
+
       for (var ri = 0; ri < $checkedRows.length; ri++) {
         var $row = $($checkedRows[ri]);
         var date = $row.data('date') || '';
@@ -5286,61 +5302,69 @@ $(function () {
           recordData['Owner'] = { id: massOwnerId };
         }
 
+        /* Build bprFieldValues for this row so the chip gets metadata-driven styling */
+        var massBprFieldValues = {};
+        if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
+          massBprFieldValues[mfFieldApi] = mfDisplayVal;
+        }
+        $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+          var $wrap    = $(this);
+          var fieldApi = String($wrap.data('api') || '');
+          if (!fieldApi) { return; }
+          var $val   = $wrap.find('.bp-dd-val');
+          var actual = $val.attr('data-actual-val') || '';
+          if (actual && actual !== 'Select\u2026') {
+            massBprFieldValues[fieldApi] = actual;
+          }
+        });
+        if (attendVal && attendVal !== 'Select\u2026') {
+          massBprFieldValues[attendApi] = attendVal;
+        }
+        if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') {
+          massBprFieldValues[leaveApi] = leaveVal;
+        }
+        massBprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+
+        var $massMwAvatar = $mwWrap.find('.bp-rec-avatar');
+        var massStartTime = isLeaveRecord ? '00:00' : hourToTime(hour);
+        var massEndTime   = isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+
+        var massEv = {
+          id:             uid(),
+          title:          mwName || (mfDisplayVal || 'Beat Plan'),
+          date:           date,
+          startTime:      massStartTime,
+          endTime:        massEndTime,
+          color:          '#1565C0',
+          description:    '',
+          bprFieldValues: massBprFieldValues,
+          mwAvatarImgSrc: $massMwAvatar.find('img').attr('src') || $massMwAvatar.attr('data-img-src') || '',
+          mwAvatarText:   $massMwAvatar.text() || '',
+          mwPhotoId:      $massMwAvatar.attr('data-photo-id') || '',
+          mwRecordId:     mwId,
+          mwLookupApi:    mwLookupApi
+        };
+
+        massPayloads.push({ recordData: recordData, massEv: massEv });
+      }
+
+      /* Single batch request for all checked Beat Plan rows */
+      if (massPayloads.length > 0) {
         try {
-          var massResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
-          created++;
-
-          /* Build bprFieldValues for this row so the chip gets metadata-driven styling */
-          var massBprFieldValues = {};
-          if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
-            massBprFieldValues[mfFieldApi] = mfDisplayVal;
-          }
-          $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
-            var $wrap    = $(this);
-            var fieldApi = String($wrap.data('api') || '');
-            if (!fieldApi) { return; }
-            var $val   = $wrap.find('.bp-dd-val');
-            var actual = $val.attr('data-actual-val') || '';
-            if (actual && actual !== 'Select\u2026') {
-              massBprFieldValues[fieldApi] = actual;
-            }
+          var massResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', {
+            data: massPayloads.map(function (p) { return p.recordData; })
           });
-          if (attendVal && attendVal !== 'Select\u2026') {
-            massBprFieldValues[attendApi] = attendVal;
-          }
-          if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') {
-            massBprFieldValues[leaveApi] = leaveVal;
-          }
-          massBprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
-
-          var $massMwWrap   = $row.find('.bp-mw-wrap');
-          var $massMwAvatar = $massMwWrap.find('.bp-rec-avatar');
-          var massStartTime = isLeaveRecord ? '00:00' : hourToTime(hour);
-          var massEndTime   = isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1));
-
-          var massEv = {
-            id:             uid(),
-            title:          mwName || (mfDisplayVal || 'Beat Plan'),
-            date:           date,
-            startTime:      massStartTime,
-            endTime:        massEndTime,
-            color:          '#1565C0',
-            description:    '',
-            bprFieldValues: massBprFieldValues,
-            mwAvatarImgSrc: $massMwAvatar.find('img').attr('src') || $massMwAvatar.attr('data-img-src') || '',
-            mwAvatarText:   $massMwAvatar.text() || '',
-            mwPhotoId:      $massMwAvatar.attr('data-photo-id') || '',
-            mwRecordId:     mwId,
-            mwLookupApi:    mwLookupApi
-          };
-
-          var massCrmId = massResp && massResp.data && massResp.data.data && massResp.data.data[0] && massResp.data.data[0].details && massResp.data.data[0].details.id;
-          if (massCrmId) { massEv.id = massCrmId; }
-
-          state.events.push(massEv);
+          var massRespItems = (massResp && massResp.data && massResp.data.data) || [];
+          massPayloads.forEach(function (p, idx) {
+            var item      = massRespItems[idx];
+            var massCrmId = item && item.details && item.details.id;
+            if (massCrmId) { p.massEv.id = massCrmId; }
+            state.events.push(p.massEv);
+            created++;
+          });
         } catch (err) {
-          console.error('Bulk create failed for row', hour, err);
-          failed++;
+          console.error('Bulk create failed', err);
+          failed += massPayloads.length;
         }
       }
 
