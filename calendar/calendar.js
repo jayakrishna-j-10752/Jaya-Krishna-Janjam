@@ -6334,7 +6334,7 @@ $(function () {
             '/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + allIds.join(',')
           );
           /* Determine which IDs succeeded based on the response */
-          var respData = bulkResp && bulkResp.data ? bulkResp.data : [];
+          var respData = (bulkResp && bulkResp.data && bulkResp.data.data) ? bulkResp.data.data : [];
           respData.forEach(function (entry) {
             if (entry && entry.status === 'success' && entry.details && entry.details.id) {
               successIds[entry.details.id] = true;
@@ -6657,9 +6657,10 @@ $(function () {
     $settingsBackBtn.show();
   });
 
-  /* Back button → hide meetings-bar + styleBar + back button, show rest */
+  /* Back button → show global loader while the Beat Planner re-initializes */
   $settingsBackBtn.on('click', function () {
-    showMainContent();
+    $('#widgetLoaderOverlay').show();
+    location.reload();
   });
 
   /* ──────────────────────────────────────────────────────────
@@ -7823,10 +7824,6 @@ $(function () {
       console.error('Failed to save Beat Plan Reference:', err);
     }
 
-    /* ── Signal that the next page load is a post-save reload so the
-       loader is shown again immediately during re-initialization ── */
-    try { sessionStorage.setItem('bp_post_save_reload', '1'); } catch (e) { /* ignore */ }
-
     /* ── Reload the widget so all components are rebuilt using the
        latest configuration fetched fresh from the API ── */
     location.reload();
@@ -7950,14 +7947,10 @@ $(function () {
   ZOHO.embeddedApp.on('PageLoad', async function (data) {
     console.log(data);
 
-    /* ── Show loader if this is a post-save reload so users never see
-       stale legend values while fresh API data is being fetched ── */
-    try {
-      if (sessionStorage.getItem('bp_post_save_reload')) {
-        sessionStorage.removeItem('bp_post_save_reload');
-        $('#widgetLoaderOverlay').show();
-      }
-    } catch (e) { /* ignore */ }
+    /* ── Show loader on every initialization (initial load, hard refresh,
+       or post-save reload) so users never see a partially rendered UI ── */
+    $('#widgetLoaderOverlay').show();
+    try { sessionStorage.removeItem('bp_post_save_reload'); } catch (e) { /* ignore */ }
 
     /* ── Step 1: Get the logged-in user and populate #userProfile immediately ── */
     var currentUserResp = await ZOHO.CRM.CONFIG.getCurrentUser();
