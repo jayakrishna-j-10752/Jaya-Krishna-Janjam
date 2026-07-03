@@ -2925,7 +2925,12 @@ input, select, textarea {
   flex-direction: column;
   overflow: hidden;
   transform: translateY(-6px) scale(.98);
-  transition: transform .15s;
+  transition: transform .15s, width .15s;
+}
+/* Wide variant for the bulk-edit table */
+.day-events-modal-box.dem-box-wide {
+  width: min(92vw, 1140px);
+  max-height: min(88vh, 760px);
 }
 .day-events-modal-overlay.dem-open .day-events-modal-box {
   transform: translateY(0) scale(1);
@@ -2969,11 +2974,69 @@ input, select, textarea {
   flex-direction: column;
   gap: 12px;
 }
+/* Table mode: remove padding and allow horizontal scroll */
+.dem-list.dem-table-mode {
+  padding: 0;
+  overflow-x: auto;
+}
 .dem-list:empty::after {
   content: 'No events on this day.';
   font-size: 13px;
   color: var(--text-muted);
   padding: 4px 2px;
+}
+
+/* Loading / empty state inside the bulk modal */
+.dem-loading {
+  padding: 24px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Bulk-actions toolbar ── */
+.dem-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+.dem-sel-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex: 1;
+}
+.dem-mass-update-btn,
+.dem-mass-delete-btn {
+  padding: 5px 14px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  border: 1.5px solid;
+}
+.dem-mass-update-btn {
+  background: var(--z-blue-pale, rgba(21,101,192,.08));
+  color: var(--z-blue, #1565C0);
+  border-color: var(--z-blue, #1565C0);
+}
+.dem-mass-update-btn:hover {
+  background: var(--z-blue, #1565C0);
+  color: #fff;
+}
+.dem-mass-delete-btn {
+  background: transparent;
+  color: var(--z-red, #c62828);
+  border-color: var(--z-red, #c62828);
+}
+.dem-mass-delete-btn:hover {
+  background: var(--z-red, #c62828);
+  color: #fff;
 }
 
 /* Each event card in the day events modal */
@@ -2988,6 +3051,16 @@ input, select, textarea {
 }
 .dem-card .hc-actions {
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Override .bp-slots-wrap max-height inside the bulk modal so it fills the available space */
+#demBulkGrid .bp-slots-wrap {
+  max-height: none;
+  overflow-y: visible;
+}
+/* The .dem-list wrapper handles the scroll in table mode */
+.dem-list.dem-table-mode #demBulkGrid {
+  min-width: max-content;
 }
 
 /* ══════════════════════════════════════════════════════════

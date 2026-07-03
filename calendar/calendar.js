@@ -2299,7 +2299,264 @@ $(function () {
   }
 
   /**
-   * Return the best display name for a CRM record (works across Leads,
+   * Build the bulk-edit table HTML for the Day Events modal.
+   * Renders one .bp-slot-row.bp-edit-row per event with enabled row checkboxes,
+   * a "Select All" header checkbox, and a bulk-actions toolbar.
+   *
+   * All picklist fields (including Attendance and Leave Type) are rendered as
+   * regular table columns so every event can be edited independently.
+   *
+   * @param {string} date          – "YYYY-MM-DD"
+   * @param {Array}  evts          – calendar events for that date
+   * @param {Object} crmRecordsMap – { [ev.id]: crmRecord } fetched from CRM API
+   */
+  function buildDemBulkTable(date, evts, crmRecordsMap) {
+    var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
+                  ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+
+    /* "Meetings For" options list (shared for every row) */
+    var mfOptions = '';
+    beatPlanModulesList.forEach(function (mod) {
+      mfOptions += '<li class="bp-dd-opt" data-api="' + escHtml(mod.api) +
+                   '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
+    });
+
+    /* ── Collect ALL picklist columns (include Attendance + Leave Type as regular columns) ── */
+    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for'];
+    var tablePicklistCols = [];
+
+    if (bprPicklistFields && bprPicklistFields.length) {
+      bprPicklistFields.forEach(function (f) {
+        var lbl = (f.field_label || '').toLowerCase().trim();
+        if (HIDDEN_BPR_LABELS.indexOf(lbl) !== -1) { return; }
+        tablePicklistCols.push(f);
+      });
+    }
+
+    /* Build <li> option list */
+    function buildOptList(opts) {
+      if (!opts || !opts.length) {
+        return '<li class="bp-dd-empty">No options available</li>';
+      }
+      return opts.map(function (v) {
+        var display = (typeof v === 'object') ? v.display : v;
+        var actual  = (typeof v === 'object') ? v.actual  : v;
+        return '<li class="bp-dd-opt" data-label="' + escHtml(display) +
+               '" data-actual="' + escHtml(actual) + '">' + escHtml(display) + '</li>';
+      }).join('');
+    }
+
+    /* ── Resolve time / meetings-for field metadata ── */
+    var startTimeApi = 'beatplanner__Date_Time_From';
+    var startTimeLbl = 'Date Time From';
+    var endTimeApi   = 'beatplanner__Date_Time_To';
+    var endTimeLbl   = 'Date Time To';
+    var mfFieldApi   = 'beatplanner__Meetings_For';
+    var mfFieldLabel = 'Meetings For';
+    bpDailyAllFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase();
+      if (lbl === 'start time')   { startTimeApi = f.api_name || startTimeApi; startTimeLbl = f.field_label || startTimeLbl; }
+      if (lbl === 'end time')     { endTimeApi   = f.api_name || endTimeApi;   endTimeLbl   = f.field_label || endTimeLbl; }
+      if (lbl === 'meetings for') { mfFieldApi   = f.api_name || mfFieldApi;   mfFieldLabel = f.field_label || mfFieldLabel; }
+    });
+
+    /* ── Bulk-actions toolbar (hidden until at least one row is checked) ── */
+    var toolbarHtml =
+      '<div class="dem-bulk-toolbar" style="display:none;">' +
+        '<span class="dem-sel-count"></span>' +
+        '<button class="dem-mass-update-btn" type="button">Mass Update</button>' +
+        '<button class="dem-mass-delete-btn" type="button">Mass Delete</button>' +
+      '</div>';
+
+    /* ── Table header ── */
+    var tableHtml = '<table class="bp-slots-table">';
+    tableHtml += '<thead><tr>';
+    tableHtml += '<th class="bp-th bp-cb-th"><input type="checkbox" class="bp-select-all-cb" aria-label="Select all rows"></th>';
+    tableHtml += '<th class="bp-th">' + escHtml(startTimeLbl) + '</th>';
+    tableHtml += '<th class="bp-th">' + escHtml(endTimeLbl) + '</th>';
+    tableHtml += '<th class="bp-th">' + escHtml(mfFieldLabel) + '</th>';
+    tableHtml += '<th class="bp-th">Meeting With</th>';
+    tablePicklistCols.forEach(function (f) {
+      tableHtml += '<th class="bp-th">' + escHtml(f.field_label) + '</th>';
+    });
+    tableHtml += '<th class="bp-th bp-action-th">Actions</th>';
+    tableHtml += '</tr></thead><tbody>';
+
+    /* ── One row per event ── */
+    evts.forEach(function (ev) {
+      var crmRecord = crmRecordsMap[ev.id] || null;
+
+      var startLbl = fmtTime(ev.startTime || '00:00');
+      var endLbl   = fmtTime(ev.endTime   || '00:00');
+
+      /* Meetings For */
+      var existingMfVal = crmRecord ? String(crmRecord[mfFieldApi] || '') : '';
+      var existingMfApi = '';
+      beatPlanModulesList.forEach(function (mod) {
+        if (mod.label === existingMfVal) { existingMfApi = mod.api; }
+      });
+
+      /* Meeting With */
+      var mwLookupApiName = '';
+      var existingMwId    = '';
+      var existingMwName  = ev.title || '';
+      if (existingMfApi) {
+        for (var i = 0; i < bpDailyAllFields.length; i++) {
+          var f = bpDailyAllFields[i];
+          if (f.data_type === 'lookup' && f.lookup && f.lookup.module) {
+            var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
+            var fldLbl     = (f.field_label || '').toLowerCase();
+            if (modApiName === existingMfApi || fldLbl === existingMfVal.toLowerCase()) {
+              mwLookupApiName = modApiName;
+              if (crmRecord && crmRecord[f.api_name]) {
+                var mwLookupVal = crmRecord[f.api_name];
+                existingMwId   = (mwLookupVal && mwLookupVal.id)   || '';
+                existingMwName = (mwLookupVal && (mwLookupVal.name || mwLookupVal.Full_Name)) || ev.title || '';
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      /* Meeting With option list */
+      var mwOpts = '';
+      if (existingMfApi) {
+        var mwRecords = filteredModuleRecords.hasOwnProperty(existingMfApi)
+          ? filteredModuleRecords[existingMfApi]
+          : (moduleRecordsMap[existingMfApi] || []);
+        if (mwRecords.length === 0) {
+          mwOpts = '<li class="bp-dd-empty">No records found</li>';
+        } else {
+          mwRecords.forEach(function (rec) {
+            mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+                      '" data-label="' + escHtml(rec.name) +
+                      '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' + escHtml(rec.name) + '</li>';
+          });
+        }
+      }
+
+      /* Avatar */
+      var avatarInitials = existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '';
+      var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
+
+      /* Row styling (same as single-edit row) */
+      var editRowStyles = buildBprEventStyles(ev);
+      var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
+      var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
+      var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
+
+      /* Original field values for per-row change detection */
+      var originalVals = {
+        mf:    existingMfVal,
+        mfApi: existingMfApi,
+        mwId:  existingMwId
+      };
+      tablePicklistCols.forEach(function (f) {
+        var rawVal    = crmRecord ? (crmRecord[f.api_name] || '') : '';
+        var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+        if (actualVal) { originalVals[f.api_name] = actualVal; }
+      });
+
+      /* Disable approve/reject/delete when already Approved or Rejected */
+      var evApprovalVal  = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+      var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+      var lockedAttr     = approvalLocked ? ' disabled' : '';
+
+      tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
+                   ' data-date="' + escHtml(date) + '"' +
+                   ' data-edit-id="' + escHtml(ev.id) + '"' +
+                   ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+                   ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                   ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '"' +
+                   (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
+
+      /* Checkbox cell – ENABLED (unlike the disabled one in single-edit mode) */
+      tableHtml += '<td class="bp-cb-cell"' +
+                   (cbCellStyle ? ' style="' + escHtml(cbCellStyle) + '"' : '') +
+                   '>' + editRowStyles.markerHtml +
+                   '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>';
+
+      /* Time cells */
+      tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
+                   ' data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
+      tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
+                   ' data-api="' + escHtml(endTimeApi) + '" data-label="' + escHtml(endTimeLbl) + '">' + endLbl + '</td>';
+
+      /* Meetings For dropdown (pre-selected) */
+      tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                   '<div class="bp-dd-wrap bp-mf-wrap" data-row="edit" data-api="' + escHtml(mfFieldApi) + '" data-label="' + escHtml(mfFieldLabel) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' + (existingMfApi ? ' data-selected-api="' + escHtml(existingMfApi) + '"' : '') + '>' +
+                   escHtml(existingMfVal || 'Select module\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + mfOptions + '</ul>' +
+                   '</div></div></td>';
+
+      /* Meeting With dropdown (pre-selected, with avatar) */
+      tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                   '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
+                   ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarInitials + '</span>' +
+                   '<span class="bp-dd-val"' + (existingMwId ? ' data-selected-id="' + escHtml(existingMwId) + '"' : '') + '>' +
+                   escHtml(existingMwName || 'Select\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list bp-mw-list">' + mwOpts + '</ul>' +
+                   '</div></div></td>';
+
+      /* Dynamic picklist columns (including Attendance and Leave Type) */
+      tablePicklistCols.forEach(function (f) {
+        var rawVal    = crmRecord ? (crmRecord[f.api_name] || '') : '';
+        var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+        var displayVal = actualVal;
+        if (actualVal && f.options) {
+          f.options.forEach(function (opt) {
+            var a    = (typeof opt === 'object') ? opt.actual  : opt;
+            var disp = (typeof opt === 'object') ? opt.display : opt;
+            if (a === actualVal || disp === actualVal) { displayVal = disp; }
+          });
+        }
+
+        tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                     '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                     '<div class="bp-dd-trigger" tabindex="0">' +
+                     '<span class="bp-dd-val"' + (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
+                     escHtml(displayVal || 'Select\u2026') + '</span>' +
+                     chevSvg + '</div>' +
+                     '<div class="bp-dd-panel">' +
+                     '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                     '<ul class="bp-dd-list">' + buildOptList(f.options) + '</ul>' +
+                     '</div></div></td>';
+      });
+
+      /* Actions column: Save, Copy, Delete, Approve, Reject */
+      tableHtml += '<td class="bp-action-cell"' + (actCellStyle ? ' style="' + escHtml(actCellStyle) + '"' : '') + '>' +
+                   '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
+                   '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
+                   '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
+                   '<button class="bp-row-action bp-row-approve" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject"  type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '</td>';
+
+      tableHtml += '</tr>';
+    });
+
+    tableHtml += '</tbody></table>';
+
+    return '<div id="demBulkGrid" class="bp-plan-container" data-date="' + escHtml(date) + '">' +
+           toolbarHtml +
+           '<div class="bp-slots-wrap">' + tableHtml + '</div>' +
+           '</div>';
+  }
+
+  /**
+   * Return a human-readable display name for a CRM record fetched from
    * Contacts, Accounts, Deals and other common modules).
    *
    * Some related/lookup fields (e.g. Account_Name inside a Deals record)
@@ -2348,10 +2605,11 @@ $(function () {
   }
 
   /**
-   * Close all open beat-plan dropdowns inside the slot picker grid.
+   * Close all open beat-plan dropdowns inside the slot picker grid or the
+   * day-events bulk modal grid.
    */
   function closeAllBpDropdowns() {
-    $('#slotPickerGrid .bp-dd-wrap.bp-dd-open').each(function () {
+    $('#slotPickerGrid .bp-dd-wrap.bp-dd-open, #demBulkGrid .bp-dd-wrap.bp-dd-open').each(function () {
       closeBpDropdown($(this));
     });
   }
@@ -2431,9 +2689,13 @@ $(function () {
 
   /**
    * Build and show the day events modal for a given date string.
-   * Each event is rendered as a full card using the same layout as the hover card.
+   *
+   * When the widget has Beat Plan refs (beatPlanHasRefs), every event is rendered
+   * using the same .bp-slot-row.bp-edit-row layout as the single-event edit form,
+   * with enabled row checkboxes and a bulk-actions toolbar (Mass Update / Mass Delete).
+   * Otherwise falls back to the original hover-card list.
    */
-  function showDayEventsModal(ds) {
+  async function showDayEventsModal(ds) {
     var evts = eventsOn(ds);
 
     /* Build date label */
@@ -2441,7 +2703,48 @@ $(function () {
     var d     = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     dom.demDate.text(WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
 
-    /* Build full event card list */
+    /* Open the overlay immediately (show loading state) */
+    dom.demList.removeClass('dem-table-mode');
+    dom.dayEventsModal.find('.day-events-modal-box').removeClass('dem-box-wide');
+    dom.dayEventsModal.addClass('dem-open');
+
+    /* ── Beat Plan mode: render bulk-edit table ── */
+    if (beatPlanHasRefs) {
+      dom.demList.addClass('dem-table-mode');
+      dom.dayEventsModal.find('.day-events-modal-box').addClass('dem-box-wide');
+      dom.demList.html('<div class="dem-loading">Loading\u2026</div>');
+
+      /* Ensure picklist metadata is loaded */
+      if (bprPicklistFields === null) {
+        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+      }
+
+      /* Fetch CRM records for all events in parallel */
+      var crmRecordsMap = {};
+      var fetchPromises = evts.map(function (ev) {
+        return ZOHO.CRM.API.getRecord({
+          Entity:   'beatplanner__Daily_Beat_Plans',
+          RecordID: ev.id
+        }).then(function (resp) {
+          if (resp && resp.data && resp.data[0]) {
+            crmRecordsMap[ev.id] = resp.data[0];
+          }
+        }).catch(function (err) {
+          console.error('showDayEventsModal: failed to fetch record', ev.id, err);
+        });
+      });
+      await Promise.all(fetchPromises);
+
+      if (evts.length === 0) {
+        dom.demList.html('<div class="dem-loading">No events on this day.</div>');
+        return;
+      }
+
+      dom.demList.html(buildDemBulkTable(ds, evts, crmRecordsMap));
+      return;
+    }
+
+    /* ── Fallback: hover-card list (non-Beat-Plan mode) ── */
     var listHtml = '';
     evts.forEach(function (ev) {
       var style      = buildHoverCardHeaderStyle(ev);
@@ -2480,11 +2783,16 @@ $(function () {
     dom.demList.find('.dem-card[data-approval-locked="1"]')
                .find('.hc-act-approve, .hc-act-reject, .hc-act-delete')
                .prop('disabled', true);
-    dom.dayEventsModal.addClass('dem-open');
   }
 
   function closeDayEventsModal() {
+    closeAllBpDropdowns();
     dom.dayEventsModal.removeClass('dem-open');
+    /* Defer class cleanup until after the fade-out transition */
+    setTimeout(function () {
+      dom.demList.removeClass('dem-table-mode');
+      dom.dayEventsModal.find('.day-events-modal-box').removeClass('dem-box-wide');
+    }, 200);
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -4509,9 +4817,10 @@ $(function () {
     });
 
     /* ── Beat plan table: custom searchable dropdown handlers ── */
+    /* These handlers cover both #slotPickerGrid and #demBulkGrid (day-events modal). */
 
     /* Toggle open / close a dropdown trigger */
-    $(document).on('click', '#slotPickerGrid .bp-dd-trigger', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-trigger, #demBulkGrid .bp-dd-trigger', function (e) {
       e.stopPropagation();
       var $wrap  = $(this).closest('.bp-dd-wrap');
       var isOpen = $wrap.hasClass('bp-dd-open');
@@ -4527,12 +4836,12 @@ $(function () {
     });
 
     /* Prevent search input click from bubbling and closing the panel */
-    $(document).on('click', '#slotPickerGrid .bp-dd-search', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-search, #demBulkGrid .bp-dd-search', function (e) {
       e.stopPropagation();
     });
 
     /* Live-filter dropdown options as the user types */
-    $(document).on('input', '#slotPickerGrid .bp-dd-search', function () {
+    $(document).on('input', '#slotPickerGrid .bp-dd-search, #demBulkGrid .bp-dd-search', function () {
       var q    = $(this).val().toLowerCase();
       var $ul  = $(this).closest('.bp-dd-panel').find('.bp-dd-opt');
       $ul.each(function () {
@@ -4542,7 +4851,7 @@ $(function () {
     });
 
     /* "Meetings For" option selected → set value + populate Meeting With */
-    $(document).on('click', '#slotPickerGrid .bp-mf-wrap .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-mf-wrap .bp-dd-opt, #demBulkGrid .bp-mf-wrap .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
       var $wrap  = bpWrapOf($opt);
@@ -4594,7 +4903,7 @@ $(function () {
     });
 
     /* "Meeting With" option selected → show initials avatar; try to load actual photo */
-    $(document).on('click', '#slotPickerGrid .bp-mw-wrap .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-mw-wrap .bp-dd-opt, #demBulkGrid .bp-mw-wrap .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt    = $(this);
       var $wrap   = bpWrapOf($opt);
@@ -4640,7 +4949,7 @@ $(function () {
 
     /* Generic picklist option selected for all dynamic BPR columns
        (meetings-for and meeting-with have their own handlers above) */
-    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt, #demBulkGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
       var $wrap  = bpWrapOf($opt);
@@ -5420,10 +5729,441 @@ $(function () {
       if (editId) { doReject(editId); }
     });
 
-    /* Close beat plan dropdowns when clicking anywhere outside */
+    /* ══════════════════════════════════════════════════════════
+       DAY-EVENTS MODAL (BULK EDIT) – #demBulkGrid handlers
+    ══════════════════════════════════════════════════════════ */
+
+    /* Helper: sync bulk toolbar and Select-All header state in the modal */
+    function syncDemBulkToolbar() {
+      var $grid      = $('#demBulkGrid');
+      var $allCbs    = $grid.find('.bp-row-cb');
+      var checkedCnt = $grid.find('.bp-row-cb:checked').length;
+      var $toolbar   = $grid.find('.dem-bulk-toolbar');
+      $toolbar.toggle(checkedCnt > 0);
+      $toolbar.find('.dem-sel-count').text(checkedCnt + ' row' + (checkedCnt === 1 ? '' : 's') + ' selected');
+      var $selectAll = $grid.find('.bp-select-all-cb');
+      if ($selectAll.length) {
+        $selectAll.prop('indeterminate', checkedCnt > 0 && checkedCnt < $allCbs.length);
+        $selectAll.prop('checked', checkedCnt > 0 && checkedCnt === $allCbs.length);
+      }
+    }
+
+    /* Row checkbox change → update toolbar & Select All */
+    $(document).on('change', '#demBulkGrid .bp-row-cb', function () {
+      syncDemBulkToolbar();
+    });
+
+    /* Select-All header checkbox → check/uncheck all rows */
+    $(document).on('change', '#demBulkGrid .bp-select-all-cb', function () {
+      var checked = $(this).is(':checked');
+      $('#demBulkGrid .bp-row-cb').prop('checked', checked);
+      syncDemBulkToolbar();
+    });
+
+    /* ── demBulkGrid: single-row Save (Update) ── */
+    $(document).on('click', '#demBulkGrid .bp-row-save', async function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      var editId = String($row.data('editId') || '');
+      var date   = $row.data('date') || '';
+
+      if (!editId) { return; } /* modal only contains existing records */
+
+      var recordData     = {};
+      var bprFieldValues = {};
+
+      /* Times – use stored data attributes (edit mode always has them) */
+      var startTime = String($row.data('startTime') || '00:00');
+      var endTime   = String($row.data('endTime')   || '00:00');
+      var startIso  = date && startTime ? toIsoDt(date, startTime) : startTime;
+      var endIso    = date && endTime   ? toIsoDt(date, endTime)   : endTime;
+
+      var $startCell = $row.find('.bp-time-cell').eq(0);
+      var $endCell   = $row.find('.bp-time-cell').eq(1);
+      recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startIso;
+      recordData[$endCell.data('api')   || 'beatplanner__Date_Time_To']   = endIso;
+      if (date) { recordData['beatplanner__Date'] = date; }
+
+      /* Meetings For */
+      var $mfWrap      = $row.find('.bp-mf-wrap');
+      var $mfVal       = $mfWrap.find('.bp-dd-val');
+      var mfDisplayVal = $mfVal.text().trim() || '';
+      var mfApi        = $mfVal.attr('data-selected-api') || '';
+      var mfFieldApi   = $mfWrap.data('api') || 'beatplanner__Meetings_For';
+      if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
+        recordData[mfFieldApi]     = mfDisplayVal;
+        bprFieldValues[mfFieldApi] = mfDisplayVal;
+      }
+
+      /* Meeting With */
+      var $mwWrap     = $row.find('.bp-mw-wrap');
+      var $mwVal      = $mwWrap.find('.bp-dd-val');
+      var mwId        = $mwVal.attr('data-selected-id') || '';
+      var mwLookupApi = $mwWrap.attr('data-api') || '';
+      var mwName      = $mwVal.text() || '';
+      if (mwId && mwLookupApi) { recordData[mwLookupApi] = { id: mwId }; }
+      beatPlanModulesList.forEach(function (mod) {
+        if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = ''; }
+      });
+
+      /* All other picklist columns (includes Attendance, Leave Type in bulk table) */
+      $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+        var $wrap    = $(this);
+        var fieldApi = String($wrap.data('api') || '');
+        if (!fieldApi) { return; }
+        var $v   = $wrap.find('.bp-dd-val');
+        var actual = $v.attr('data-actual-val') || $v.text() || '';
+        if (actual && actual !== 'Select\u2026') {
+          recordData[fieldApi]     = actual;
+          bprFieldValues[fieldApi] = actual;
+        }
+      });
+
+      recordData['Name'] = 'Meeting With ' + mwName;
+
+      var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
+      var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '';
+      var mwAvatarText   = $mwAvatar.text() || '';
+      var mwPhotoId      = $mwAvatar.attr('data-photo-id') || '';
+
+      $btn.prop('disabled', true);
+
+      /* Compare current values vs originals to decide if approval resets */
+      var origValsStr = $row.attr('data-original-vals') || '{}';
+      var origVals;
+      try { origVals = JSON.parse(origValsStr); } catch (e) { origVals = {}; }
+
+      var currentVals = {
+        mf:    (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') ? mfDisplayVal : '',
+        mfApi: mfApi,
+        mwId:  mwId
+      };
+      $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+        var fieldApi = String($(this).data('api') || '');
+        if (!fieldApi) { return; }
+        var $v   = $(this).find('.bp-dd-val');
+        var actual = $v.attr('data-actual-val') || $v.text() || '';
+        if (actual && actual !== 'Select\u2026') { currentVals[fieldApi] = actual; }
+      });
+
+      var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
+      var hasChanges = allKeys.some(function (k) {
+        return (origVals[k] || '') !== (currentVals[k] || '');
+      });
+
+      var existingEv       = findEvent(editId);
+      var existingApproval = (existingEv && existingEv.bprFieldValues)
+        ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
+        : '';
+
+      if (hasChanges) {
+        recordData['beatplanner__Managers_Approval'] = 'Pending';
+        bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+      } else {
+        if (existingApproval) {
+          bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
+        }
+      }
+
+      try {
+        await ZOHO.CRM.API.updateRecord({
+          Entity:  'beatplanner__Daily_Beat_Plans',
+          APIData: Object.assign({ id: editId }, recordData),
+          Trigger: ['workflow']
+        });
+
+        /* Update in-memory event */
+        var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
+        if (evIdx !== -1) {
+          var updEv          = state.events[evIdx];
+          updEv.title          = mwName || (mfDisplayVal || 'Beat Plan');
+          updEv.startTime      = startTime;
+          updEv.endTime        = endTime;
+          updEv.bprFieldValues = bprFieldValues;
+          updEv.mwAvatarImgSrc = mwAvatarImgSrc;
+          updEv.mwAvatarText   = mwAvatarText;
+          updEv.mwPhotoId      = mwPhotoId;
+        }
+
+        /* Update stored original-vals so the next save can detect further changes */
+        $row.attr('data-original-vals', JSON.stringify(currentVals));
+
+        saveEvents();
+        refreshCalendarCell(date);
+        showToast('Beat plan record updated.');
+      } catch (err) {
+        console.error('Failed to update Daily Beat Plan (bulk modal)', err);
+        showToast('Failed to update beat plan record.');
+      } finally {
+        $btn.prop('disabled', false);
+      }
+    });
+
+    /* ── demBulkGrid: single-row Delete ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-delete', async function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      var editId = String($row.data('editId') || '');
+      if (!editId) { return; }
+      if (!window.confirm('Delete this event?')) { return; }
+
+      $btn.prop('disabled', true);
+      try {
+        await zrc.delete({
+          Entity: 'beatplanner__Daily_Beat_Plans',
+          RecordID: editId
+        });
+      } catch (delErr) {
+        console.error('demBulkGrid delete failed, removing from local state anyway', delErr);
+      }
+
+      state.events = state.events.filter(function (e) { return e.id !== editId; });
+      if (state.clipboard) {
+        state.clipboard = state.clipboard.filter(function (e) { return e.id !== editId; });
+        if (state.clipboard.length === 0) { state.clipboard = null; state.clipboardSource = null; }
+      }
+      saveEvents();
+      $row.remove();
+      refreshCalendarCell($row.data('date') || '');
+      syncDemBulkToolbar();
+
+      /* If no rows remain, close the modal */
+      if ($('#demBulkGrid .bp-slot-row').length === 0) {
+        closeDayEventsModal();
+      }
+      showToast('Event deleted.');
+      $btn.prop('disabled', false);
+    });
+
+    /* ── demBulkGrid: single-row Approve ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve', function () {
+      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+      if (editId) { doApprove(editId); }
+    });
+
+    /* ── demBulkGrid: single-row Reject ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject', function () {
+      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+      if (editId) { doReject(editId); }
+    });
+
+    /* ── demBulkGrid: Mass Update ── */
+    $(document).on('click', '#demBulkGrid .dem-mass-update-btn', async function () {
+      var $btn  = $(this);
+      var $grid = $('#demBulkGrid');
+
+      var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
+        return $(this).find('.bp-row-cb').is(':checked');
+      });
+      if ($checkedRows.length === 0) { return; }
+
+      $btn.prop('disabled', true);
+      var updated = 0;
+      var failed  = 0;
+
+      for (var ri = 0; ri < $checkedRows.length; ri++) {
+        var $row   = $($checkedRows[ri]);
+        var editId = String($row.data('editId') || '');
+        var date   = $row.data('date') || '';
+        if (!editId) { continue; }
+
+        var recordData     = {};
+        var bprFieldValues = {};
+
+        /* Times */
+        var startTime = String($row.data('startTime') || '00:00');
+        var endTime   = String($row.data('endTime')   || '00:00');
+        var startIso  = date && startTime ? toIsoDt(date, startTime) : startTime;
+        var endIso    = date && endTime   ? toIsoDt(date, endTime)   : endTime;
+        var $startCell = $row.find('.bp-time-cell').eq(0);
+        var $endCell   = $row.find('.bp-time-cell').eq(1);
+        recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startIso;
+        recordData[$endCell.data('api')   || 'beatplanner__Date_Time_To']   = endIso;
+        if (date) { recordData['beatplanner__Date'] = date; }
+
+        /* Meetings For */
+        var $mfWrap      = $row.find('.bp-mf-wrap');
+        var $mfVal       = $mfWrap.find('.bp-dd-val');
+        var mfDisplayVal = $mfVal.text().trim() || '';
+        var mfApi        = $mfVal.attr('data-selected-api') || '';
+        var mfFieldApi   = $mfWrap.data('api') || 'beatplanner__Meetings_For';
+        if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
+          recordData[mfFieldApi]     = mfDisplayVal;
+          bprFieldValues[mfFieldApi] = mfDisplayVal;
+        }
+
+        /* Meeting With */
+        var $mwWrap     = $row.find('.bp-mw-wrap');
+        var $mwVal      = $mwWrap.find('.bp-dd-val');
+        var mwId        = $mwVal.attr('data-selected-id') || '';
+        var mwLookupApi = $mwWrap.attr('data-api') || '';
+        var mwName      = $mwVal.text() || '';
+        if (mwId && mwLookupApi) { recordData[mwLookupApi] = { id: mwId }; }
+        beatPlanModulesList.forEach(function (mod) {
+          if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = ''; }
+        });
+
+        /* All other picklist columns */
+        $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+          var $wrap    = $(this);
+          var fieldApi = String($wrap.data('api') || '');
+          if (!fieldApi) { return; }
+          var $v   = $wrap.find('.bp-dd-val');
+          var actual = $v.attr('data-actual-val') || $v.text() || '';
+          if (actual && actual !== 'Select\u2026') {
+            recordData[fieldApi]     = actual;
+            bprFieldValues[fieldApi] = actual;
+          }
+        });
+
+        recordData['Name'] = 'Meeting With ' + mwName;
+
+        /* Compare against original values; reset Approval to Pending if anything changed */
+        var origValsStr = $row.attr('data-original-vals') || '{}';
+        var origVals;
+        try { origVals = JSON.parse(origValsStr); } catch (e) { origVals = {}; }
+
+        var currentVals = {
+          mf:    (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') ? mfDisplayVal : '',
+          mfApi: mfApi,
+          mwId:  mwId
+        };
+        $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+          var fieldApi = String($(this).data('api') || '');
+          if (!fieldApi) { return; }
+          var $v   = $(this).find('.bp-dd-val');
+          var actual = $v.attr('data-actual-val') || $v.text() || '';
+          if (actual && actual !== 'Select\u2026') { currentVals[fieldApi] = actual; }
+        });
+
+        var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
+        var hasChanges = allKeys.some(function (k) {
+          return (origVals[k] || '') !== (currentVals[k] || '');
+        });
+
+        var existingEv       = findEvent(editId);
+        var existingApproval = (existingEv && existingEv.bprFieldValues)
+          ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
+          : '';
+
+        if (hasChanges) {
+          recordData['beatplanner__Managers_Approval'] = 'Pending';
+          bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+        } else {
+          if (existingApproval) {
+            bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
+          }
+        }
+
+        try {
+          await ZOHO.CRM.API.updateRecord({
+            Entity:  'beatplanner__Daily_Beat_Plans',
+            APIData: Object.assign({ id: editId }, recordData),
+            Trigger: ['workflow']
+          });
+
+          /* Update in-memory event */
+          var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
+          if (evIdx !== -1) {
+            var updEv2          = state.events[evIdx];
+            updEv2.title          = mwName || (mfDisplayVal || 'Beat Plan');
+            updEv2.bprFieldValues = bprFieldValues;
+            var $mwAvatar2        = $mwWrap.find('.bp-rec-avatar');
+            updEv2.mwAvatarImgSrc = $mwAvatar2.find('img').attr('src') || $mwAvatar2.attr('data-img-src') || '';
+            updEv2.mwAvatarText   = $mwAvatar2.text() || '';
+            updEv2.mwPhotoId      = $mwAvatar2.attr('data-photo-id') || '';
+          }
+
+          /* Update the row's stored original-vals for future comparisons */
+          $row.attr('data-original-vals', JSON.stringify(currentVals));
+          updated++;
+        } catch (err) {
+          console.error('Mass update failed for record', editId, err);
+          failed++;
+        }
+      }
+
+      saveEvents();
+      render();
+
+      /* Uncheck all rows */
+      $grid.find('.bp-row-cb').prop('checked', false);
+      $grid.find('.bp-select-all-cb').prop('checked', false).prop('indeterminate', false);
+      syncDemBulkToolbar();
+
+      $btn.prop('disabled', false);
+      if (failed > 0) {
+        showToast(updated + ' record(s) updated. ' + failed + ' failed.');
+      } else {
+        showToast(updated + ' beat plan record(s) updated.');
+      }
+    });
+
+    /* ── demBulkGrid: Mass Delete ── */
+    $(document).on('click', '#demBulkGrid .dem-mass-delete-btn', async function () {
+      var $btn  = $(this);
+      var $grid = $('#demBulkGrid');
+
+      var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
+        return $(this).find('.bp-row-cb').is(':checked');
+      });
+      if ($checkedRows.length === 0) { return; }
+
+      if (!window.confirm('Delete ' + $checkedRows.length + ' selected record(s)?')) { return; }
+
+      $btn.prop('disabled', true);
+      var deleted  = 0;
+      var failed   = 0;
+      var datesToRefresh = {};
+
+      for (var rj = 0; rj < $checkedRows.length; rj++) {
+        var $row2  = $($checkedRows[rj]);
+        var delId  = String($row2.data('editId') || '');
+        var delDate = $row2.data('date') || '';
+        if (!delId) { continue; }
+
+        try {
+          await zrc.delete({
+            Entity:   'beatplanner__Daily_Beat_Plans',
+            RecordID: delId
+          });
+        } catch (delErr2) {
+          console.error('Mass delete failed for record', delId, delErr2);
+          failed++;
+          continue;
+        }
+
+        state.events = state.events.filter(function (e) { return e.id !== delId; });
+        if (state.clipboard) {
+          state.clipboard = state.clipboard.filter(function (e) { return e.id !== delId; });
+          if (state.clipboard.length === 0) { state.clipboard = null; state.clipboardSource = null; }
+        }
+        $row2.remove();
+        if (delDate) { datesToRefresh[delDate] = true; }
+        deleted++;
+      }
+
+      saveEvents();
+      Object.keys(datesToRefresh).forEach(function (ds) { refreshCalendarCell(ds); });
+      syncDemBulkToolbar();
+
+      $btn.prop('disabled', false);
+
+      /* Close modal if no rows remain */
+      if ($grid.find('.bp-slot-row').length === 0) {
+        closeDayEventsModal();
+      }
+
+      if (failed > 0) {
+        showToast(deleted + ' record(s) deleted. ' + failed + ' failed.');
+      } else {
+        showToast(deleted + ' beat plan record(s) deleted.');
+      }
+    });
     $(document).on('click', function (e) {
-      /* Clicks inside the open trigger wrap must not close */
-      if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length) {
+      /* Clicks inside an open trigger wrap (in either grid) must not close */
+      if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length &&
+          !$(e.target).closest('#demBulkGrid .bp-dd-wrap').length) {
         closeAllBpDropdowns();
       }
       /* Close open filter-panel multi-selects when clicking outside */
