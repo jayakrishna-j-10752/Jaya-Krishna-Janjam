@@ -1647,6 +1647,100 @@ $(function () {
   }
 
   /**
+   * Open the modal for editing an existing Beat Planner record.
+   * Reuses the same Beat Planner form structure as event creation, but renders
+   * a single pre-populated row for the existing CRM record. The save handler
+   * calls updateRecord (instead of insertRecord) when data-edit-id is present.
+   *
+   * @param {Object} ev – calendar event from state.events
+   */
+  async function openBpEditModal(ev) {
+    closeAllBpDropdowns();
+
+    /* Format heading the same way as openSlotPicker */
+    var parts   = ev.date.split('-');
+    var d       = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    var heading = WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    dom.modalHeading.text(heading);
+
+    var $modalBody  = dom.modal.find('.modal-body');
+    var $modalFoot  = dom.modal.find('.modal-foot');
+    var $initLoader = $('#modalInitLoader');
+    dom.modal.addClass('modal-open');
+    $initLoader.show();
+    $modalBody.hide();
+    $modalFoot.hide();
+
+    try {
+      /* Ensure picklist + field metadata is available (same guard as openSlotPicker) */
+      if (bprPicklistFields === null) {
+        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+      }
+
+      /* Fetch the full CRM record so every field can be pre-populated */
+      var crmRecord = null;
+      try {
+        var recResp = await ZOHO.CRM.API.getRecord({
+          Entity:   'beatplanner__Daily_Beat_Plans',
+          RecordID: ev.id
+        });
+        if (recResp && recResp.data && recResp.data[0]) {
+          crmRecord = recResp.data[0];
+        }
+      } catch (fetchErr) {
+        console.error('openBpEditModal: failed to fetch CRM record:', fetchErr);
+      }
+
+      dom.slotPickerGrid.html(buildBpEditForm(ev.date, crmRecord, ev));
+      updateFilterBadge();
+      dom.modal.find('.modal-box').addClass('modal-box--wide');
+
+      /* ── Pre-populate / async-load the Meeting With avatar ── */
+      var $mwWrap = dom.slotPickerGrid.find('.bp-mw-wrap');
+      var $avatar = $mwWrap.find('.bp-rec-avatar');
+
+      if (ev.mwAvatarImgSrc) {
+        /* Cached image data URL available – use it immediately */
+        $avatar.html('<img src="' + escHtml(ev.mwAvatarImgSrc) + '">')
+               .attr('data-img-src', ev.mwAvatarImgSrc)
+               .attr('data-photo-id', ev.mwPhotoId || '')
+               .addClass('bp-rec-avatar--show');
+      } else if (ev.mwPhotoId) {
+        /* Not yet cached – load asynchronously; initials remain until image arrives */
+        var evPhotoId = ev.mwPhotoId;
+        ZOHO.CRM.API.getFile({ id: evPhotoId })
+          .then(function (resp) {
+            if (resp) {
+              var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+              var reader  = new FileReader();
+              reader.onloadend = function () {
+                var dataUrl = reader.result;
+                ev.mwAvatarImgSrc = dataUrl;
+                saveEvents();
+                $avatar.html('<img src="' + dataUrl + '">')
+                       .attr('data-img-src', dataUrl)
+                       .addClass('bp-rec-avatar--show');
+              };
+              reader.readAsDataURL(imgBlob);
+            }
+          })
+          .catch(function () { /* keep initials fallback */ });
+      }
+
+    } catch (err) {
+      console.error('openBpEditModal error:', err);
+    }
+
+    $initLoader.hide();
+    $modalBody.show();
+    $modalFoot.show();
+    dom.slotPickerSection.show();
+    dom.eventFormSection.hide();
+    dom.slotPickerFoot.show();
+    dom.eventFormFoot.hide();
+  }
+
+  /**
    * Build the beat-plan slot table HTML for the given date.
    * Renders 24 rows (one per hour) with auto-filled Start/End times,
    * fixed Meetings For / Meeting With columns, and dynamically-built
@@ -1841,6 +1935,309 @@ $(function () {
     tableHtml += '</tbody></table>';
 
     return '<div class="bp-plan-container" data-date="' + escHtml(date) + '">' + attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
+  }
+
+  /**
+   * Build the beat-plan EDIT form HTML for a single existing event.
+   * Produces the same attend-bar + table structure as buildBeatPlanTable but:
+   *   - Renders only ONE row (for the event being edited).
+   *   - Pre-populates every field from the fetched CRM record.
+   *   - Marks the row with data-edit-id so the .bp-row-save handler calls
+   *     updateRecord instead of insertRecord.
+   *
+   * Any field added to beatplanner__Daily_Beat_Plans automatically appears here
+   * because the same bprPicklistFields / bpDailyAllFields metadata is used.
+   *
+   * @param {string} date       – "YYYY-MM-DD"
+   * @param {Object} crmRecord  – Full CRM record from getRecord, or null
+   * @param {Object} ev         – Calendar event from state.events
+   */
+  function buildBpEditForm(date, crmRecord, ev) {
+    var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
+                  ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+
+    /* "Meetings For" options list (same for every row) */
+    var mfOptions = '';
+    beatPlanModulesList.forEach(function (mod) {
+      mfOptions += '<li class="bp-dd-opt" data-api="' + escHtml(mod.api) +
+                   '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
+    });
+
+    /* ── Separate BPR picklist fields (same logic as buildBeatPlanTable) ── */
+    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for'];
+    var tablePicklistCols = [];
+    var attendanceField   = null;
+    var leaveTypeField    = null;
+
+    if (bprPicklistFields && bprPicklistFields.length) {
+      bprPicklistFields.forEach(function (f) {
+        var lbl = (f.field_label || '').toLowerCase().trim();
+        if (HIDDEN_BPR_LABELS.indexOf(lbl) !== -1) { return; }
+        if (lbl === 'attendance') { attendanceField = f; return; }
+        if (lbl === 'leave type') { leaveTypeField  = f; return; }
+        tablePicklistCols.push(f);
+      });
+    }
+
+    /* Build an <li> option list (same helper as in buildBeatPlanTable) */
+    function buildOptList(opts) {
+      if (!opts || !opts.length) {
+        return '<li class="bp-dd-empty">No options available</li>';
+      }
+      return opts.map(function (v) {
+        var display = (typeof v === 'object') ? v.display : v;
+        var actual  = (typeof v === 'object') ? v.actual  : v;
+        return '<li class="bp-dd-opt" data-label="' + escHtml(display) +
+               '" data-actual="' + escHtml(actual) + '">' + escHtml(display) + '</li>';
+      }).join('');
+    }
+
+    /* Build a full searchable bp-dd-wrap dropdown */
+    function buildDdWrap(fieldApi, fieldLabel, placeholder, optListHtml) {
+      return '<div class="bp-dd-wrap" data-api="' + escHtml(fieldApi) + '" data-label="' + escHtml(fieldLabel) + '">' +
+             '<div class="bp-dd-trigger" tabindex="0">' +
+             '<span class="bp-dd-val">' + escHtml(placeholder) + '</span>' +
+             chevSvg +
+             '</div>' +
+             '<div class="bp-dd-panel">' +
+             '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+             '<ul class="bp-dd-list">' + optListHtml + '</ul>' +
+             '</div>' +
+             '</div>';
+    }
+
+    /* ── Resolve field metadata for time and meetings-for fields ── */
+    var startTimeMeta = null, endTimeMeta = null, mfMeta = null;
+    bpDailyAllFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase();
+      if (lbl === 'start time')   { startTimeMeta = f; }
+      if (lbl === 'end time')     { endTimeMeta   = f; }
+      if (lbl === 'meetings for') { mfMeta        = f; }
+    });
+    var startTimeApi = (startTimeMeta && startTimeMeta.api_name) || 'beatplanner__Date_Time_From';
+    var startTimeLbl = (startTimeMeta && startTimeMeta.field_label) || 'Date Time From';
+    var endTimeApi   = (endTimeMeta   && endTimeMeta.api_name)   || 'beatplanner__Date_Time_To';
+    var endTimeLbl   = (endTimeMeta   && endTimeMeta.field_label) || 'Date Time To';
+    var mfFieldApi   = (mfMeta && mfMeta.api_name)               || 'beatplanner__Meetings_For';
+    var mfFieldLabel = (mfMeta && mfMeta.field_label)            || 'Meetings For';
+
+    /* ── Read existing field values from CRM record ── */
+    var attendApi      = (attendanceField && attendanceField.api_name) || 'beatplanner__Attendance';
+    var leaveApi       = (leaveTypeField  && leaveTypeField.api_name)  || 'beatplanner__Leave_Type';
+    var existingAttend = crmRecord ? (String(crmRecord[attendApi]  || '')) : '';
+    var existingLeave  = crmRecord ? (String(crmRecord[leaveApi]   || '')) : '';
+    var existingMfVal  = crmRecord ? (String(crmRecord[mfFieldApi] || '')) : '';
+
+    /* ── Find the CRM module API that matches the stored Meetings For display label ── */
+    var existingMfApi = '';
+    beatPlanModulesList.forEach(function (mod) {
+      if (mod.label === existingMfVal) { existingMfApi = mod.api; }
+    });
+
+    /* ── Find the lookup field for the currently selected Meetings For module ── */
+    var mwLookupApiName = '';
+    var existingMwId    = '';
+    var existingMwName  = ev.title || '';
+    if (existingMfApi) {
+      for (var i = 0; i < bpDailyAllFields.length; i++) {
+        var f = bpDailyAllFields[i];
+        if (f.data_type === 'lookup' && f.lookup && f.lookup.module) {
+          var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
+          var fldLbl     = (f.field_label || '').toLowerCase();
+          if (modApiName === existingMfApi || fldLbl === existingMfVal.toLowerCase()) {
+            mwLookupApiName = modApiName;
+            if (crmRecord && crmRecord[f.api_name]) {
+              var mwLookupVal = crmRecord[f.api_name];
+              existingMwId   = (mwLookupVal && mwLookupVal.id)   || '';
+              existingMwName = (mwLookupVal && (mwLookupVal.name || mwLookupVal.Full_Name)) || ev.title || '';
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    /* ── Build Meeting With options from cached records ── */
+    var mwOpts = '';
+    if (existingMfApi) {
+      var mwRecords = filteredModuleRecords.hasOwnProperty(existingMfApi)
+        ? filteredModuleRecords[existingMfApi]
+        : (moduleRecordsMap[existingMfApi] || []);
+      if (mwRecords.length === 0) {
+        mwOpts = '<li class="bp-dd-empty">No records found</li>';
+      } else {
+        mwRecords.forEach(function (rec) {
+          mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+                    '" data-label="' + escHtml(rec.name) +
+                    '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' + escHtml(rec.name) + '</li>';
+        });
+      }
+    }
+
+    /* ── Visibility flags based on existing attendance value ── */
+    var isWorking   = existingAttend.toLowerCase() === 'working';
+    var isLeaveMode = existingAttend.toLowerCase() === 'leave';
+    var tableStyle  = isWorking   ? '' : 'display:none;';
+    var leaveStyle  = isLeaveMode ? '' : 'display:none;';
+    var applyStyle  = isLeaveMode ? '' : 'display:none;';
+    var filterStyle = isWorking   ? '' : 'display:none;';
+
+    /* ── Attendance bar ── */
+    var attendBar = '<div class="bp-attend-bar">';
+    if (attendanceField) {
+      var attendOptList = buildOptList(attendanceField.options);
+      attendBar += '<div class="bp-attend-field">' +
+                   '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
+                   '<div class="bp-dd-wrap" data-api="' + escHtml(attendApi) + '" data-label="' + escHtml(attendanceField.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' +
+                   (existingAttend ? ' data-actual-val="' + escHtml(existingAttend) + '"' : '') + '>' +
+                   escHtml(existingAttend || 'Select\u2026') + '</span>' +
+                   chevSvg +
+                   '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + attendOptList + '</ul>' +
+                   '</div>' +
+                   '</div>' +
+                   '</div>';
+    }
+    if (leaveTypeField) {
+      var leaveOptList = buildOptList(leaveTypeField.options);
+      attendBar += '<div class="bp-attend-field bp-leave-type-field" style="' + leaveStyle + '">' +
+                   '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
+                   '<div class="bp-dd-wrap" data-api="' + escHtml(leaveApi) + '" data-label="' + escHtml(leaveTypeField.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' +
+                   (existingLeave ? ' data-actual-val="' + escHtml(existingLeave) + '"' : '') + '>' +
+                   escHtml(existingLeave || 'Select\u2026') + '</span>' +
+                   chevSvg +
+                   '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + leaveOptList + '</ul>' +
+                   '</div>' +
+                   '</div>' +
+                   '</div>';
+      attendBar += '<button class="bp-apply-leave-btn" type="button" style="' + applyStyle + '">Apply Leave</button>';
+    }
+    attendBar += '<div class="bp-filter-action" style="' + filterStyle + '">' +
+                 '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+                 '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
+                 'Filter</button>' +
+                 '</div>';
+    /* No Mass Create button in edit mode */
+    attendBar += '</div>';
+
+    /* ── Table header ── */
+    var tableHtml = '<table class="bp-slots-table" style="' + tableStyle + '">';
+    tableHtml += '<thead><tr>';
+    tableHtml += '<th class="bp-th bp-cb-th"></th>';
+    tableHtml += '<th class="bp-th">Date Time From</th>';
+    tableHtml += '<th class="bp-th">Date Time To</th>';
+    tableHtml += '<th class="bp-th">Meetings For</th>';
+    tableHtml += '<th class="bp-th">Meeting With</th>';
+    tablePicklistCols.forEach(function (f) {
+      tableHtml += '<th class="bp-th">' + escHtml(f.field_label) + '</th>';
+    });
+    tableHtml += '<th class="bp-th bp-action-th">Actions</th>';
+    tableHtml += '</tr></thead><tbody>';
+
+    /* ── Single edit row ── */
+    var startLbl = fmtTime(ev.startTime || '00:00');
+    var endLbl   = fmtTime(ev.endTime   || '00:00');
+
+    /* Avatar: show initials immediately; openBpEditModal replaces with actual image */
+    var avatarInitials = existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '';
+    var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
+
+    tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
+                 ' data-date="' + escHtml(date) + '"' +
+                 ' data-edit-id="' + escHtml(ev.id) + '"' +
+                 ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+                 ' data-end-time="' + escHtml(ev.endTime || '') + '">';
+
+    /* Checkbox cell – hidden/disabled in edit mode */
+    tableHtml += '<td class="bp-cb-cell"><input type="checkbox" class="bp-row-cb" aria-label="Select row" disabled style="visibility:hidden;"></td>';
+
+    /* Time cells */
+    tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
+    tableHtml += '<td class="bp-time-cell" data-api="' + escHtml(endTimeApi)   + '" data-label="' + escHtml(endTimeLbl)   + '">' + endLbl   + '</td>';
+
+    /* ── Meetings For dropdown (pre-selected) ── */
+    tableHtml += '<td class="bp-dd-cell">' +
+                 '<div class="bp-dd-wrap bp-mf-wrap" data-row="edit" data-api="' + escHtml(mfFieldApi) + '" data-label="' + escHtml(mfFieldLabel) + '">' +
+                 '<div class="bp-dd-trigger" tabindex="0">' +
+                 '<span class="bp-dd-val"' +
+                 (existingMfApi ? ' data-selected-api="' + escHtml(existingMfApi) + '"' : '') + '>' +
+                 escHtml(existingMfVal || 'Select module\u2026') + '</span>' +
+                 chevSvg + '</div>' +
+                 '<div class="bp-dd-panel">' +
+                 '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                 '<ul class="bp-dd-list">' + mfOptions + '</ul>' +
+                 '</div>' +
+                 '</div>' +
+                 '</td>';
+
+    /* ── Meeting With dropdown (pre-selected, with avatar) ── */
+    tableHtml += '<td class="bp-dd-cell">' +
+                 '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
+                 '<div class="bp-dd-trigger" tabindex="0">' +
+                 '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
+                 ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarInitials + '</span>' +
+                 '<span class="bp-dd-val"' +
+                 (existingMwId ? ' data-selected-id="' + escHtml(existingMwId) + '"' : '') + '>' +
+                 escHtml(existingMwName || 'Select\u2026') + '</span>' +
+                 chevSvg + '</div>' +
+                 '<div class="bp-dd-panel">' +
+                 '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                 '<ul class="bp-dd-list bp-mw-list">' + mwOpts + '</ul>' +
+                 '</div>' +
+                 '</div>' +
+                 '</td>';
+
+    /* ── Dynamic picklist columns (pre-populated) ── */
+    tablePicklistCols.forEach(function (f) {
+      var rawVal    = crmRecord ? (crmRecord[f.api_name] || '') : '';
+      /* rawVal may be an object (lookup) – coerce to string */
+      var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+      /* Find matching display label from field options */
+      var displayVal = actualVal;
+      if (actualVal && f.options) {
+        f.options.forEach(function (opt) {
+          var a = (typeof opt === 'object') ? opt.actual  : opt;
+          var disp = (typeof opt === 'object') ? opt.display : opt;
+          if (a === actualVal || disp === actualVal) { displayVal = disp; }
+        });
+      }
+
+      tableHtml += '<td class="bp-dd-cell">' +
+                   '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' +
+                   (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
+                   escHtml(displayVal || 'Select\u2026') + '</span>' +
+                   chevSvg +
+                   '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + buildOptList(f.options) + '</ul>' +
+                   '</div>' +
+                   '</div>' +
+                   '</td>';
+    });
+
+    /* ── Actions column: Update button only (no copy/paste in edit mode) ── */
+    tableHtml += '<td class="bp-action-cell">' +
+                 '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
+                 '</td>';
+
+    tableHtml += '</tr>';
+    tableHtml += '</tbody></table>';
+
+    return '<div class="bp-plan-container" data-date="' + escHtml(date) + '" data-edit-id="' + escHtml(ev.id) + '">' +
+           attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
   }
 
   /**
@@ -3915,7 +4312,9 @@ $(function () {
       e.stopPropagation();
       var ev = findEvent($(this).data('evid'));
       hideHoverCard();
-      if (ev) { openModal(ev.date, ev.startTime, ev.endTime, ev); }
+      if (ev) {
+        if (beatPlanHasRefs) { openBpEditModal(ev); } else { openModal(ev.date, ev.startTime, ev.endTime, ev); }
+      }
     });
     dom.hoverCard.on('click', '.hc-act-approve', function (e) {
       e.stopPropagation();
@@ -3958,7 +4357,9 @@ $(function () {
       e.stopPropagation();
       var ev = findEvent($(this).data('evid'));
       closeDayEventsModal();
-      if (ev) { openModal(ev.date, ev.startTime, ev.endTime, ev); }
+      if (ev) {
+        if (beatPlanHasRefs) { openBpEditModal(ev); } else { openModal(ev.date, ev.startTime, ev.endTime, ev); }
+      }
     });
     dom.dayEventsModal.on('click', '.hc-act-approve', function (e) {
       e.stopPropagation();
@@ -4466,10 +4867,11 @@ $(function () {
 
     /* ── Beat plan row: Save ── */
     $(document).on('click', '#slotPickerGrid .bp-row-save', async function () {
-      var $btn = $(this);
-      var $row = $btn.closest('.bp-slot-row');
-      var date = $row.data('date') || '';
-      var hour = $row.data('hour');
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      var editId = String($row.data('editId') || '');
+      var date   = $row.data('date') || '';
+      var hour   = $row.data('hour');  /* undefined in edit mode */
 
       /* Build the record data for beatplanner__Daily_Beat_Plans */
       var recordData     = {};
@@ -4482,20 +4884,39 @@ $(function () {
       var $leaveWrap  = $row.closest('.bp-plan-container').find('.bp-leave-type-field .bp-dd-wrap');
       var leaveVal    = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
 
-      /* Start / End time fields – build ISO-8601 datetimes from the row date + hour.
-         For Leave records, override with the full-day range (00:00:00 … 23:59:59). */
       var isLeaveRecord = (attendVal && attendVal !== 'Select\u2026' &&
                            attendVal.toLowerCase() === 'leave');
-      var startIso, endIso;
-      if (isLeaveRecord && date) {
-        startIso = toIsoDt(date, '00:00');
-        endIso   = toIsoDt(date, '23:59').replace('T23:59:00', 'T23:59:59');
+
+      /* ── Start / End times ──
+         Edit mode: read stored times from the data attributes set in buildBpEditForm.
+         Create mode: derive from the hour slot. */
+      var startTime, endTime, startIso, endIso;
+      if (editId) {
+        startTime = String($row.data('startTime') || '00:00');
+        endTime   = String($row.data('endTime')   || '00:00');
+        if (isLeaveRecord && date) {
+          startIso  = toIsoDt(date, '00:00');
+          endIso    = toIsoDt(date, '23:59').replace('T23:59:00', 'T23:59:59');
+          startTime = '00:00';
+          endTime   = '23:59';
+        } else {
+          startIso = date && startTime ? toIsoDt(date, startTime) : startTime;
+          endIso   = date && endTime   ? toIsoDt(date, endTime)   : endTime;
+        }
       } else {
-        startIso = date ? toIsoDt(date, hourToTime(hour))                             : hourToTime(hour);
-        endIso   = date ? toIsoDt(date, hour === 23 ? '23:59' : hourToTime(hour + 1)) : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+        if (isLeaveRecord && date) {
+          startIso  = toIsoDt(date, '00:00');
+          endIso    = toIsoDt(date, '23:59').replace('T23:59:00', 'T23:59:59');
+          startTime = '00:00';
+          endTime   = '23:59';
+        } else {
+          startIso  = date ? toIsoDt(date, hourToTime(hour))                             : hourToTime(hour);
+          endIso    = date ? toIsoDt(date, hour === 23 ? '23:59' : hourToTime(hour + 1)) : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+          startTime = hourToTime(hour);
+          endTime   = hour === 23 ? '23:59' : hourToTime(hour + 1);
+        }
       }
-      var startTime  = isLeaveRecord ? '00:00' : hourToTime(hour);
-      var endTime    = isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1));
+
       var $startCell = $row.find('.bp-time-cell').eq(0);
       var $endCell   = $row.find('.bp-time-cell').eq(1);
       recordData[$startCell.data('api') || 'beatplanner__Date_Time_From'] = startIso;
@@ -4562,73 +4983,119 @@ $(function () {
         bprFieldValues[leaveApi] = leaveVal;
       }
 
-      /* Link to the Monthly Beat Plan record resolved during modal init */
-      if (monthlyBeatPlanId) {
-        recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
-      }
-
       /* Mandatory Name field */
       recordData['Name'] = 'Meeting With ' + mwName;
 
-      /* Always default Managers Approval to "Pending" on creation.
-         Also add to bprFieldValues so the left-border colour is resolved from
-         the beatplanner__Daily_Beat_Plans metadata. */
-      recordData['beatplanner__Managers_Approval'] = 'Pending';
-      bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
-
-      /* Assign the record to the currently selected user */
-      var saveOwnerId = $('#userProfile').attr('data-userid');
-      if (saveOwnerId) {
-        recordData['Owner'] = { id: saveOwnerId };
-      }
+      /* Collect avatar data from the Meeting With dropdown */
+      var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
+      var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '';
+      var mwAvatarText   = $mwAvatar.text() || '';
+      var mwPhotoId      = $mwAvatar.attr('data-photo-id') || '';
 
       /* Disable the save button while the API call is in progress */
       $btn.prop('disabled', true);
 
-      try {
-        var resp = await ZOHO.CRM.API.insertRecord({
-          Entity:  'beatplanner__Daily_Beat_Plans',
-          APIData: recordData,
-          Trigger: ['workflow']
-        });
-        console.log('Daily Beat Plan saved', resp);
+      if (editId) {
+        /* ── EDIT MODE: call updateRecord, preserve Managers Approval ── */
+        var existingEv       = findEvent(editId);
+        var existingApproval = (existingEv && existingEv.bprFieldValues)
+          ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
+          : '';
+        if (existingApproval) {
+          bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
+        }
 
-        /* Also save as a calendar event so it appears on the grid with BPR styling */
-        var $mwValText     = $mwWrap.find('.bp-dd-val').text() || '';
-        var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
-        /* Use the data-img-src attribute as a reliable fallback for the img src,
-           since the async photo load may finish after the img element is replaced. */
-        var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '';
-        var mwAvatarText   = $mwAvatar.text() || '';
-        var mwPhotoId      = $mwAvatar.attr('data-photo-id') || '';
-        var newEv = {
-          id:             uid(),
-          title:          $mwValText || (mfDisplayVal || 'Beat Plan'),
-          date:           date,
-          startTime:      startTime,
-          endTime:        endTime,
-          color:          '#1565C0',
-          description:    '',
-          bprFieldValues: bprFieldValues,
-          mwAvatarImgSrc: mwAvatarImgSrc,
-          mwAvatarText:   mwAvatarText,
-          mwPhotoId:      mwPhotoId
-        };
+        try {
+          await ZOHO.CRM.API.updateRecord({
+            Entity:  'beatplanner__Daily_Beat_Plans',
+            APIData: Object.assign({ id: editId }, recordData),
+            Trigger: ['workflow']
+          });
+          console.log('Daily Beat Plan updated', editId);
 
-        /* Update event ID with the CRM record ID returned in the response */
-        var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
-        if (crmId) { newEv.id = crmId; }
+          /* Update the in-memory event */
+          var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
+          if (evIdx !== -1) {
+            var updEv          = state.events[evIdx];
+            updEv.title          = mwName || (mfDisplayVal || 'Beat Plan');
+            updEv.startTime      = startTime;
+            updEv.endTime        = endTime;
+            updEv.bprFieldValues = bprFieldValues;
+            updEv.mwAvatarImgSrc = mwAvatarImgSrc;
+            updEv.mwAvatarText   = mwAvatarText;
+            updEv.mwPhotoId      = mwPhotoId;
+          }
 
-        state.events.push(newEv);
-        saveEvents();
-        render();
+          saveEvents();
+          closeSlotPicker();
+          render();
+          showToast('Beat plan record updated.');
+        } catch (err) {
+          console.error('Failed to update Daily Beat Plan', err);
+          showToast('Failed to update beat plan record.');
+        } finally {
+          $btn.prop('disabled', false);
+        }
 
-        showToast('Beat plan record saved.');
-      } catch (err) {
-        console.error('Failed to save Daily Beat Plan', err);
-        showToast('Failed to save beat plan record.');
-      } finally {
-        $btn.prop('disabled', false);
+      } else {
+        /* ── CREATE MODE: call insertRecord, default Managers Approval to Pending ── */
+
+        /* Link to the Monthly Beat Plan record resolved during modal init */
+        if (monthlyBeatPlanId) {
+          recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
+        }
+
+        /* Always default Managers Approval to "Pending" on creation.
+           Also add to bprFieldValues so the left-border colour is resolved from
+           the beatplanner__Daily_Beat_Plans metadata. */
+        recordData['beatplanner__Managers_Approval'] = 'Pending';
+        bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+
+        /* Assign the record to the currently selected user */
+        var saveOwnerId = $('#userProfile').attr('data-userid');
+        if (saveOwnerId) {
+          recordData['Owner'] = { id: saveOwnerId };
+        }
+
+        try {
+          var resp = await ZOHO.CRM.API.insertRecord({
+            Entity:  'beatplanner__Daily_Beat_Plans',
+            APIData: recordData,
+            Trigger: ['workflow']
+          });
+          console.log('Daily Beat Plan saved', resp);
+
+          /* Also save as a calendar event so it appears on the grid with BPR styling */
+          var $mwValText = $mwWrap.find('.bp-dd-val').text() || '';
+          var newEv = {
+            id:             uid(),
+            title:          $mwValText || (mfDisplayVal || 'Beat Plan'),
+            date:           date,
+            startTime:      startTime,
+            endTime:        endTime,
+            color:          '#1565C0',
+            description:    '',
+            bprFieldValues: bprFieldValues,
+            mwAvatarImgSrc: mwAvatarImgSrc,
+            mwAvatarText:   mwAvatarText,
+            mwPhotoId:      mwPhotoId
+          };
+
+          /* Update event ID with the CRM record ID returned in the response */
+          var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+          if (crmId) { newEv.id = crmId; }
+
+          state.events.push(newEv);
+          saveEvents();
+          render();
+
+          showToast('Beat plan record saved.');
+        } catch (err) {
+          console.error('Failed to save Daily Beat Plan', err);
+          showToast('Failed to save beat plan record.');
+        } finally {
+          $btn.prop('disabled', false);
+        }
       }
     });
 
