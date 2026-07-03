@@ -1310,11 +1310,7 @@ $(function () {
       if (ownerId) { recordData['Owner'] = { id: ownerId }; }
 
       try {
-        var resp = await ZOHO.CRM.API.insertRecord({
-          Entity:  'beatplanner__Daily_Beat_Plans',
-          APIData: recordData,
-          Trigger: ['workflow']
-        });
+        var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
         console.log('Pasted Beat Plan record saved', resp);
         /* Update the in-memory event id with the real CRM record id */
         var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
@@ -3043,10 +3039,7 @@ $(function () {
     /* Delete from CRM when this is a Beat Plan record (has bprFieldValues) */
     if (ev && ev.bprFieldValues && Object.keys(ev.bprFieldValues).length) {
       try {
-        await ZOHO.CRM.API.deleteRecord({
-          Entity:   'beatplanner__Daily_Beat_Plans',
-          RecordID: evid
-        });
+        await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + evid);
         console.log('CRM record deleted', evid);
       } catch (err) {
         console.error('Failed to delete CRM record', err);
@@ -5294,11 +5287,7 @@ $(function () {
         }
 
         try {
-          var massResp = await ZOHO.CRM.API.insertRecord({
-            Entity:  'beatplanner__Daily_Beat_Plans',
-            APIData: recordData,
-            Trigger: ['workflow']
-          });
+          var massResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
           created++;
 
           /* Build bprFieldValues for this row so the chip gets metadata-driven styling */
@@ -5436,11 +5425,7 @@ $(function () {
 
       $btn.prop('disabled', true);
       try {
-        var resp = await ZOHO.CRM.API.insertRecord({
-          Entity:  'beatplanner__Daily_Beat_Plans',
-          APIData: recordData,
-          Trigger: ['workflow']
-        });
+        var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
         console.log('Leave record created', resp);
 
         var newEv = {
@@ -5710,11 +5695,7 @@ $(function () {
         }
 
         try {
-          var resp = await ZOHO.CRM.API.insertRecord({
-            Entity:  'beatplanner__Daily_Beat_Plans',
-            APIData: recordData,
-            Trigger: ['workflow']
-          });
+          var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
           console.log('Daily Beat Plan saved', resp);
 
           /* Also save as a calendar event so it appears on the grid with BPR styling */
@@ -6090,10 +6071,7 @@ $(function () {
 
       $btn.prop('disabled', true);
       try {
-        await ZOHO.CRM.API.deleteRecord({
-          Entity:   'beatplanner__Daily_Beat_Plans',
-          RecordID: editId
-        });
+        await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + editId);
       } catch (delErr) {
         console.error('demBulkGrid delete failed, removing from local state anyway', delErr);
       }
@@ -6297,31 +6275,53 @@ $(function () {
       var failed   = 0;
       var datesToRefresh = {};
 
+      /* Collect all record IDs and their associated rows/dates */
+      var deleteItems = [];
       for (var rj = 0; rj < $checkedRows.length; rj++) {
         var $row2  = $($checkedRows[rj]);
         var delId  = String($row2.data('editId') || '');
         var delDate = $row2.data('date') || '';
         if (!delId) { continue; }
+        deleteItems.push({ id: delId, date: delDate, $row: $row2 });
+      }
 
+      if (deleteItems.length > 0) {
+        var allIds = deleteItems.map(function (item) { return item.id; });
+        var successIds = {};
         try {
-          await ZOHO.CRM.API.deleteRecord({
-            Entity:   'beatplanner__Daily_Beat_Plans',
-            RecordID: delId
+          var bulkResp = await zrc.delete(
+            '/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + allIds.join(',')
+          );
+          /* Determine which IDs succeeded based on the response */
+          var respData = bulkResp && bulkResp.data ? bulkResp.data : [];
+          respData.forEach(function (entry) {
+            if (entry && entry.status === 'success' && entry.details && entry.details.id) {
+              successIds[entry.details.id] = true;
+            }
           });
-        } catch (delErr2) {
-          console.error('Mass delete failed for record', delId, delErr2);
-          failed++;
-          continue;
+          /* If the API does not return per-record status, treat all as success */
+          if (respData.length === 0) {
+            allIds.forEach(function (id) { successIds[id] = true; });
+          }
+        } catch (bulkErr) {
+          console.error('Bulk delete request failed', bulkErr);
         }
 
-        state.events = state.events.filter(function (e) { return e.id !== delId; });
-        if (state.clipboard) {
-          state.clipboard = state.clipboard.filter(function (e) { return e.id !== delId; });
-          if (state.clipboard.length === 0) { state.clipboard = null; state.clipboardSource = null; }
-        }
-        $row2.remove();
-        if (delDate) { datesToRefresh[delDate] = true; }
-        deleted++;
+        deleteItems.forEach(function (item) {
+          if (successIds[item.id]) {
+            state.events = state.events.filter(function (e) { return e.id !== item.id; });
+            if (state.clipboard) {
+              state.clipboard = state.clipboard.filter(function (e) { return e.id !== item.id; });
+              if (state.clipboard.length === 0) { state.clipboard = null; state.clipboardSource = null; }
+            }
+            item.$row.remove();
+            if (item.date) { datesToRefresh[item.date] = true; }
+            deleted++;
+          } else {
+            console.error('Mass delete failed for record', item.id);
+            failed++;
+          }
+        });
       }
 
       saveEvents();
