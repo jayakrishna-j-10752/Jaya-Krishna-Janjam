@@ -1247,13 +1247,44 @@ $(function () {
         }
       });
 
-      /* Meeting With lookup (stored on the event if created via the form) */
-      if (ev.mwRecordId && ev.mwLookupApi) {
-        recordData[ev.mwLookupApi] = { id: ev.mwRecordId };
+      /* ── Resolve the Meeting With lookup API using the same logic as .bp-row-save ──
+         ev.mwLookupApi is set when the event was created or last saved through the form.
+         For older events (loaded from localStorage before this field was added) or events
+         whose Meetings For value changed after creation, derive it dynamically from the
+         Meetings For value stored in bprFieldValues, mirroring the resolution in
+         the Meetings For dropdown handler and buildBpEditForm. */
+      var pasteMwLookupApi = ev.mwLookupApi || '';
+      if (!pasteMwLookupApi) {
+        var pasteMfApi = 'beatplanner__Meetings_For';
+        bpDailyAllFields.forEach(function (f) {
+          if ((f.field_label || '').toLowerCase() === 'meetings for') { pasteMfApi = f.api_name; }
+        });
+        var pasteMfLabel = ev.bprFieldValues ? (ev.bprFieldValues[pasteMfApi] || '') : '';
+        var pasteMfModApi = '';
+        beatPlanModulesList.forEach(function (mod) {
+          if (mod.label === pasteMfLabel) { pasteMfModApi = mod.api; }
+        });
+        for (var fi = 0; fi < bpDailyAllFields.length; fi++) {
+          var lf = bpDailyAllFields[fi];
+          if (lf.data_type === 'lookup' && lf.lookup && lf.lookup.module) {
+            var lfMod = lf.lookup.module.api_name || lf.lookup.module.module || '';
+            if ((pasteMfModApi && lfMod === pasteMfModApi) ||
+                (!pasteMfModApi && pasteMfLabel &&
+                 (lf.field_label || '').toLowerCase() === pasteMfLabel.toLowerCase())) {
+              pasteMwLookupApi = lfMod;
+              break;
+            }
+          }
+        }
       }
-      /* Clear all other module lookup fields so the record is not left with stale references */
+
+      /* Meeting With lookup – populate the correct field; clear all others.
+         This is the same assignment pattern used by .bp-row-save. */
+      if (ev.mwRecordId && pasteMwLookupApi) {
+        recordData[pasteMwLookupApi] = { id: ev.mwRecordId };
+      }
       beatPlanModulesList.forEach(function (mod) {
-        if (mod.api && mod.api !== (ev.mwLookupApi || '')) {
+        if (mod.api && mod.api !== pasteMwLookupApi) {
           recordData[mod.api] = '';
         }
       });
@@ -5630,6 +5661,8 @@ $(function () {
             updEv.mwAvatarImgSrc = mwAvatarImgSrc;
             updEv.mwAvatarText   = mwAvatarText;
             updEv.mwPhotoId      = mwPhotoId;
+            updEv.mwRecordId     = mwId;
+            updEv.mwLookupApi    = mwLookupApi;
           }
 
           saveEvents();
@@ -6027,6 +6060,8 @@ $(function () {
           updEv.mwAvatarImgSrc = mwAvatarImgSrc;
           updEv.mwAvatarText   = mwAvatarText;
           updEv.mwPhotoId      = mwPhotoId;
+          updEv.mwRecordId     = mwId;
+          updEv.mwLookupApi    = mwLookupApi;
         }
 
         /* Update stored original-vals so the next save can detect further changes */
