@@ -1313,7 +1313,7 @@ $(function () {
         var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
         console.log('Pasted Beat Plan record saved', resp);
         /* Update the in-memory event id with the real CRM record id */
-        var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+        var crmId = resp && resp.data && resp.data.data && resp.data.data[0] && resp.data.data[0].details && resp.data.data[0].details.id;
         if (crmId) {
           var oldId = ev.id;
           var evIdx = state.events.indexOf(ev);
@@ -5334,7 +5334,7 @@ $(function () {
             mwLookupApi:    mwLookupApi
           };
 
-          var massCrmId = massResp && massResp.data && massResp.data[0] && massResp.data[0].details && massResp.data[0].details.id;
+          var massCrmId = massResp && massResp.data && massResp.data.data && massResp.data.data[0] && massResp.data.data[0].details && massResp.data.data[0].details.id;
           if (massCrmId) { massEv.id = massCrmId; }
 
           state.events.push(massEv);
@@ -5440,7 +5440,7 @@ $(function () {
         };
 
         /* Update event ID with the CRM record ID */
-        var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+        var crmId = resp && resp.data && resp.data.data && resp.data.data[0] && resp.data.data[0].details && resp.data.data[0].details.id;
         if (crmId) { newEv.id = crmId; }
 
         state.events.push(newEv);
@@ -5717,7 +5717,7 @@ $(function () {
           };
 
           /* Update event ID with the CRM record ID returned in the response */
-          var crmId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+          var crmId = resp && resp.data && resp.data.data && resp.data.data[0] && resp.data.data[0].details && resp.data.data[0].details.id;
           if (crmId) { newEv.id = crmId; }
 
           state.events.push(newEv);
