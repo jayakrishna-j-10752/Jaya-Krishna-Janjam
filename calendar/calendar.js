@@ -1285,7 +1285,7 @@ $(function () {
       }
       beatPlanModulesList.forEach(function (mod) {
         if (mod.api && mod.api !== pasteMwLookupApi) {
-          recordData[mod.api] = '';
+          recordData[mod.api] = null;
         }
       });
 
@@ -5242,10 +5242,10 @@ $(function () {
         if (mwId && mwLookupApi) {
           recordData[mwLookupApi] = { id: mwId };
         }
-        /* Include all other module lookup fields as empty strings */
+        /* Include all other module lookup fields as null to clear them */
         beatPlanModulesList.forEach(function (mod) {
           if (mod.api && mod.api !== mwLookupApi) {
-            recordData[mod.api] = '';
+            recordData[mod.api] = null;
           }
         });
 
@@ -5537,11 +5537,11 @@ $(function () {
       if (mwId && mwLookupApi) {
         recordData[mwLookupApi] = { id: mwId };
       }
-      /* Include all other module lookup fields as empty strings so the payload
+      /* Include all other module lookup fields as null to clear them so the payload
          always contains every Meetings For module field, not just the selected one */
       beatPlanModulesList.forEach(function (mod) {
         if (mod.api && mod.api !== mwLookupApi) {
-          recordData[mod.api] = '';
+          recordData[mod.api] = null;
         }
       });
 
@@ -5963,7 +5963,7 @@ $(function () {
       var mwName      = $mwVal.text() || '';
       if (mwId && mwLookupApi) { recordData[mwLookupApi] = { id: mwId }; }
       beatPlanModulesList.forEach(function (mod) {
-        if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = ''; }
+        if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = null; }
       });
 
       /* All other picklist columns (includes Attendance, Leave Type in bulk table) */
@@ -6159,7 +6159,7 @@ $(function () {
         var mwName      = $mwVal.text() || '';
         if (mwId && mwLookupApi) { recordData[mwLookupApi] = { id: mwId }; }
         beatPlanModulesList.forEach(function (mod) {
-          if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = ''; }
+          if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = null; }
         });
 
         /* All other picklist columns */
