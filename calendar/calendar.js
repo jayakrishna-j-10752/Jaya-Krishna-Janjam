@@ -7142,6 +7142,37 @@ $(function () {
     });
   }
 
+  /**
+   * Pre-fetch all CRM records for every module in beatPlanModulesList and cache
+   * them in moduleRecordsMap.  Called once after beatPlanModulesList is built so
+   * the Meeting With dropdown can be populated instantly when the user selects a
+   * Meetings For value.
+   */
+  function fetchAllModuleRecords() {
+    beatPlanModulesList.forEach(function (mod) {
+      if (!mod.api) { return; }
+      if (moduleRecordsMap.hasOwnProperty(mod.api)) { return; } /* already fetched */
+      ZOHO.CRM.API.getAllRecords({ Entity: mod.api })
+        .then(function (data) {
+          if (data && data.data) {
+            moduleRecordsMap[mod.api] = data.data.map(function (rec) {
+              return {
+                id:       rec.id,
+                name:     recordDisplayName(rec),
+                photo_id: rec['$photo_id'] || ''
+              };
+            });
+          } else {
+            moduleRecordsMap[mod.api] = [];
+          }
+          refreshMeetingWithRows(mod.api);
+        })
+        .catch(function () {
+          moduleRecordsMap[mod.api] = [];
+        });
+    });
+  }
+
   /* ── Filter Panel helpers ── */
 
   /**
@@ -8080,6 +8111,10 @@ $(function () {
 
       /* Pre-fetch picklist metadata for ALL modules so the Filter panel opens instantly. */
       fetchAllModulePicklistMeta();
+
+      /* Pre-fetch all CRM records for ALL modules so the Meeting With dropdown
+         is populated as soon as the user selects a Meetings For value. */
+      fetchAllModuleRecords();
     }
 
     var response = await zrc.get('/crm/v8/settings/modules');
