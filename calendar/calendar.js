@@ -3221,16 +3221,27 @@ $(function () {
       var bounds = getViewBoundaries();
 
       /* Step 3: Assemble the COQL query */
-      var dynamicFieldList    = selectFields.filter(function (f) { return f !== 'id'; }).join(', ');
-      var currentViewStart    = bounds.startDt;
-      var currentViewEnd      = bounds.endDt;
+      var dynamicFieldList = selectFields.filter(function (f) { return f !== 'id'; }).join(', ');
+      var currentViewStart = bounds.startDt;
+      var currentViewEnd   = bounds.endDt;
       var query = {
-        select_query: `select id, ${dynamicFieldList} from beatplanner__Daily_Beat_Plans where ((beatplanner__Date_Time_From between '${currentViewStart}' and '${currentViewEnd}') and beatplanner__Date_Time_To between '${currentViewStart}' and '${currentViewEnd}') LIMIT 0, 2000`
+        select_query: `
+          SELECT
+            id,
+            ${dynamicFieldList}
+          FROM beatplanner__Daily_Beat_Plans
+          WHERE (
+            (beatplanner__Date_Time_From BETWEEN '${currentViewStart}' AND '${currentViewEnd}')
+            AND
+            (beatplanner__Date_Time_To BETWEEN '${currentViewStart}' AND '${currentViewEnd}')
+          )
+          LIMIT 0,2000
+        `.replace(/\s+/g, ' ').trim()
       };
 
       console.log(query.select_query);
       var coqlRes     = await zrc.post('/crm/v8/coql', query);
-      console.log(coqlRes.data);
+      console.log(coqlRes.data.data);
       var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
 
       /* Step 5: Remove previously COQL-loaded events; keep user-created events */
