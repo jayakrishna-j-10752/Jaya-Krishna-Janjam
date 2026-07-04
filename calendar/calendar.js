@@ -3245,9 +3245,9 @@ $(function () {
           ' LIMIT 0,2000'
       };
 
-      var coqlRes     = await zrc.post('/crm/v8/coql', coqlQuery);
-      console.log(coqlRes.data.data);
-      var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data) || [];
+      var coqlRes     = await ZOHO.CRM.API.coql(coqlQuery);
+      console.log(coqlRes.data);
+      var coqlRecords = (coqlRes && coqlRes.data && Array.isArray(coqlRes.data) ? coqlRes.data : []);
 
       /* Step 6: Resolve Meetings For field API name from module metadata */
       var mfFieldApiName = '';
