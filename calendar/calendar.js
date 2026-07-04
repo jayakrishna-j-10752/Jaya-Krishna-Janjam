@@ -3220,15 +3220,7 @@ $(function () {
       /* Step 2: Compute the actual visible grid date range */
       var bounds = getViewBoundaries();
 
-      /* Step 3: Resolve the currently displayed owner */
-      var selectedOwnerId = $('#userProfile').attr('data-userid') || '';
-
-      /* Step 4: Assemble the COQL query */
-      var ownerClause    = selectedOwnerId   ? (' AND Owner.id = \'' + selectedOwnerId + '\'') : '';
-      var meetingsInValues = mfModuleLabels.map(function (v) {
-        return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-      }).join(', ');
-      var meetingsClause = meetingsInValues  ? (' AND beatplanner__Meetings_For in (' + meetingsInValues + ')') : '';
+      /* Step 3: Assemble the COQL query */
       var coqlQuery = {
         select_query: 'SELECT ' + selectFields.join(',') +
           ' FROM beatplanner__Daily_Beat_Plans' +
@@ -3237,8 +3229,6 @@ $(function () {
             ' AND beatplanner__Date_Time_From <= \'' + bounds.endDt + '\'' +
             ' AND beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
             ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\'' +
-            ownerClause +
-            meetingsClause +
           ')' +
           ' LIMIT 0,2000'
       };
