@@ -1274,7 +1274,7 @@ $(function () {
             if ((pasteMfModApi && lfMod === pasteMfModApi) ||
                 (!pasteMfModApi && pasteMfLabel &&
                  (lf.field_label || '').toLowerCase() === pasteMfLabel.toLowerCase())) {
-              pasteMwLookupApi = lfMod;
+              pasteMwLookupApi = lf.api_name;
               break;
             }
           }
@@ -1286,9 +1286,12 @@ $(function () {
       if (ev.mwRecordId && pasteMwLookupApi) {
         recordData[pasteMwLookupApi] = { id: ev.mwRecordId };
       }
-      beatPlanModulesList.forEach(function (mod) {
-        if (mod.api && mod.api !== pasteMwLookupApi) {
-          recordData[mod.api] = null;
+      bpDailyAllFields.forEach(function (f) {
+        if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
+        if (f.api_name === pasteMwLookupApi) { return; }
+        var modApi = f.lookup.module.api_name || f.lookup.module.module || '';
+        if (beatPlanModulesList.some(function (mod) { return mod.api === modApi; })) {
+          recordData[f.api_name] = null;
         }
       });
 
@@ -2217,7 +2220,7 @@ $(function () {
           var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
           var fldLbl     = (f.field_label || '').toLowerCase();
           if (modApiName === existingMfApi || fldLbl === existingMfVal.toLowerCase()) {
-            mwLookupApiName = modApiName;
+            mwLookupApiName = f.api_name;
             if (crmRecord && crmRecord[f.api_name]) {
               var mwLookupVal = crmRecord[f.api_name];
               existingMwId   = (mwLookupVal && mwLookupVal.id)   || '';
@@ -2560,7 +2563,7 @@ $(function () {
             var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
             var fldLbl     = (f.field_label || '').toLowerCase();
             if (modApiName === existingMfApi || fldLbl === existingMfVal.toLowerCase()) {
-              mwLookupApiName = modApiName;
+              mwLookupApiName = f.api_name;
               if (crmRecord && crmRecord[f.api_name]) {
                 var mwLookupVal = crmRecord[f.api_name];
                 existingMwId   = (mwLookupVal && mwLookupVal.id)   || '';
@@ -5046,7 +5049,7 @@ $(function () {
           var modApiName = f.lookup.module.api_name || f.lookup.module.module || '';
           var fieldLbl   = (f.field_label || '').toLowerCase();
           if (modApiName === api || fieldLbl === label.toLowerCase()) {
-            lookupApiName = modApiName;
+            lookupApiName = f.api_name;
             break;
           }
         }
@@ -5255,9 +5258,12 @@ $(function () {
           recordData[mwLookupApi] = { id: mwId };
         }
         /* Include all other module lookup fields as null to clear them */
-        beatPlanModulesList.forEach(function (mod) {
-          if (mod.api && mod.api !== mwLookupApi) {
-            recordData[mod.api] = null;
+        bpDailyAllFields.forEach(function (f) {
+          if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
+          if (f.api_name === mwLookupApi) { return; }
+          var modApi = f.lookup.module.api_name || f.lookup.module.module || '';
+          if (beatPlanModulesList.some(function (mod) { return mod.api === modApi; })) {
+            recordData[f.api_name] = null;
           }
         });
 
@@ -5559,9 +5565,12 @@ $(function () {
       }
       /* Include all other module lookup fields as null to clear them so the payload
          always contains every Meetings For module field, not just the selected one */
-      beatPlanModulesList.forEach(function (mod) {
-        if (mod.api && mod.api !== mwLookupApi) {
-          recordData[mod.api] = null;
+      bpDailyAllFields.forEach(function (f) {
+        if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
+        if (f.api_name === mwLookupApi) { return; }
+        var modApi = f.lookup.module.api_name || f.lookup.module.module || '';
+        if (beatPlanModulesList.some(function (mod) { return mod.api === modApi; })) {
+          recordData[f.api_name] = null;
         }
       });
 
@@ -5980,8 +5989,13 @@ $(function () {
       var mwLookupApi = $mwWrap.attr('data-api') || '';
       var mwName      = $mwVal.text() || '';
       if (mwId && mwLookupApi) { recordData[mwLookupApi] = { id: mwId }; }
-      beatPlanModulesList.forEach(function (mod) {
-        if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = null; }
+      bpDailyAllFields.forEach(function (f) {
+        if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
+        if (f.api_name === mwLookupApi) { return; }
+        var modApi = f.lookup.module.api_name || f.lookup.module.module || '';
+        if (beatPlanModulesList.some(function (mod) { return mod.api === modApi; })) {
+          recordData[f.api_name] = null;
+        }
       });
 
       /* All other picklist columns (includes Attendance, Leave Type in bulk table) */
@@ -6177,8 +6191,13 @@ $(function () {
         var mwLookupApi = $mwWrap.attr('data-api') || '';
         var mwName      = $mwVal.text() || '';
         if (mwId && mwLookupApi) { recordData[mwLookupApi] = { id: mwId }; }
-        beatPlanModulesList.forEach(function (mod) {
-          if (mod.api && mod.api !== mwLookupApi) { recordData[mod.api] = null; }
+        bpDailyAllFields.forEach(function (f) {
+          if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
+          if (f.api_name === mwLookupApi) { return; }
+          var modApi = f.lookup.module.api_name || f.lookup.module.module || '';
+          if (beatPlanModulesList.some(function (mod) { return mod.api === modApi; })) {
+            recordData[f.api_name] = null;
+          }
         });
 
         /* All other picklist columns */
