@@ -3198,7 +3198,6 @@ $(function () {
       /* Also include every lookup API from Beat Plan References so the COQL
          response contains the Meeting With object for every possible module. */
       var mfModuleApis   = (bpSavedRec['beatplanner__Meetings_For_Apis']    || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-      var mfModuleLabels = (bpSavedRec['beatplanner__Meetings_For_Modules'] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       mfModuleApis.forEach(function (api) { rawApiList.push(api); });
 
       /* Deduplicate */
@@ -3223,14 +3222,8 @@ $(function () {
       /* Step 3: Resolve the currently displayed owner */
       var selectedOwnerId = $('#userProfile').attr('data-userid') || '';
 
-      /* Step 4: Build the Meetings_For in (...) clause from Beat Plan References */
-      var meetingsInValues = mfModuleLabels.map(function (v) {
-        return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-      }).join(', ');
-
-      /* Step 5: Assemble the COQL query */
+      /* Step 4: Assemble the COQL query */
       var ownerClause    = selectedOwnerId   ? (' AND Owner = \'' + selectedOwnerId + '\'') : '';
-      var meetingsClause = meetingsInValues  ? (' AND Meetings_For in (' + meetingsInValues + ')') : '';
       var coqlQuery = {
         select_query: 'SELECT ' + selectFields.join(',') +
           ' FROM beatplanner__Daily_Beat_Plans' +
@@ -3240,7 +3233,6 @@ $(function () {
             ' AND beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
             ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\'' +
             ownerClause +
-            meetingsClause +
           ')' +
           ' LIMIT 0,2000'
       };
@@ -3249,16 +3241,7 @@ $(function () {
       console.log(coqlRes.data);
       var coqlRecords = (coqlRes && coqlRes.data && Array.isArray(coqlRes.data) ? coqlRes.data : []);
 
-      /* Step 6: Resolve Meetings For field API name from module metadata */
-      var mfFieldApiName = '';
-      bpDailyAllFields.forEach(function (f) {
-        if ((f.field_label || '').toLowerCase() === 'meetings for') {
-          mfFieldApiName = f.api_name || '';
-        }
-      });
-      if (!mfFieldApiName) { mfFieldApiName = 'beatplanner__Meetings_For'; }
-
-      /* Step 7: Remove previously COQL-loaded events; keep user-created events */
+      /* Step 5: Remove previously COQL-loaded events; keep user-created events */
       state.events = state.events.filter(function (e) { return !e.fromCoql; });
       var existingIds = {};
       state.events.forEach(function (e) { existingIds[e.id] = true; });
@@ -3286,16 +3269,18 @@ $(function () {
           }
         });
 
-        /* Resolve CRM Module API from Meetings For value */
-        var mfValue   = rec[mfFieldApiName] || '';
+        /* Resolve CRM Module API by checking which lookup field has a value */
         var moduleApi = '';
-        var mfIdx     = mfModuleLabels.indexOf(mfValue);
-        if (mfIdx !== -1) { moduleApi = mfModuleApis[mfIdx] || ''; }
-
-        /* Read only the lookup object for the resolved module; ignore all others */
-        var lookupRec = moduleApi ? (rec[moduleApi] || null) : null;
-        var recTitle  = (lookupRec && (lookupRec.name || lookupRec.Full_Name)) ||
-                        mfValue || 'Beat Plan';
+        var lookupRec = null;
+        for (var mi = 0; mi < mfModuleApis.length; mi++) {
+          var candidate = rec[mfModuleApis[mi]];
+          if (candidate && typeof candidate === 'object') {
+            moduleApi = mfModuleApis[mi];
+            lookupRec = candidate;
+            break;
+          }
+        }
+        var recTitle  = (lookupRec && (lookupRec.name || lookupRec.Full_Name)) || 'Beat Plan';
 
         var newEv = {
           id:             rec.id || uid(),
