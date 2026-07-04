@@ -3236,7 +3236,7 @@ $(function () {
             AND
             (beatplanner__Date_Time_To >= '${currentViewStart}' AND beatplanner__Date_Time_To <= '${currentViewEnd}')
             AND
-            (Owner = '${ownerId}')
+            (Owner.id = '${ownerId}')
           )
           LIMIT 0,2000
         `.replace(/\s+/g, ' ').trim()
