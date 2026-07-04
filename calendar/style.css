@@ -4935,3 +4935,31 @@ input, select, textarea {
 .theme-night .widget-loader-overlay {
   background: rgba(30, 32, 40, 0.92);
 }
+
+/* ── Beat Planner events horizontal loading bar ── */
+.bp-events-loader {
+  height: 3px;
+  background: var(--border);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.bp-events-loader::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: var(--z-blue, #1565C0);
+  animation: bp-loader-slide 1.2s ease-in-out infinite;
+}
+@keyframes bp-loader-slide {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Disable all pointer interactions on the calendar body while events are loading */
+.cal-body--loading {
+  pointer-events: none;
+}

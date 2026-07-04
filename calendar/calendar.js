@@ -3104,12 +3104,278 @@ $(function () {
       var d = new Date(c); d.setDate(d.getDate() + dir);
       state.cursor = d;
     }
+    var c = state.cursor;
+    if (state.view === 'month') {
+      state.cursor = new Date(c.getFullYear(), c.getMonth() + dir, 1);
+    } else if (state.view === 'week') {
+      var d = new Date(c); d.setDate(d.getDate() + dir * 7);
+      state.cursor = d;
+    } else {
+      var d = new Date(c); d.setDate(d.getDate() + dir);
+      state.cursor = d;
+    }
     render();
+    if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
   }
 
   function goToday() {
     state.cursor = new Date();
     render();
+    if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     VIEW BOUNDARIES + DYNAMIC EVENT LOADER
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Return the visible calendar grid start/end as ISO-8601 datetime strings that
+   * include the local timezone offset.  For month view the boundaries cover the
+   * entire visible grid (leading/trailing cells from adjacent months included),
+   * not just the selected month.
+   */
+  function getViewBoundaries() {
+    var vc       = state.cursor;
+    var tzOffset = -new Date().getTimezoneOffset(); /* minutes ahead of UTC */
+    var tzSign   = tzOffset >= 0 ? '+' : '-';
+    var tzAbs    = Math.abs(tzOffset);
+    var tzStr    = tzSign + pad2(Math.floor(tzAbs / 60)) + ':' + pad2(tzAbs % 60);
+
+    var startDt, endDt;
+    if (state.view === 'month') {
+      var vy       = vc.getFullYear();
+      var vm       = vc.getMonth();
+      var fdow     = firstDOW(vy, vm);
+      var dim      = daysInMonth(vy, vm);
+      var total    = fdow + dim;
+      var trailing = (7 - (total % 7)) % 7;
+      /* gridStartDate = first visible cell (may be in previous month) */
+      var gridStartDate = new Date(vy, vm, 1 - fdow);
+      /* gridEndDate   = last visible cell (may be in next month) */
+      var gridEndDate   = new Date(vy, vm, dim + trailing);
+      startDt = dateToStr(gridStartDate) + 'T00:00:00' + tzStr;
+      endDt   = dateToStr(gridEndDate)   + 'T23:59:59' + tzStr;
+    } else if (state.view === 'week') {
+      var vws = weekStart(vc);
+      var vwe = new Date(vws); vwe.setDate(vws.getDate() + 6);
+      startDt = dateToStr(vws) + 'T00:00:00' + tzStr;
+      endDt   = dateToStr(vwe) + 'T23:59:59' + tzStr;
+    } else {
+      var vds = dateToStr(vc);
+      startDt = vds + 'T00:00:00' + tzStr;
+      endDt   = vds + 'T23:59:59' + tzStr;
+    }
+    return { startDt: startDt, endDt: endDt };
+  }
+
+  /**
+   * Fetch beatplanner__Daily_Beat_Plans records for the current view/owner via COQL,
+   * convert them to event objects, and render.  This single function is reused for
+   * the initial page load, calendar navigation, view changes, and user switches.
+   *
+   * Requires beatPlanHasRefs and bpSavedRec to be truthy before calling.
+   */
+  async function loadBeatPlanEvents() {
+    if (!beatPlanHasRefs || !bpSavedRec) { return; }
+
+    /* ── Show horizontal loading bar and disable calendar interactions ── */
+    $('#bpEventsLoader').show();
+    $('.cal-body').addClass('cal-body--loading');
+    $('#userProfile').prop('disabled', true);
+
+    try {
+      /* Step 1: Probe a beat-plan table to collect all data-api field names.
+         Use a date far enough in the future so all 24 hour slots are present. */
+      var probeDate   = dateToStr(new Date(state.cursor.getFullYear(), state.cursor.getMonth() + 1, 1));
+      var tempHtml    = buildBeatPlanTable(probeDate);
+      var $tempRoot   = $(tempHtml);
+      var rawApiList  = [];
+      $tempRoot.find('[data-api]').each(function () {
+        var api = $(this).attr('data-api');
+        if (api) { rawApiList.push(api); }
+      });
+
+      /* Also include every lookup API from Beat Plan References so the COQL
+         response contains the Meeting With object for every possible module. */
+      var mfModuleApis   = (bpSavedRec['beatplanner__Meetings_For_Apis']    || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      var mfModuleLabels = (bpSavedRec['beatplanner__Meetings_For_Modules'] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      mfModuleApis.forEach(function (api) { rawApiList.push(api); });
+
+      /* Deduplicate */
+      var seenApis    = {};
+      var dynamicFields = [];
+      rawApiList.forEach(function (api) {
+        if (api && !seenApis[api]) {
+          seenApis[api]  = true;
+          dynamicFields.push(api);
+        }
+      });
+
+      /* SELECT: id + beatplanner__Managers_Approval + dynamic fields (deduped) */
+      var selectFields = ['id', 'beatplanner__Managers_Approval'];
+      dynamicFields.forEach(function (api) {
+        if (selectFields.indexOf(api) === -1) { selectFields.push(api); }
+      });
+
+      /* Step 2: Compute the actual visible grid date range */
+      var bounds = getViewBoundaries();
+
+      /* Step 3: Resolve the currently displayed owner */
+      var selectedOwnerId = $('#userProfile').attr('data-userid') || '';
+
+      /* Step 4: Build the Meetings_For IN clause from Beat Plan References */
+      var meetingModules = mfModuleLabels.map(function (v) {
+        return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+      }).join(',');
+
+      /* Step 5: Assemble the COQL query */
+      var ownerClause    = selectedOwnerId ? (' AND (Owner = \'' + selectedOwnerId + '\')') : '';
+      var meetingsClause = meetingModules  ? (' AND (Meetings_For IN (' + meetingModules + '))') : '';
+      var coqlQuery = {
+        select_query: 'SELECT ' + selectFields.join(',') +
+          ' FROM beatplanner__Daily_Beat_Plans' +
+          ' WHERE (' +
+            '(beatplanner__Date_Time_From >= \'' + bounds.startDt + '\'' +
+            ' AND beatplanner__Date_Time_From <= \'' + bounds.endDt + '\')' +
+            ' AND ' +
+            '(beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
+            ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\')' +
+            ownerClause +
+            meetingsClause +
+          ')' +
+          ' LIMIT 0,2000'
+      };
+
+      var coqlRes     = await zrc.post('/crm/v8/coql', coqlQuery);
+      console.log(coqlRes.data.data);
+      var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data) || [];
+
+      /* Step 6: Resolve Meetings For field API name from module metadata */
+      var mfFieldApiName = '';
+      bpDailyAllFields.forEach(function (f) {
+        if ((f.field_label || '').toLowerCase() === 'meetings for') {
+          mfFieldApiName = f.api_name || '';
+        }
+      });
+      if (!mfFieldApiName) { mfFieldApiName = 'beatplanner__Meetings_For'; }
+
+      /* Step 7: Remove previously COQL-loaded events; keep user-created events */
+      state.events = state.events.filter(function (e) { return !e.fromCoql; });
+      var existingIds = {};
+      state.events.forEach(function (e) { existingIds[e.id] = true; });
+
+      coqlRecords.forEach(function (rec) {
+        if (existingIds[rec.id]) { return; }
+
+        /* Extract date and time from ISO-8601 datetime strings */
+        var fromStr   = rec['beatplanner__Date_Time_From'] || '';
+        var toStr     = rec['beatplanner__Date_Time_To']   || '';
+        var datePart  = fromStr ? fromStr.substring(0, 10) : todayStr();
+        var startTime = fromStr ? fromStr.substring(11, 16) : '00:00';
+        var endTime   = toStr   ? toStr.substring(11, 16)   : '01:00';
+
+        /* Build bprFieldValues: always include Managers Approval + all dynamic fields */
+        var bprFieldValues = {};
+        var maVal = rec['beatplanner__Managers_Approval'];
+        if (maVal !== null && maVal !== undefined && typeof maVal !== 'object') {
+          bprFieldValues['beatplanner__Managers_Approval'] = String(maVal);
+        }
+        dynamicFields.forEach(function (fieldApi) {
+          var val = rec[fieldApi];
+          if (val !== null && val !== undefined && typeof val !== 'object') {
+            bprFieldValues[fieldApi] = String(val);
+          }
+        });
+
+        /* Resolve CRM Module API from Meetings For value */
+        var mfValue   = rec[mfFieldApiName] || '';
+        var moduleApi = '';
+        var mfIdx     = mfModuleLabels.indexOf(mfValue);
+        if (mfIdx !== -1) { moduleApi = mfModuleApis[mfIdx] || ''; }
+
+        /* Read only the lookup object for the resolved module; ignore all others */
+        var lookupRec = moduleApi ? (rec[moduleApi] || null) : null;
+        var recTitle  = (lookupRec && (lookupRec.name || lookupRec.Full_Name)) ||
+                        mfValue || 'Beat Plan';
+
+        var newEv = {
+          id:             rec.id || uid(),
+          title:          recTitle,
+          date:           datePart,
+          startTime:      startTime,
+          endTime:        endTime,
+          color:          '#1565C0',
+          description:    '',
+          bprFieldValues: bprFieldValues,
+          mwRecordId:     lookupRec ? (lookupRec.id || '') : '',
+          mwLookupApi:    moduleApi,
+          mwAvatarText:   buildRecordInitials(recTitle),
+          mwAvatarImgSrc: '',
+          mwPhotoId:      '',
+          fromCoql:       true
+        };
+
+        state.events.push(newEv);
+        existingIds[rec.id] = true;
+      });
+
+      /* Step 8: Render all events using the existing pipeline */
+      saveEvents();
+      render();
+
+      /* Step 9: Load profile images from the module records cache */
+      var avatarLoadPromises = coqlRecords.map(async function (rec) {
+        var evObj = findEvent(rec.id);
+        if (!evObj) { return; }
+
+        var modApi  = evObj.mwLookupApi || '';
+        var mwRecId = evObj.mwRecordId  || '';
+        if (!modApi || !mwRecId) { return; }
+
+        var cachedRecs = moduleRecordsMap[modApi] || [];
+        var photoId    = '';
+        for (var ci = 0; ci < cachedRecs.length; ci++) {
+          if (String(cachedRecs[ci].id) === String(mwRecId)) {
+            photoId = cachedRecs[ci].photo_id || '';
+            break;
+          }
+        }
+        if (!photoId) { return; }
+
+        evObj.mwPhotoId = photoId;
+
+        await new Promise(function (resolve) {
+          ZOHO.CRM.API.getFile({ id: photoId })
+            .then(function (resp) {
+              if (!resp) { resolve(); return; }
+              var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+              var reader  = new FileReader();
+              reader.onloadend = function () {
+                var dataUrl = reader.result;
+                evObj.mwAvatarImgSrc = dataUrl;
+                dom.canvas.find('[data-evid="' + evObj.id + '"] .bp-rec-avatar')
+                  .html('<img src="' + escHtml(dataUrl) + '">')
+                  .attr('data-img-src', dataUrl)
+                  .attr('data-photo-id', photoId);
+                resolve();
+              };
+              reader.readAsDataURL(imgBlob);
+            })
+            .catch(function () { resolve(); });
+        });
+      });
+
+      await Promise.all(avatarLoadPromises);
+      saveEvents();
+
+    } catch (err) {
+      console.error('Failed to load Daily Beat Plans:', err);
+    } finally {
+      /* Hide loader and restore calendar interactions regardless of success/failure */
+      $('#bpEventsLoader').hide();
+      $('.cal-body').removeClass('cal-body--loading');
+      $('#userProfile').prop('disabled', false);
+    }
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -3758,6 +4024,8 @@ $(function () {
       var userId = $(this).data('uid');
       var user   = userMap[userId];
       if (!user) return;
+      /* Capture the previously displayed user BEFORE updating, so we can detect a change */
+      var prevUserId = $('#userProfile').attr('data-userid');
       activeUserId = userId;
       /* Persist the selected user ID on the profile button for use during record creation */
       $('#userProfile').attr('data-userid', userId);
@@ -3767,6 +4035,10 @@ $(function () {
       var avatarHtml = $(this).find('.ud-item-avatar').html();
       $('.user-avatar').html(avatarHtml || buildAvatarInnerHtml(user));
       closeUserDropdown();
+      /* Reload events only when the selected user is different from the current one */
+      if (beatPlanHasRefs && bpSavedRec && String(userId) !== String(prevUserId)) {
+        loadBeatPlanEvents();
+      }
     });
 
     /* Toggle node expand / collapse */
@@ -3814,6 +4086,7 @@ $(function () {
   var bprPicklistFields   = null;   /* null = not fetched; [] = empty; [{api_name,field_label,options}] */
   var bpDailyAllFields    = [];     /* all fields from beatplanner__Daily_Beat_Plans (including lookups) */
   var bprStyleConfig      = null;   /* style slot → field API name, read directly from BPR record */
+  var bpSavedRec          = null;   /* saved beatplanner__Beat_Plan_References record (for navigation reloads) */
   var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
   var monthlyBeatPlanId   = null;   /* ID of the beatplanner__Monthly_Beat_Plans record for the open modal's month */
 
@@ -4862,6 +5135,7 @@ $(function () {
       state.view = $(this).data('view');
       updateViewTab(state.view);
       render();
+      if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
 
     /* Theme toggle – cycles light → dark → night → light */
@@ -8144,215 +8418,12 @@ $(function () {
       });
     }
 
-    /* ── Load existing Daily Beat Plans after all initialization is complete ── */
+    /* ── Load existing Daily Beat Plans after all initialization is complete.
+       Store the reference record first so loadBeatPlanEvents() can use it during
+       navigation / user-change reloads as well. ── */
     if (hasRecords && savedRec) {
-      try {
-        /* Step 1: Build a temporary beat-plan table to discover all data-api field names.
-           Use the first day of the next month so it is never "today" and all 24 hour
-           slots are available, guaranteeing that the time-cell <td> elements (which
-           carry data-api for beatplanner__Date_Time_From / beatplanner__Date_Time_To)
-           are always present in the generated HTML. */
-        var probeDate   = dateToStr(new Date(state.cursor.getFullYear(), state.cursor.getMonth() + 1, 1));
-        var tempHtml    = buildBeatPlanTable(probeDate);
-        var $tempRoot   = $(tempHtml);
-        var rawApiList  = [];
-        $tempRoot.find('[data-api]').each(function () {
-          var api = $(this).attr('data-api');
-          if (api) { rawApiList.push(api); }
-        });
-
-        /* Remove duplicates and empty values */
-        var seenApis    = {};
-        var dynamicFields = [];
-        rawApiList.forEach(function (api) {
-          if (api && !seenApis[api]) {
-            seenApis[api]  = true;
-            dynamicFields.push(api);
-          }
-        });
-
-        /* Step 2: Compute the date-range for the current view using the same
-           logic already used by renderMonth / renderWeek / renderDay.
-           DateTime values include the user's local timezone offset so COQL
-           can compare them correctly (BETWEEN is not supported for DateTime
-           fields; use >= / <= instead). */
-        var vc = state.cursor;
-        var viewStartDateTime, viewEndDateTime;
-        var tzOffset = -new Date().getTimezoneOffset(); /* minutes ahead of UTC */
-        var tzSign   = tzOffset >= 0 ? '+' : '-';
-        var tzAbs    = Math.abs(tzOffset);
-        var tzStr    = tzSign + pad2(Math.floor(tzAbs / 60)) + ':' + pad2(tzAbs % 60);
-        if (state.view === 'month') {
-          var vy = vc.getFullYear(), vm = vc.getMonth();
-          viewStartDateTime = pad4(vy) + '-' + pad2(vm + 1) + '-01T00:00:00' + tzStr;
-          viewEndDateTime   = pad4(vy) + '-' + pad2(vm + 1) + '-' + pad2(daysInMonth(vy, vm)) + 'T23:59:59' + tzStr;
-        } else if (state.view === 'week') {
-          var vws = weekStart(vc);
-          var vwe = new Date(vws); vwe.setDate(vws.getDate() + 6);
-          viewStartDateTime = dateToStr(vws) + 'T00:00:00' + tzStr;
-          viewEndDateTime   = dateToStr(vwe) + 'T23:59:59' + tzStr;
-        } else {
-          var vds = dateToStr(vc);
-          viewStartDateTime = vds + 'T00:00:00' + tzStr;
-          viewEndDateTime   = vds + 'T23:59:59' + tzStr;
-        }
-
-        /* Step 3: Build the COQL query dynamically.
-           SELECT clause: id + every unique data-api collected from #bp-slots-table.
-           DateTime filters use >= / <= because COQL does not support BETWEEN
-           for DateTime fields. */
-        var selectFields = ['id'].concat(dynamicFields);
-        var coqlQuery = {
-          select_query: 'SELECT ' + selectFields.join(',') +
-            ' FROM beatplanner__Daily_Beat_Plans' +
-            ' WHERE (' +
-              '(beatplanner__Date_Time_From >= \'' + viewStartDateTime + '\'' +
-              ' AND beatplanner__Date_Time_From <= \'' + viewEndDateTime + '\')' +
-              ' AND ' +
-              '(beatplanner__Date_Time_To >= \'' + viewStartDateTime + '\'' +
-              ' AND beatplanner__Date_Time_To <= \'' + viewEndDateTime + '\')' +
-            ')' +
-            ' LIMIT 0,2000'
-        };
-        var coqlRes     = await zrc.post('/crm/v8/coql', coqlQuery);
-        console.log(coqlRes.data.data);
-        var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data) || [];
-
-        /* Step 4: Resolve the Meetings For field API name (same derivation as
-           buildBeatPlanTable so it matches the SELECT clause field name). */
-        var mfFieldApiName = '';
-        bpDailyAllFields.forEach(function (f) {
-          if ((f.field_label || '').toLowerCase() === 'meetings for') {
-            mfFieldApiName = f.api_name || '';
-          }
-        });
-        if (!mfFieldApiName) { mfFieldApiName = 'beatplanner__Meetings_For'; }
-
-        /* Module label → API mapping from Beat Plan References */
-        var mfModuleLabels = (savedRec['beatplanner__Meetings_For_Modules'] || '').split(',').map(function (s) { return s.trim(); });
-        var mfModuleApis   = (savedRec['beatplanner__Meetings_For_Apis']    || '').split(',').map(function (s) { return s.trim(); });
-
-        /* Step 5: Convert COQL records to Beat Planner event objects.
-           Skip any record whose id is already present in state.events (e.g. loaded
-           from localStorage on a previous session). */
-        var existingIds = {};
-        state.events.forEach(function (e) { existingIds[e.id] = true; });
-
-        coqlRecords.forEach(function (rec) {
-          if (existingIds[rec.id]) { return; }
-
-          /* Extract date and time from ISO-8601 datetime strings */
-          var fromStr   = rec['beatplanner__Date_Time_From'] || '';
-          var toStr     = rec['beatplanner__Date_Time_To']   || '';
-          var datePart  = fromStr ? fromStr.substring(0, 10) : todayStr();
-          var startTime = fromStr ? fromStr.substring(11, 16) : '00:00';
-          var endTime   = toStr   ? toStr.substring(11, 16)   : '01:00';
-
-          /* Build bprFieldValues from flat (non-object, non-null) field values */
-          var bprFieldValues = {};
-          dynamicFields.forEach(function (fieldApi) {
-            var val = rec[fieldApi];
-            if (val !== null && val !== undefined && typeof val !== 'object') {
-              bprFieldValues[fieldApi] = String(val);
-            }
-          });
-
-          /* Resolve CRM Module API from Meetings For value using Beat Plan References */
-          var mfValue   = rec[mfFieldApiName] || '';
-          var moduleApi = '';
-          var mfIdx     = mfModuleLabels.indexOf(mfValue);
-          if (mfIdx !== -1) { moduleApi = mfModuleApis[mfIdx] || ''; }
-
-          /* Update the Meeting With control: read only the lookup object for the
-             resolved module API; ignore all other lookup fields. */
-          var lookupRec = moduleApi ? (rec[moduleApi] || null) : null;
-          var recTitle  = (lookupRec && (lookupRec.name || lookupRec.Full_Name)) ||
-                          mfValue || 'Beat Plan';
-
-          var newEv = {
-            id:             rec.id || uid(),
-            title:          recTitle,
-            date:           datePart,
-            startTime:      startTime,
-            endTime:        endTime,
-            color:          '#1565C0',
-            description:    '',
-            bprFieldValues: bprFieldValues,
-            mwRecordId:     lookupRec ? (lookupRec.id || '') : '',
-            mwLookupApi:    moduleApi,
-            mwAvatarText:   buildRecordInitials(recTitle),
-            mwAvatarImgSrc: '',
-            mwPhotoId:      ''
-          };
-
-          state.events.push(newEv);
-          existingIds[rec.id] = true;
-        });
-
-        /* Step 6: Render all events using the existing rendering pipeline */
-        saveEvents();
-        render();
-
-        /* Step 7: For each COQL record, resolve $photo_id from the already-cached
-           moduleRecordsMap (populated by fetchAllModuleRecords via getAllRecords)
-           and load the profile image using the existing ZOHO.CRM.API.getFile pipeline.
-           No additional per-record REST calls are made.
-           The loader remains visible until every avatar attempt has settled. */
-        var avatarLoadPromises = coqlRecords.map(async function (rec) {
-          var evObj = findEvent(rec.id);
-          if (!evObj) { return; }
-
-          var modApi  = evObj.mwLookupApi || '';
-          var mwRecId = evObj.mwRecordId  || '';
-          if (!modApi || !mwRecId) { return; }
-
-          /* Look up the cached record from moduleRecordsMap to read photo_id */
-          var cachedRecs = moduleRecordsMap[modApi] || [];
-          var photoId    = '';
-          for (var ci = 0; ci < cachedRecs.length; ci++) {
-            if (String(cachedRecs[ci].id) === String(mwRecId)) {
-              photoId = cachedRecs[ci].photo_id || '';
-              break;
-            }
-          }
-          if (!photoId) { return; }
-
-          evObj.mwPhotoId = photoId;
-
-          /* Load the profile photo using the existing ZOHO.CRM.API.getFile implementation */
-          await new Promise(function (resolve) {
-            ZOHO.CRM.API.getFile({ id: photoId })
-              .then(function (resp) {
-                if (!resp) { resolve(); return; }
-                var imgBlob = new Blob([resp], { type: 'image/jpeg' });
-                var reader  = new FileReader();
-                reader.onloadend = function () {
-                  var dataUrl = reader.result;
-                  evObj.mwAvatarImgSrc = dataUrl;
-                  /* Update the .bp-rec-avatar element for this event if it is
-                     currently visible in any rendered Beat Plan table */
-                  dom.canvas.find('[data-evid="' + evObj.id + '"] .bp-rec-avatar')
-                    .html('<img src="' + escHtml(dataUrl) + '">')
-                    .attr('data-img-src', dataUrl)
-                    .attr('data-photo-id', photoId);
-                  resolve();
-                };
-                reader.readAsDataURL(imgBlob);
-              })
-              .catch(function () {
-                /* keep initials fallback */
-                resolve();
-              });
-          });
-        });
-
-        await Promise.all(avatarLoadPromises);
-        /* Persist updated avatar data (mwPhotoId, mwAvatarImgSrc) to localStorage */
-        saveEvents();
-
-      } catch (err) {
-        console.error('Failed to load Daily Beat Plans:', err);
-      }
+      bpSavedRec = savedRec;
+      await loadBeatPlanEvents();
     }
 
     /* ── Hide the loader only after all events have been rendered and every
