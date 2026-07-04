@@ -8095,34 +8095,213 @@ $(function () {
       });
     }
 
-    /* ── Fetch records for each module in beatplanner__Meetings_For_Apis ── */
+    /* ── Load existing Daily Beat Plans after all initialization is complete ── */
     if (hasRecords && savedRec) {
-      var meetingsForApis = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
-      meetingsForApis.forEach(function (moduleName) {
-        moduleName = moduleName.trim();
-        if (!moduleName) { return; }
-        ZOHO.CRM.API.getAllRecords({ Entity: moduleName, sort_order: 'asc', per_page: 200, page: 1 })
-          .then(function (data) {
-            console.log(data);
-            if (data && data.data) {
-              moduleRecordsMap[moduleName] = data.data.map(function (rec) {
-                return {
-                  id:       rec.id,
-                  name:     recordDisplayName(rec),
-                  photo_id: rec['$photo_id'] || ''
-                };
-              });
+      try {
+        /* Step 1: Build a temporary beat-plan table to discover all data-api field names.
+           Use the first day of the next month so it is never "today" and all 24 hour
+           slots are available, guaranteeing that the time-cell <td> elements (which
+           carry data-api for beatplanner__Date_Time_From / beatplanner__Date_Time_To)
+           are always present in the generated HTML. */
+        var probeDate   = dateToStr(new Date(state.cursor.getFullYear(), state.cursor.getMonth() + 1, 1));
+        var tempHtml    = buildBeatPlanTable(probeDate);
+        var $tempRoot   = $(tempHtml);
+        var rawApiList  = [];
+        $tempRoot.find('[data-api]').each(function () {
+          var api = $(this).attr('data-api');
+          if (api) { rawApiList.push(api); }
+        });
+
+        /* Remove duplicates and empty values */
+        var seenApis    = {};
+        var dynamicFields = [];
+        rawApiList.forEach(function (api) {
+          if (api && !seenApis[api]) {
+            seenApis[api]  = true;
+            dynamicFields.push(api);
+          }
+        });
+
+        /* Step 2: Compute the date-range for the current view using the same
+           logic already used by renderMonth / renderWeek / renderDay. */
+        var vc = state.cursor;
+        var viewStartDateTime, viewEndDateTime;
+        if (state.view === 'month') {
+          var vy = vc.getFullYear(), vm = vc.getMonth();
+          viewStartDateTime = pad4(vy) + '-' + pad2(vm + 1) + '-01T00:00:00';
+          viewEndDateTime   = pad4(vy) + '-' + pad2(vm + 1) + '-' + pad2(daysInMonth(vy, vm)) + 'T23:59:59';
+        } else if (state.view === 'week') {
+          var vws = weekStart(vc);
+          var vwe = new Date(vws); vwe.setDate(vws.getDate() + 6);
+          viewStartDateTime = dateToStr(vws) + 'T00:00:00';
+          viewEndDateTime   = dateToStr(vwe) + 'T23:59:59';
+        } else {
+          var vds = dateToStr(vc);
+          viewStartDateTime = vds + 'T00:00:00';
+          viewEndDateTime   = vds + 'T23:59:59';
+        }
+
+        /* Step 3: Build the COQL query dynamically.
+           SELECT clause: id + every unique data-api collected from #bp-slots-table. */
+        var selectFields = ['id'].concat(dynamicFields);
+        var coqlQuery = {
+          select_query: 'SELECT ' + selectFields.join(',') +
+            ' FROM beatplanner__Daily_Beat_Plans' +
+            ' WHERE (' +
+              '(beatplanner__Date_Time_From BETWEEN \'' + viewStartDateTime + '\' AND \'' + viewEndDateTime + '\')' +
+              ' AND ' +
+              '(beatplanner__Date_Time_To BETWEEN \'' + viewStartDateTime + '\' AND \'' + viewEndDateTime + '\')' +
+            ')' +
+            ' LIMIT 0,2000'
+        };
+        var coqlRes     = await zrc.post('/crm/v8/coql', coqlQuery);
+        console.log(coqlRes.data.data);
+        var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data) || [];
+
+        /* Step 4: Resolve the Meetings For field API name (same derivation as
+           buildBeatPlanTable so it matches the SELECT clause field name). */
+        var mfFieldApiName = '';
+        bpDailyAllFields.forEach(function (f) {
+          if ((f.field_label || '').toLowerCase() === 'meetings for') {
+            mfFieldApiName = f.api_name || '';
+          }
+        });
+        if (!mfFieldApiName) { mfFieldApiName = 'beatplanner__Meetings_For'; }
+
+        /* Module label → API mapping from Beat Plan References */
+        var mfModuleLabels = (savedRec['beatplanner__Meetings_For_Modules'] || '').split(',').map(function (s) { return s.trim(); });
+        var mfModuleApis   = (savedRec['beatplanner__Meetings_For_Apis']    || '').split(',').map(function (s) { return s.trim(); });
+
+        /* Step 5: Convert COQL records to Beat Planner event objects.
+           Skip any record whose id is already present in state.events (e.g. loaded
+           from localStorage on a previous session). */
+        var existingIds = {};
+        state.events.forEach(function (e) { existingIds[e.id] = true; });
+
+        coqlRecords.forEach(function (rec) {
+          if (existingIds[rec.id]) { return; }
+
+          /* Extract date and time from ISO-8601 datetime strings */
+          var fromStr   = rec['beatplanner__Date_Time_From'] || '';
+          var toStr     = rec['beatplanner__Date_Time_To']   || '';
+          var datePart  = fromStr ? fromStr.substring(0, 10) : todayStr();
+          var startTime = fromStr ? fromStr.substring(11, 16) : '00:00';
+          var endTime   = toStr   ? toStr.substring(11, 16)   : '01:00';
+
+          /* Build bprFieldValues from flat (non-object, non-null) field values */
+          var bprFieldValues = {};
+          dynamicFields.forEach(function (fieldApi) {
+            var val = rec[fieldApi];
+            if (val !== null && val !== undefined && typeof val !== 'object') {
+              bprFieldValues[fieldApi] = String(val);
             }
           });
-        ZOHO.CRM.META.getFields({ Entity: moduleName })
-          .then(function (data) {
-            console.log(data);
-          });
-      });
+
+          /* Resolve CRM Module API from Meetings For value using Beat Plan References */
+          var mfValue   = rec[mfFieldApiName] || '';
+          var moduleApi = '';
+          var mfIdx     = mfModuleLabels.indexOf(mfValue);
+          if (mfIdx !== -1) { moduleApi = mfModuleApis[mfIdx] || ''; }
+
+          /* Update the Meeting With control: read only the lookup object for the
+             resolved module API; ignore all other lookup fields. */
+          var lookupRec = moduleApi ? (rec[moduleApi] || null) : null;
+          var recTitle  = (lookupRec && (lookupRec.name || lookupRec.Full_Name)) ||
+                          mfValue || 'Beat Plan';
+
+          var newEv = {
+            id:             rec.id || uid(),
+            title:          recTitle,
+            date:           datePart,
+            startTime:      startTime,
+            endTime:        endTime,
+            color:          '#1565C0',
+            description:    '',
+            bprFieldValues: bprFieldValues,
+            mwRecordId:     lookupRec ? (lookupRec.id || '') : '',
+            mwLookupApi:    moduleApi,
+            mwAvatarText:   buildRecordInitials(recTitle),
+            mwAvatarImgSrc: '',
+            mwPhotoId:      ''
+          };
+
+          state.events.push(newEv);
+          existingIds[rec.id] = true;
+        });
+
+        /* Step 6: Render all events using the existing rendering pipeline */
+        saveEvents();
+        render();
+
+        /* Step 7: For each record, fetch the related CRM record, retrieve $photo_id,
+           and load the profile image using the existing ZOHO.CRM.API.getFile pipeline.
+           The loader remains visible until every avatar attempt has settled. */
+        var avatarLoadPromises = coqlRecords.map(async function (rec) {
+          var mfVal = rec[mfFieldApiName] || '';
+          var aIdx  = mfModuleLabels.indexOf(mfVal);
+          if (aIdx === -1) { return; }
+
+          var modApi    = mfModuleApis[aIdx] || '';
+          if (!modApi) { return; }
+
+          var lookupObj = rec[modApi];
+          if (!lookupObj || !lookupObj.id) { return; }
+
+          try {
+            /* Dynamically fetch the related CRM record using the resolved module API */
+            var crmResp = await zrc.get('/crm/v8/' + modApi + '/' + lookupObj.id);
+            var crmData = crmResp && crmResp.data && crmResp.data.data && crmResp.data.data[0];
+            if (!crmData) { return; }
+
+            var photoId = crmData['$photo_id'] || '';
+            if (!photoId) { return; }
+
+            /* Update the event's photo metadata */
+            var evObj = findEvent(rec.id);
+            if (!evObj) { return; }
+            evObj.mwPhotoId = photoId;
+
+            /* Load the profile photo using the existing ZOHO.CRM.API.getFile implementation */
+            await new Promise(function (resolve) {
+              var config = { id: photoId };
+              ZOHO.CRM.API.getFile(config)
+                .then(function (resp) {
+                  if (!resp) { resolve(); return; }
+                  var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+                  var reader  = new FileReader();
+                  reader.onloadend = function () {
+                    var dataUrl = reader.result;
+                    evObj.mwAvatarImgSrc = dataUrl;
+                    /* Update the .bp-rec-avatar element for this event if it is
+                       currently visible in any rendered Beat Plan table */
+                    dom.canvas.find('[data-evid="' + evObj.id + '"] .bp-rec-avatar')
+                      .html('<img src="' + escHtml(dataUrl) + '">')
+                      .attr('data-img-src', dataUrl);
+                    resolve();
+                  };
+                  reader.readAsDataURL(imgBlob);
+                })
+                .catch(function () {
+                  /* keep initials fallback */
+                  resolve();
+                });
+            });
+          } catch (err) {
+            console.error('Failed to load avatar for event', rec.id, err);
+          }
+        });
+
+        await Promise.all(avatarLoadPromises);
+        /* Persist updated avatar data (mwPhotoId, mwAvatarImgSrc) to localStorage */
+        saveEvents();
+
+      } catch (err) {
+        console.error('Failed to load Daily Beat Plans:', err);
+      }
     }
 
-    /* ── Hide the loader now that all critical initialization is complete
-       and #legendsDisplay reflects the latest API data ── */
+    /* ── Hide the loader only after all events have been rendered and every
+       avatar attempt has settled – the calendar is now fully ready for interaction ── */
     $('#widgetLoaderOverlay').hide();
   });
   ZOHO.embeddedApp.init();
