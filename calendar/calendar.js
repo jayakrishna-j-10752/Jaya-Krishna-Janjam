@@ -3198,6 +3198,7 @@ $(function () {
       /* Also include every lookup API from Beat Plan References so the COQL
          response contains the Meeting With object for every possible module. */
       var mfModuleApis   = (bpSavedRec['beatplanner__Meetings_For_Apis']    || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      var mfModuleLabels = (bpSavedRec['beatplanner__Meetings_For_Modules'] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       mfModuleApis.forEach(function (api) { rawApiList.push(api); });
 
       /* Deduplicate */
@@ -3223,7 +3224,11 @@ $(function () {
       var selectedOwnerId = $('#userProfile').attr('data-userid') || '';
 
       /* Step 4: Assemble the COQL query */
-      var ownerClause    = selectedOwnerId   ? (' AND Owner = \'' + selectedOwnerId + '\'') : '';
+      var ownerClause    = selectedOwnerId   ? (' AND Owner.id = \'' + selectedOwnerId + '\'') : '';
+      var meetingsInValues = mfModuleLabels.map(function (v) {
+        return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+      }).join(', ');
+      var meetingsClause = meetingsInValues  ? (' AND beatplanner__Meetings_For in (' + meetingsInValues + ')') : '';
       var coqlQuery = {
         select_query: 'SELECT ' + selectFields.join(',') +
           ' FROM beatplanner__Daily_Beat_Plans' +
@@ -3233,6 +3238,7 @@ $(function () {
             ' AND beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
             ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\'' +
             ownerClause +
+            meetingsClause +
           ')' +
           ' LIMIT 0,2000'
       };
