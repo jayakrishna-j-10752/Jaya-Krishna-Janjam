@@ -8123,34 +8123,45 @@ $(function () {
         });
 
         /* Step 2: Compute the date-range for the current view using the same
-           logic already used by renderMonth / renderWeek / renderDay. */
+           logic already used by renderMonth / renderWeek / renderDay.
+           DateTime values include the user's local timezone offset so COQL
+           can compare them correctly (BETWEEN is not supported for DateTime
+           fields; use >= / <= instead). */
         var vc = state.cursor;
         var viewStartDateTime, viewEndDateTime;
+        var tzOffset = -new Date().getTimezoneOffset(); /* minutes ahead of UTC */
+        var tzSign   = tzOffset >= 0 ? '+' : '-';
+        var tzAbs    = Math.abs(tzOffset);
+        var tzStr    = tzSign + pad2(Math.floor(tzAbs / 60)) + ':' + pad2(tzAbs % 60);
         if (state.view === 'month') {
           var vy = vc.getFullYear(), vm = vc.getMonth();
-          viewStartDateTime = pad4(vy) + '-' + pad2(vm + 1) + '-01T00:00:00';
-          viewEndDateTime   = pad4(vy) + '-' + pad2(vm + 1) + '-' + pad2(daysInMonth(vy, vm)) + 'T23:59:59';
+          viewStartDateTime = pad4(vy) + '-' + pad2(vm + 1) + '-01T00:00:00' + tzStr;
+          viewEndDateTime   = pad4(vy) + '-' + pad2(vm + 1) + '-' + pad2(daysInMonth(vy, vm)) + 'T23:59:59' + tzStr;
         } else if (state.view === 'week') {
           var vws = weekStart(vc);
           var vwe = new Date(vws); vwe.setDate(vws.getDate() + 6);
-          viewStartDateTime = dateToStr(vws) + 'T00:00:00';
-          viewEndDateTime   = dateToStr(vwe) + 'T23:59:59';
+          viewStartDateTime = dateToStr(vws) + 'T00:00:00' + tzStr;
+          viewEndDateTime   = dateToStr(vwe) + 'T23:59:59' + tzStr;
         } else {
           var vds = dateToStr(vc);
-          viewStartDateTime = vds + 'T00:00:00';
-          viewEndDateTime   = vds + 'T23:59:59';
+          viewStartDateTime = vds + 'T00:00:00' + tzStr;
+          viewEndDateTime   = vds + 'T23:59:59' + tzStr;
         }
 
         /* Step 3: Build the COQL query dynamically.
-           SELECT clause: id + every unique data-api collected from #bp-slots-table. */
+           SELECT clause: id + every unique data-api collected from #bp-slots-table.
+           DateTime filters use >= / <= because COQL does not support BETWEEN
+           for DateTime fields. */
         var selectFields = ['id'].concat(dynamicFields);
         var coqlQuery = {
           select_query: 'SELECT ' + selectFields.join(',') +
             ' FROM beatplanner__Daily_Beat_Plans' +
             ' WHERE (' +
-              '(beatplanner__Date_Time_From BETWEEN \'' + viewStartDateTime + '\' AND \'' + viewEndDateTime + '\')' +
+              '(beatplanner__Date_Time_From >= \'' + viewStartDateTime + '\'' +
+              ' AND beatplanner__Date_Time_From <= \'' + viewEndDateTime + '\')' +
               ' AND ' +
-              '(beatplanner__Date_Time_To BETWEEN \'' + viewStartDateTime + '\' AND \'' + viewEndDateTime + '\')' +
+              '(beatplanner__Date_Time_To >= \'' + viewStartDateTime + '\'' +
+              ' AND beatplanner__Date_Time_To <= \'' + viewEndDateTime + '\')' +
             ')' +
             ' LIMIT 0,2000'
         };
