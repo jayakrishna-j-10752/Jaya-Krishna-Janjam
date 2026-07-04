@@ -3243,9 +3243,10 @@ $(function () {
           ' LIMIT 0,2000'
       };
 
-      var coqlRes     = await ZOHO.CRM.API.coql(coqlQuery);
+      console.log(coqlQuery.select_query);
+      var coqlRes     = await zrc.post('/crm/v8/coql', coqlQuery);
       console.log(coqlRes.data);
-      var coqlRecords = (coqlRes && coqlRes.data && Array.isArray(coqlRes.data) ? coqlRes.data : []);
+      var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
 
       /* Step 5: Remove previously COQL-loaded events; keep user-created events */
       state.events = state.events.filter(function (e) { return !e.fromCoql; });
