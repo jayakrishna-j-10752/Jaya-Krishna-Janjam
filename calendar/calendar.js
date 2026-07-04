@@ -3223,23 +3223,22 @@ $(function () {
       /* Step 3: Resolve the currently displayed owner */
       var selectedOwnerId = $('#userProfile').attr('data-userid') || '';
 
-      /* Step 4: Build the Meetings_For OR clause from Beat Plan References */
-      var meetingsForCondition = mfModuleLabels.map(function (v) {
-        return "Meetings_For = '" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-      }).join(' OR ');
+      /* Step 4: Build the Meetings_For in (...) clause from Beat Plan References */
+      var meetingsInValues = mfModuleLabels.map(function (v) {
+        return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+      }).join(', ');
 
       /* Step 5: Assemble the COQL query */
-      var ownerClause    = selectedOwnerId       ? (' AND (Owner = \'' + selectedOwnerId + '\')') : '';
-      var meetingsClause = meetingsForCondition  ? (' AND (' + meetingsForCondition + ')')        : '';
+      var ownerClause    = selectedOwnerId   ? (' AND Owner = \'' + selectedOwnerId + '\'') : '';
+      var meetingsClause = meetingsInValues  ? (' AND Meetings_For in (' + meetingsInValues + ')') : '';
       var coqlQuery = {
         select_query: 'SELECT ' + selectFields.join(',') +
           ' FROM beatplanner__Daily_Beat_Plans' +
           ' WHERE (' +
-            '(beatplanner__Date_Time_From >= \'' + bounds.startDt + '\'' +
-            ' AND beatplanner__Date_Time_From <= \'' + bounds.endDt + '\')' +
-            ' AND ' +
-            '(beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
-            ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\')' +
+            'beatplanner__Date_Time_From >= \'' + bounds.startDt + '\'' +
+            ' AND beatplanner__Date_Time_From <= \'' + bounds.endDt + '\'' +
+            ' AND beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
+            ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\'' +
             ownerClause +
             meetingsClause +
           ')' +
