@@ -3223,14 +3223,14 @@ $(function () {
       /* Step 3: Resolve the currently displayed owner */
       var selectedOwnerId = $('#userProfile').attr('data-userid') || '';
 
-      /* Step 4: Build the Meetings_For IN clause from Beat Plan References */
-      var meetingModules = mfModuleLabels.map(function (v) {
-        return "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-      }).join(',');
+      /* Step 4: Build the Meetings_For OR clause from Beat Plan References */
+      var meetingsForCondition = mfModuleLabels.map(function (v) {
+        return "Meetings_For = '" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+      }).join(' OR ');
 
       /* Step 5: Assemble the COQL query */
-      var ownerClause    = selectedOwnerId ? (' AND (Owner = \'' + selectedOwnerId + '\')') : '';
-      var meetingsClause = meetingModules  ? (' AND (Meetings_For IN (' + meetingModules + '))') : '';
+      var ownerClause    = selectedOwnerId       ? (' AND (Owner = \'' + selectedOwnerId + '\')') : '';
+      var meetingsClause = meetingsForCondition  ? (' AND (' + meetingsForCondition + ')')        : '';
       var coqlQuery = {
         select_query: 'SELECT ' + selectFields.join(',') +
           ' FROM beatplanner__Daily_Beat_Plans' +
