@@ -3221,20 +3221,41 @@ $(function () {
       var bounds = getViewBoundaries();
 
       /* Step 3: Assemble the COQL query */
-      var coqlQuery = {
-        select_query: 'SELECT ' + selectFields.join(',') +
-          ' FROM beatplanner__Daily_Beat_Plans' +
-          ' WHERE (' +
-            'beatplanner__Date_Time_From >= \'' + bounds.startDt + '\'' +
-            ' AND beatplanner__Date_Time_From <= \'' + bounds.endDt + '\'' +
-            ' AND beatplanner__Date_Time_To >= \'' + bounds.startDt + '\'' +
-            ' AND beatplanner__Date_Time_To <= \'' + bounds.endDt + '\'' +
-          ')' +
-          ' LIMIT 0,2000'
+      var dynamicFieldList    = selectFields.filter(function (f) { return f !== 'id'; }).join(',\n            ');
+      var currentViewStart    = bounds.startDt;
+      var currentViewEnd      = bounds.endDt;
+      var query = {
+        select_query: `
+            SELECT
+                id,
+                ${dynamicFieldList}
+
+            FROM beatplanner__Daily_Beat_Plans
+
+            WHERE (
+                (
+                    beatplanner__Date_Time_From BETWEEN
+                    '${currentViewStart}'
+                    AND
+                    '${currentViewEnd}'
+                )
+
+                AND
+
+                (
+                    beatplanner__Date_Time_To BETWEEN
+                    '${currentViewStart}'
+                    AND
+                    '${currentViewEnd}'
+                )
+            )
+
+            LIMIT 0, 2000
+        `
       };
 
-      console.log(coqlQuery.select_query);
-      var coqlRes     = await zrc.post('/crm/v8/coql', coqlQuery);
+      console.log(query.select_query);
+      var coqlRes     = await zrc.post('/crm/v8/coql', query);
       console.log(coqlRes.data);
       var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
 
