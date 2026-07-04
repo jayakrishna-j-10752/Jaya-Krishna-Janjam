@@ -3231,9 +3231,9 @@ $(function () {
             ${dynamicFieldList}
           FROM beatplanner__Daily_Beat_Plans
           WHERE (
-            (beatplanner__Date_Time_From BETWEEN '${currentViewStart}' AND '${currentViewEnd}')
+            (beatplanner__Date_Time_From >= '${currentViewStart}' AND beatplanner__Date_Time_From <= '${currentViewEnd}')
             AND
-            (beatplanner__Date_Time_To BETWEEN '${currentViewStart}' AND '${currentViewEnd}')
+            (beatplanner__Date_Time_To >= '${currentViewStart}' AND beatplanner__Date_Time_To <= '${currentViewEnd}')
           )
           LIMIT 0,2000
         `.replace(/\s+/g, ' ').trim()
