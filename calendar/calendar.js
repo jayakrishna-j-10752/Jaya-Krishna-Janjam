@@ -1500,6 +1500,8 @@ $(function () {
       });
 
       orderedApis.forEach(function (api) {
+        /* Date Time From / Date Time To are internal scheduling fields – never shown */
+        if (api === 'beatplanner__Date_Time_From' || api === 'beatplanner__Date_Time_To') { return; }
         var val = ev.bprFieldValues[api];
         if (!val || val === 'Select\u2026') { return; }
         var label = fieldLabelMap[api] || api;
@@ -1676,6 +1678,18 @@ $(function () {
     var approvalVal = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
     if (approvalVal === 'Approved' || approvalVal === 'Rejected') {
       $card.find('.hc-act-approve, .hc-act-reject, .hc-act-delete').prop('disabled', true);
+    }
+
+    /* ── Resolve mwPhotoId from cached module records if not already set ──
+       Handles COQL-loaded events where photo_id was not available at init time. */
+    if (!ev.mwPhotoId && ev.mwLookupApi && ev.mwRecordId) {
+      var modRecs = moduleRecordsMap[ev.mwLookupApi] || [];
+      for (var mri = 0; mri < modRecs.length; mri++) {
+        if (String(modRecs[mri].id) === String(ev.mwRecordId)) {
+          ev.mwPhotoId = modRecs[mri].photo_id || '';
+          break;
+        }
+      }
     }
 
     /* ── Load Meeting With avatar asynchronously if not yet cached ── */
@@ -8279,62 +8293,57 @@ $(function () {
         saveEvents();
         render();
 
-        /* Step 7: For each record, fetch the related CRM record, retrieve $photo_id,
+        /* Step 7: For each COQL record, resolve $photo_id from the already-cached
+           moduleRecordsMap (populated by fetchAllModuleRecords via getAllRecords)
            and load the profile image using the existing ZOHO.CRM.API.getFile pipeline.
+           No additional per-record REST calls are made.
            The loader remains visible until every avatar attempt has settled. */
         var avatarLoadPromises = coqlRecords.map(async function (rec) {
-          var mfVal = rec[mfFieldApiName] || '';
-          var aIdx  = mfModuleLabels.indexOf(mfVal);
-          if (aIdx === -1) { return; }
+          var evObj = findEvent(rec.id);
+          if (!evObj) { return; }
 
-          var modApi    = mfModuleApis[aIdx] || '';
-          if (!modApi) { return; }
+          var modApi  = evObj.mwLookupApi || '';
+          var mwRecId = evObj.mwRecordId  || '';
+          if (!modApi || !mwRecId) { return; }
 
-          var lookupObj = rec[modApi];
-          if (!lookupObj || !lookupObj.id) { return; }
-
-          try {
-            /* Dynamically fetch the related CRM record using the resolved module API */
-            var crmResp = await zrc.get('/crm/v8/' + modApi + '/' + lookupObj.id);
-            var crmData = crmResp && crmResp.data && crmResp.data.data && crmResp.data.data[0];
-            if (!crmData) { return; }
-
-            var photoId = crmData['$photo_id'] || '';
-            if (!photoId) { return; }
-
-            /* Update the event's photo metadata */
-            var evObj = findEvent(rec.id);
-            if (!evObj) { return; }
-            evObj.mwPhotoId = photoId;
-
-            /* Load the profile photo using the existing ZOHO.CRM.API.getFile implementation */
-            await new Promise(function (resolve) {
-              var config = { id: photoId };
-              ZOHO.CRM.API.getFile(config)
-                .then(function (resp) {
-                  if (!resp) { resolve(); return; }
-                  var imgBlob = new Blob([resp], { type: 'image/jpeg' });
-                  var reader  = new FileReader();
-                  reader.onloadend = function () {
-                    var dataUrl = reader.result;
-                    evObj.mwAvatarImgSrc = dataUrl;
-                    /* Update the .bp-rec-avatar element for this event if it is
-                       currently visible in any rendered Beat Plan table */
-                    dom.canvas.find('[data-evid="' + evObj.id + '"] .bp-rec-avatar')
-                      .html('<img src="' + escHtml(dataUrl) + '">')
-                      .attr('data-img-src', dataUrl);
-                    resolve();
-                  };
-                  reader.readAsDataURL(imgBlob);
-                })
-                .catch(function () {
-                  /* keep initials fallback */
-                  resolve();
-                });
-            });
-          } catch (err) {
-            console.error('Failed to load avatar for event', rec.id, err);
+          /* Look up the cached record from moduleRecordsMap to read photo_id */
+          var cachedRecs = moduleRecordsMap[modApi] || [];
+          var photoId    = '';
+          for (var ci = 0; ci < cachedRecs.length; ci++) {
+            if (String(cachedRecs[ci].id) === String(mwRecId)) {
+              photoId = cachedRecs[ci].photo_id || '';
+              break;
+            }
           }
+          if (!photoId) { return; }
+
+          evObj.mwPhotoId = photoId;
+
+          /* Load the profile photo using the existing ZOHO.CRM.API.getFile implementation */
+          await new Promise(function (resolve) {
+            ZOHO.CRM.API.getFile({ id: photoId })
+              .then(function (resp) {
+                if (!resp) { resolve(); return; }
+                var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+                var reader  = new FileReader();
+                reader.onloadend = function () {
+                  var dataUrl = reader.result;
+                  evObj.mwAvatarImgSrc = dataUrl;
+                  /* Update the .bp-rec-avatar element for this event if it is
+                     currently visible in any rendered Beat Plan table */
+                  dom.canvas.find('[data-evid="' + evObj.id + '"] .bp-rec-avatar')
+                    .html('<img src="' + escHtml(dataUrl) + '">')
+                    .attr('data-img-src', dataUrl)
+                    .attr('data-photo-id', photoId);
+                  resolve();
+                };
+                reader.readAsDataURL(imgBlob);
+              })
+              .catch(function () {
+                /* keep initials fallback */
+                resolve();
+              });
+          });
         });
 
         await Promise.all(avatarLoadPromises);
