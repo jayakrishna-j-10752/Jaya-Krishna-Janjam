@@ -3244,7 +3244,7 @@ $(function () {
 
       console.log(query.select_query);
       var coqlRes     = await zrc.post('/crm/v8/coql', query);
-      console.log(coqlRes.data.data);
+      console.log(coqlRes && coqlRes.data && coqlRes.data.data);
       var allCoqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
 
       /* Filter by owner client-side — COQL does not support Owner field filtering
