@@ -3178,6 +3178,10 @@ $(function () {
   async function loadBeatPlanEvents() {
     if (!beatPlanHasRefs || !bpSavedRec) { return; }
 
+    /* Capture a generation token so that stale responses (from a previous call
+       that was superseded by a newer user selection) are silently discarded. */
+    var myGen = ++beatPlanLoadGen;
+
     /* ── Show horizontal loading bar and disable calendar interactions ── */
     $('#bpEventsLoader').show();
     $('.cal-body').addClass('cal-body--loading');
@@ -3247,6 +3251,11 @@ $(function () {
 
       console.log(query.select_query);
       var coqlRes     = await zrc.post('/crm/v8/coql', query);
+
+      /* Discard this response if a newer loadBeatPlanEvents() call has since started
+         (e.g. the user switched to a different owner while this request was in flight). */
+      if (myGen !== beatPlanLoadGen) { return; }
+
       console.log(coqlRes && coqlRes.data && coqlRes.data.data);
       var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
 
@@ -3364,10 +3373,13 @@ $(function () {
     } catch (err) {
       console.error('Failed to load Daily Beat Plans:', err);
     } finally {
-      /* Hide loader and restore calendar interactions regardless of success/failure */
-      $('#bpEventsLoader').hide();
-      $('.cal-body').removeClass('cal-body--loading');
-      $('#userProfile').prop('disabled', false);
+      /* Hide loader and restore calendar interactions only if this is still the
+         most-recent call (a newer call will handle its own cleanup). */
+      if (myGen === beatPlanLoadGen) {
+        $('#bpEventsLoader').hide();
+        $('.cal-body').removeClass('cal-body--loading');
+        $('#userProfile').prop('disabled', false);
+      }
     }
   }
 
@@ -4099,6 +4111,7 @@ $(function () {
   var bpDailyAllFields    = [];     /* all fields from beatplanner__Daily_Beat_Plans (including lookups) */
   var bprStyleConfig      = null;   /* style slot → field API name, read directly from BPR record */
   var bpSavedRec          = null;   /* saved beatplanner__Beat_Plan_References record (for navigation reloads) */
+  var beatPlanLoadGen     = 0;      /* incremented on every loadBeatPlanEvents() call; used to discard stale responses */
   var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
   var monthlyBeatPlanId   = null;   /* ID of the beatplanner__Monthly_Beat_Plans record for the open modal's month */
 
