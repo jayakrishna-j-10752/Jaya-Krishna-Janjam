@@ -4022,10 +4022,27 @@ $(function () {
       var userId = $(this).data('uid');
       var user   = userMap[userId];
       if (!user) return;
-      /* Capture the previously displayed user BEFORE updating, so we can detect a change */
-      var prevUserId = $('#userProfile').attr('data-userid');
+
+      /* Compare the selected user against the currently active user BEFORE modifying anything */
+      var currentUserId = $('#userProfile').attr('data-userid');
+
+      /* Case 1 — Same user: close the selector and do nothing else */
+      if (String(userId) === String(currentUserId)) {
+        closeUserDropdown();
+        return;
+      }
+
+      /* Case 2 — Different user */
+
+      /* Step 1: Immediately clear all COQL-loaded events so the calendar appears
+         empty before the new user's events are fetched. */
+      if (beatPlanHasRefs && bpSavedRec) {
+        state.events = state.events.filter(function (ev) { return !ev.fromCoql; });
+        render();
+      }
+
+      /* Step 2: Update #userProfile and the header with the selected user's details */
       activeUserId = userId;
-      /* Persist the selected user ID on the profile button for use during record creation */
       $('#userProfile').attr('data-userid', userId);
       $('.user-name').text(user.full_name);
       /* Copy the exact avatar content from the selected .ud-item-avatar so the
@@ -4033,8 +4050,10 @@ $(function () {
       var avatarHtml = $(this).find('.ud-item-avatar').html();
       $('.user-avatar').html(avatarHtml || buildAvatarInnerHtml(user));
       closeUserDropdown();
-      /* Reload events only when the selected user is different from the current one */
-      if (beatPlanHasRefs && bpSavedRec && String(userId) !== String(prevUserId)) {
+
+      /* Steps 3-5: Execute the existing COQL query, filter the response
+         client-side by Owner.id, and render only the selected user's events. */
+      if (beatPlanHasRefs && bpSavedRec) {
         loadBeatPlanEvents();
       }
     });
