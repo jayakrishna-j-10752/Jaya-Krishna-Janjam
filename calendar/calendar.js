@@ -3211,8 +3211,10 @@ $(function () {
         }
       });
 
-      /* SELECT: id + beatplanner__Managers_Approval + dynamic fields (deduped) */
-      var selectFields = ['id', 'beatplanner__Managers_Approval'];
+      /* SELECT: id + beatplanner__Managers_Approval + Owner + dynamic fields (deduped).
+         Owner is included so we can filter client-side (COQL does not support Owner
+         filtering on custom/third-party modules). */
+      var selectFields = ['id', 'beatplanner__Managers_Approval', 'Owner'];
       dynamicFields.forEach(function (api) {
         if (selectFields.indexOf(api) === -1) { selectFields.push(api); }
       });
@@ -3235,8 +3237,6 @@ $(function () {
             (beatplanner__Date_Time_From >= '${currentViewStart}' AND beatplanner__Date_Time_From <= '${currentViewEnd}')
             AND
             (beatplanner__Date_Time_To >= '${currentViewStart}' AND beatplanner__Date_Time_To <= '${currentViewEnd}')
-            AND
-            (Owner.id = '${ownerId}')
           )
           LIMIT 0,2000
         `.replace(/\s+/g, ' ').trim()
@@ -3245,7 +3245,15 @@ $(function () {
       console.log(query.select_query);
       var coqlRes     = await zrc.post('/crm/v8/coql', query);
       console.log(coqlRes.data.data);
-      var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
+      var allCoqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
+
+      /* Filter by owner client-side — COQL does not support Owner field filtering
+         on custom/third-party modules and returns SYNTAX_ERROR when attempted. */
+      var coqlRecords = ownerId
+        ? allCoqlRecords.filter(function (rec) {
+            return rec.Owner && String(rec.Owner.id) === String(ownerId);
+          })
+        : allCoqlRecords;
 
       /* Step 5: Remove previously COQL-loaded events; keep user-created events */
       state.events = state.events.filter(function (e) { return !e.fromCoql; });
