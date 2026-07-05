@@ -3226,8 +3226,7 @@ $(function () {
       var dynamicFieldList = selectFields.filter(function (f) { return f !== 'id'; }).join(', ');
       var currentViewStart = bounds.startDt;
       var currentViewEnd   = bounds.endDt;
-      var ownerId = $('#userProfile').data('userid');
-      var meetingModules = mfModuleLabels.map(function (v) { return "'" + v + "'"; }).join(',');
+      var ownerId = activeUserId;
       var query = {
         select_query: `
           SELECT
@@ -3238,8 +3237,6 @@ $(function () {
             (beatplanner__Date_Time_From >= '${currentViewStart}' AND beatplanner__Date_Time_From <= '${currentViewEnd}')
             AND
             (beatplanner__Date_Time_To >= '${currentViewStart}' AND beatplanner__Date_Time_To <= '${currentViewEnd}')
-            AND
-            (Meetings_For IN (${meetingModules}))
           )
           LIMIT 0,2000
         `.replace(/\s+/g, ' ').trim()
