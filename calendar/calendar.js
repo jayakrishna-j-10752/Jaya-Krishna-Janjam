@@ -2583,8 +2583,18 @@ $(function () {
     var toolbarHtml =
       '<div class="dem-bulk-toolbar" style="display:none;">' +
         '<span class="dem-sel-count"></span>' +
-        '<button class="dem-mass-update-btn" type="button">Mass Update</button>' +
-        '<button class="dem-mass-delete-btn" type="button">Mass Delete</button>' +
+        '<div class="dem-actions-dropdown">' +
+          '<button class="dem-actions-btn" type="button">' +
+            'Actions' +
+            '<svg class="dem-actions-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="6"><path d="M1 1l4 4 4-4"/></svg>' +
+          '</button>' +
+          '<ul class="dem-actions-menu" role="menu">' +
+            '<li><button class="dem-mass-update-btn" type="button" role="menuitem">Mass Update</button></li>' +
+            '<li><button class="dem-mass-delete-btn" type="button" role="menuitem">Mass Delete</button></li>' +
+            '<li><button class="dem-mass-approve-btn" type="button" role="menuitem">Mass Approve</button></li>' +
+            '<li><button class="dem-mass-reject-btn" type="button" role="menuitem">Mass Reject</button></li>' +
+          '</ul>' +
+        '</div>' +
       '</div>';
 
     /* ── Table header ── */
@@ -6349,6 +6359,28 @@ $(function () {
       syncDemBulkToolbar();
     });
 
+    /* Actions dropdown toggle */
+    $(document).on('click', '#demBulkGrid .dem-actions-btn', function (e) {
+      e.stopPropagation();
+      var $btn  = $(this);
+      var $menu = $btn.siblings('.dem-actions-menu');
+      var isOpen = $menu.hasClass('dem-actions-menu-open');
+      $('.dem-actions-menu').removeClass('dem-actions-menu-open');
+      $('.dem-actions-btn').removeClass('dem-actions-open');
+      if (!isOpen) {
+        $menu.addClass('dem-actions-menu-open');
+        $btn.addClass('dem-actions-open');
+      }
+    });
+
+    /* Close Actions dropdown when clicking outside */
+    $(document).on('click', function (e) {
+      if (!$(e.target).closest('.dem-actions-dropdown').length) {
+        $('.dem-actions-menu').removeClass('dem-actions-menu-open');
+        $('.dem-actions-btn').removeClass('dem-actions-open');
+      }
+    });
+
     /* Select-All header checkbox → check/uncheck all rows */
     $(document).on('change', '#demBulkGrid .bp-select-all-cb', function () {
       var checked = $(this).is(':checked');
@@ -6549,6 +6581,7 @@ $(function () {
     $(document).on('click', '#demBulkGrid .dem-mass-update-btn', async function () {
       var $btn  = $(this);
       var $grid = $('#demBulkGrid');
+      $('.dem-actions-menu').removeClass('dem-actions-menu-open');
 
       var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
         return $(this).find('.bp-row-cb').is(':checked');
@@ -6731,6 +6764,7 @@ $(function () {
     $(document).on('click', '#demBulkGrid .dem-mass-delete-btn', async function () {
       var $btn  = $(this);
       var $grid = $('#demBulkGrid');
+      $('.dem-actions-menu').removeClass('dem-actions-menu-open');
 
       var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
         return $(this).find('.bp-row-cb').is(':checked');
@@ -6810,6 +6844,131 @@ $(function () {
         showToast(deleted + ' beat plan record(s) deleted.');
       }
     });
+
+    /* ── demBulkGrid: Mass Approve ── */
+    $(document).on('click', '#demBulkGrid .dem-mass-approve-btn', async function () {
+      var $btn  = $(this);
+      var $grid = $('#demBulkGrid');
+      $('.dem-actions-menu').removeClass('dem-actions-menu-open');
+
+      var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
+        return $(this).find('.bp-row-cb').is(':checked');
+      });
+      if ($checkedRows.length === 0) { return; }
+
+      $btn.prop('disabled', true);
+      var updated = 0;
+      var failed  = 0;
+
+      var batchData = [];
+      var batchRows = [];
+      for (var ai = 0; ai < $checkedRows.length; ai++) {
+        var $aRow  = $($checkedRows[ai]);
+        var aId    = String($aRow.data('editId') || '');
+        if (!aId) { continue; }
+        batchData.push({ id: aId, beatplanner__Managers_Approval: 'Approved' });
+        batchRows.push({ $row: $aRow, editId: aId });
+      }
+
+      if (batchData.length > 0) {
+        try {
+          var approveResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', { data: batchData });
+          var approveResults = (approveResp && approveResp.data && approveResp.data.data) ? approveResp.data.data : [];
+          for (var aj = 0; aj < batchRows.length; aj++) {
+            var aResult = approveResults[aj] || {};
+            if (aResult.status === 'success') {
+              var aEvIdx = state.events.findIndex(function (e) { return e.id === batchRows[aj].editId; });
+              if (aEvIdx !== -1) {
+                if (!state.events[aEvIdx].bprFieldValues) { state.events[aEvIdx].bprFieldValues = {}; }
+                state.events[aEvIdx].bprFieldValues['beatplanner__Managers_Approval'] = 'Approved';
+              }
+              updated++;
+            } else {
+              console.error('Mass approve failed for record', batchRows[aj].editId, aResult);
+              failed++;
+            }
+          }
+        } catch (aErr) {
+          console.error('Mass approve batch request failed', aErr);
+          failed = batchData.length;
+        }
+      }
+
+      saveEvents();
+      render();
+      $grid.find('.bp-row-cb').prop('checked', false);
+      $grid.find('.bp-select-all-cb').prop('checked', false).prop('indeterminate', false);
+      syncDemBulkToolbar();
+      $btn.prop('disabled', false);
+      if (failed > 0) {
+        showToast(updated + ' record(s) approved. ' + failed + ' failed.');
+      } else {
+        showToast(updated + ' beat plan record(s) approved.');
+      }
+    });
+
+    /* ── demBulkGrid: Mass Reject ── */
+    $(document).on('click', '#demBulkGrid .dem-mass-reject-btn', async function () {
+      var $btn  = $(this);
+      var $grid = $('#demBulkGrid');
+      $('.dem-actions-menu').removeClass('dem-actions-menu-open');
+
+      var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
+        return $(this).find('.bp-row-cb').is(':checked');
+      });
+      if ($checkedRows.length === 0) { return; }
+
+      $btn.prop('disabled', true);
+      var updated = 0;
+      var failed  = 0;
+
+      var batchData = [];
+      var batchRows = [];
+      for (var rri = 0; rri < $checkedRows.length; rri++) {
+        var $rRow  = $($checkedRows[rri]);
+        var rId    = String($rRow.data('editId') || '');
+        if (!rId) { continue; }
+        batchData.push({ id: rId, beatplanner__Managers_Approval: 'Rejected' });
+        batchRows.push({ $row: $rRow, editId: rId });
+      }
+
+      if (batchData.length > 0) {
+        try {
+          var rejectResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', { data: batchData });
+          var rejectResults = (rejectResp && rejectResp.data && rejectResp.data.data) ? rejectResp.data.data : [];
+          for (var rj = 0; rj < batchRows.length; rj++) {
+            var rResult = rejectResults[rj] || {};
+            if (rResult.status === 'success') {
+              var rEvIdx = state.events.findIndex(function (e) { return e.id === batchRows[rj].editId; });
+              if (rEvIdx !== -1) {
+                if (!state.events[rEvIdx].bprFieldValues) { state.events[rEvIdx].bprFieldValues = {}; }
+                state.events[rEvIdx].bprFieldValues['beatplanner__Managers_Approval'] = 'Rejected';
+              }
+              updated++;
+            } else {
+              console.error('Mass reject failed for record', batchRows[rj].editId, rResult);
+              failed++;
+            }
+          }
+        } catch (rErr) {
+          console.error('Mass reject batch request failed', rErr);
+          failed = batchData.length;
+        }
+      }
+
+      saveEvents();
+      render();
+      $grid.find('.bp-row-cb').prop('checked', false);
+      $grid.find('.bp-select-all-cb').prop('checked', false).prop('indeterminate', false);
+      syncDemBulkToolbar();
+      $btn.prop('disabled', false);
+      if (failed > 0) {
+        showToast(updated + ' record(s) rejected. ' + failed + ' failed.');
+      } else {
+        showToast(updated + ' beat plan record(s) rejected.');
+      }
+    });
+
     $(document).on('click', function (e) {
       /* Clicks inside an open trigger wrap (in either grid) must not close */
       if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length &&

@@ -3010,33 +3010,77 @@ input, select, textarea {
   color: var(--text-secondary);
   flex: 1;
 }
-.dem-mass-update-btn,
-.dem-mass-delete-btn {
+.dem-actions-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.dem-actions-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 5px 14px;
   border-radius: var(--radius-sm, 6px);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background .12s, color .12s, border-color .12s;
-  border: 1.5px solid;
-}
-.dem-mass-update-btn {
+  border: 1.5px solid var(--z-blue, #1565C0);
   background: var(--z-blue-pale, rgba(21,101,192,.08));
   color: var(--z-blue, #1565C0);
-  border-color: var(--z-blue, #1565C0);
 }
-.dem-mass-update-btn:hover {
+.dem-actions-btn:hover {
   background: var(--z-blue, #1565C0);
   color: #fff;
 }
-.dem-mass-delete-btn {
-  background: transparent;
-  color: var(--z-red, #c62828);
-  border-color: var(--z-red, #c62828);
+.dem-actions-chevron {
+  transition: transform .15s;
+}
+.dem-actions-menu-open + .dem-actions-chevron,
+.dem-actions-btn.dem-actions-open .dem-actions-chevron {
+  transform: rotate(180deg);
+}
+.dem-actions-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  z-index: 200;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.dem-actions-menu.dem-actions-menu-open {
+  display: block;
+}
+.dem-actions-menu li {
+  margin: 0;
+  padding: 0;
+}
+.dem-actions-menu li button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary, #222);
+  transition: background .1s;
+}
+.dem-actions-menu li button:hover {
+  background: var(--surface-hover, rgba(21,101,192,.07));
+  color: var(--z-blue, #1565C0);
 }
 .dem-mass-delete-btn:hover {
-  background: var(--z-red, #c62828);
-  color: #fff;
+  background: var(--z-red-pale, rgba(198,40,40,.07));
+  color: var(--z-red, #c62828);
 }
 
 /* Each event card in the day events modal */
