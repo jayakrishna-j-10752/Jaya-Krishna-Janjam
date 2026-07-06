@@ -506,6 +506,72 @@ input, select, textarea {
   overflow: hidden;
 }
 
+/* ── Beat Planner Calendar Event Filter Bar ── */
+.bp-cal-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 6px 14px;
+  background: var(--surface-1, #fff);
+  border-bottom: 1px solid var(--border, rgba(0,0,0,.08));
+  font-size: 12px;
+}
+.bp-cal-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.bp-cal-filter-lbl {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+}
+.bp-cal-filter-select {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--border, rgba(0,0,0,.12));
+  border-radius: var(--radius-sm);
+  background: var(--surface-1, #fff);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  max-width: 140px;
+  transition: border-color .12s;
+}
+.bp-cal-filter-select:focus  { border-color: var(--accent, #1565C0); }
+.bp-cal-filter-select--active { border-color: var(--accent, #1565C0); color: var(--accent, #1565C0); }
+.theme-dark  .bp-cal-filter-bar,
+.theme-night .bp-cal-filter-bar {
+  background: var(--surface-2);
+  border-bottom-color: var(--border);
+}
+.theme-dark  .bp-cal-filter-select,
+.theme-night .bp-cal-filter-select {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.bp-cal-filter-clear-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border, rgba(0,0,0,.12));
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.bp-cal-filter-clear-btn:hover { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); border-color: var(--z-red, #C62828); }
+
 /* ══════════════════════════════════════════════════════════
    MONTH VIEW
 ══════════════════════════════════════════════════════════ */
@@ -4887,24 +4953,28 @@ input, select, textarea {
   height: 14px;
   pointer-events: none;
 }
+/* Base hover: matches .hc-act:hover */
 .bp-row-action:hover             { background: rgba(0,0,0,.08); color: var(--text-primary); }
-.bp-row-save:hover               { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); }
-.bp-row-copy:hover               { background: #ede7f6; color: #4527a0; }
-.bp-row-paste:hover              { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); }
-.bp-row-delete:hover             { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); }
-.bp-row-approve:hover            { background: #e8f5e9; color: #2e7d32; }
-.bp-row-reject:hover             { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); }
+/* Per-button color accents: matches hc-act-* hover color rules (no custom background) */
+.bp-row-save:hover               { color: var(--z-blue, #1565C0); }
+.bp-row-paste:hover              { color: var(--z-blue, #1565C0); }
+.bp-row-delete:hover             { color: var(--z-red, #C62828); }
+.bp-row-approve:hover            { color: #2e7d32; }
+.bp-row-reject:hover             { color: #c62828; }
+/* Dark / Night theme: use surface-2 hover background to match hover card */
+.theme-dark  .bp-row-action:hover,
+.theme-night .bp-row-action:hover { background: var(--surface-2); }
 .bp-row-action[disabled],
 .bp-row-paste:disabled           { opacity: 0.3; pointer-events: none; cursor: not-allowed; }
 
-/* ── Approval / Rejection state indicators on row action buttons ── */
+/* ── Approval / Rejection state indicators: icon color only, no background ── */
 /* Approved: approve icon is highlighted green; reject icon is dimmed */
-.bp-row-approve.is-approved          { color: #2e7d32; background: #e8f5e9; opacity: 1; }
-.bp-row-approve.is-approved:hover    { color: #2e7d32; background: #c8e6c9; }
+.bp-row-approve.is-approved          { color: #2e7d32; opacity: 1; }
+.bp-row-approve.is-approved:hover    { color: #2e7d32; }
 .bp-row-reject.is-approved           { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 /* Rejected: reject icon is highlighted red; approve icon is dimmed */
-.bp-row-reject.is-rejected           { color: var(--z-red, #C62828); background: var(--z-red-pale, #FDECEA); opacity: 1; }
-.bp-row-reject.is-rejected:hover     { color: var(--z-red, #C62828); background: #ffcdd2; }
+.bp-row-reject.is-rejected           { color: var(--z-red, #C62828); opacity: 1; }
+.bp-row-reject.is-rejected:hover     { color: var(--z-red, #C62828); }
 .bp-row-approve.is-rejected          { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 
 /* ── Edit row: white text and icon colours for readability on accent backgrounds ── */

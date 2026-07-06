@@ -230,8 +230,19 @@ $(function () {
      EVENT HELPERS
   ────────────────────────────────────────────────────────── */
   function eventsOn(ds) {
-    return state.events.filter(function (e) { return e.date === ds; })
-                       .sort(function (a, b) { return a.startTime.localeCompare(b.startTime); });
+    return state.events.filter(function (e) {
+      if (e.date !== ds) { return false; }
+      /* Apply active calendar event filters */
+      var keys = Object.keys(calEventFilters);
+      for (var i = 0; i < keys.length; i++) {
+        var api = keys[i];
+        var sel = calEventFilters[api];
+        if (!sel) { continue; } /* empty string = "All" */
+        var evVal = (e.bprFieldValues && e.bprFieldValues[api]) ? e.bprFieldValues[api] : '';
+        if (evVal !== sel) { return false; }
+      }
+      return true;
+    }).sort(function (a, b) { return a.startTime.localeCompare(b.startTime); });
   }
 
   function findEvent(id) {
@@ -4217,6 +4228,9 @@ $(function () {
   var activeModuleFilters   = {};  /* {moduleName: {fieldApiName: ['val1','val2']}} – currently applied filter selections */
   var filteredModuleRecords = {};  /* {moduleName: [{id, name, photo_id}]} – records matching active filters */
 
+  /* ── Calendar Event Filters state (client-side event filtering by BPR picklist values) ── */
+  var calEventFilters = {};  /* {fieldApiName: 'selectedValue'} – '' means "All" (no filter) */
+
   /* ── Hover preview card state ── */
   var hoverTimer    = null;  /* debounce timer – delays hiding the hover card */
   var hoverActiveId = null;  /* event id of the currently-visible hover card */
@@ -6087,14 +6101,15 @@ $(function () {
           });
           console.log('Daily Beat Plan updated', editId);
 
-          /* Update the in-memory event */
+          /* Update the in-memory event – merge so any fields not collected from the form
+             (e.g. future-added BPR columns) are preserved from the original event. */
           var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
           if (evIdx !== -1) {
             var updEv          = state.events[evIdx];
             updEv.title          = mwName || (mfDisplayVal || 'Beat Plan');
             updEv.startTime      = startTime;
             updEv.endTime        = endTime;
-            updEv.bprFieldValues = bprFieldValues;
+            updEv.bprFieldValues = Object.assign({}, updEv.bprFieldValues || {}, bprFieldValues);
             updEv.mwAvatarImgSrc = mwAvatarImgSrc;
             updEv.mwAvatarText   = mwAvatarText;
             updEv.mwPhotoId      = mwPhotoId;
@@ -6507,14 +6522,15 @@ $(function () {
           data: [Object.assign({ id: editId }, recordData)]
         });
 
-        /* Update in-memory event */
+        /* Update in-memory event – merge new values so fields not shown in the Day Events
+           Modal (Attendance, Leave Type) are preserved from the original event. */
         var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
         if (evIdx !== -1) {
           var updEv          = state.events[evIdx];
           updEv.title          = mwName || (mfDisplayVal || 'Beat Plan');
           updEv.startTime      = startTime;
           updEv.endTime        = endTime;
-          updEv.bprFieldValues = bprFieldValues;
+          updEv.bprFieldValues = Object.assign({}, updEv.bprFieldValues || {}, bprFieldValues);
           updEv.mwAvatarImgSrc = mwAvatarImgSrc;
           updEv.mwAvatarText   = mwAvatarText;
           updEv.mwPhotoId      = mwPhotoId;
@@ -7032,6 +7048,32 @@ $(function () {
     });
 
     /* ── Filter Panel event handlers ── */
+
+    /* Calendar event filter bar: a select changes → update calEventFilters and re-render */
+    $(document).on('change', '#bpCalFilterBar .bp-cal-filter-select', function () {
+      var api = String($(this).data('api') || '');
+      var val = $(this).val() || '';
+      if (api) {
+        if (val) {
+          calEventFilters[api] = val;
+          $(this).addClass('bp-cal-filter-select--active');
+        } else {
+          delete calEventFilters[api];
+          $(this).removeClass('bp-cal-filter-select--active');
+        }
+      }
+      /* Show/hide the Clear filters button */
+      var hasActive = Object.keys(calEventFilters).some(function (k) { return !!calEventFilters[k]; });
+      $('#bpCalFilterClear').toggle(hasActive);
+      render();
+    });
+
+    /* Calendar event filter bar: Clear All button */
+    $(document).on('click', '#bpCalFilterClear', function () {
+      calEventFilters = {};
+      buildCalFilterBar(); /* rebuild to reset all selects to "All" */
+      render();
+    });
 
     /* Open filter panel when Filter button is clicked */
     $(document).on('click', '#bpFilterBtn', function (e) {
@@ -7790,9 +7832,57 @@ $(function () {
   /* ── Filter Panel helpers ── */
 
   /**
-   * Position a .bpf-ms-panel using position:fixed so it is never clipped by
-   * overflow:hidden on .bpf-mod-fields or any ancestor container.
+   * Build and render the calendar event filter bar (#bpCalFilterBar).
+   * Called once after bprPicklistFields are loaded and beatPlanHasRefs is true.
+   * Generates one <select> per picklist field from beatplanner__Daily_Beat_Plans,
+   * omitting purely internal fields that are not useful as event filters.
    */
+  function buildCalFilterBar() {
+    var $bar = $('#bpCalFilterBar');
+    if (!$bar.length || !beatPlanHasRefs || !bprPicklistFields || !bprPicklistFields.length) {
+      $bar.hide();
+      return;
+    }
+
+    /* Fields to exclude from the filter bar (internal / low-value) */
+    var EXCLUDED = ['record status', 'currency', 'unsubscribed mode'];
+
+    var html = '';
+    bprPicklistFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase().trim();
+      if (EXCLUDED.indexOf(lbl) !== -1) { return; }
+      if (!f.options || !f.options.length) { return; }
+
+      var currentVal = calEventFilters[f.api_name] || '';
+      var activeClass = currentVal ? ' bp-cal-filter-select--active' : '';
+
+      html += '<div class="bp-cal-filter-item">' +
+              '<span class="bp-cal-filter-lbl">' + escHtml(f.field_label) + '</span>' +
+              '<select class="bp-cal-filter-select' + activeClass + '" data-api="' + escHtml(f.api_name) + '">' +
+              '<option value="">All</option>';
+      f.options.forEach(function (opt) {
+        var display = (typeof opt === 'object') ? (opt.display || opt.actual || '') : String(opt);
+        var actual  = (typeof opt === 'object') ? (opt.actual  || opt.display || '') : String(opt);
+        var sel = (actual === currentVal || display === currentVal) ? ' selected' : '';
+        html += '<option value="' + escHtml(actual) + '"' + sel + '>' + escHtml(display) + '</option>';
+      });
+      html += '</select></div>';
+    });
+
+    if (!html) {
+      $bar.hide();
+      return;
+    }
+
+    /* Add a "Clear filters" button at the right end */
+    var hasActive = Object.values(calEventFilters).some(function (v) { return !!v; });
+    html += '<button class="bp-cal-filter-clear-btn" id="bpCalFilterClear" type="button"' +
+            (hasActive ? '' : ' style="display:none;"') + '>Clear filters</button>';
+
+    $bar.html(html).show();
+  }
+
+
   function positionBpMsPanel($wrap) {
     var triggerEl = $wrap.find('.bpf-ms-trigger')[0];
     var $panel    = $wrap.find('.bpf-ms-panel');
@@ -8722,6 +8812,9 @@ $(function () {
          any user interaction can trigger event rendering. */
       restorePreferences(savedRec);
       applyBprChipStyles();
+
+      /* Build the calendar event filter bar now that picklist metadata is available. */
+      buildCalFilterBar();
 
       /* Pre-fetch picklist metadata for ALL modules so the Filter panel opens instantly. */
       fetchAllModulePicklistMeta();
