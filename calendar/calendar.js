@@ -2881,33 +2881,34 @@ $(function () {
     if (beatPlanHasRefs) {
       dom.demList.addClass('dem-table-mode');
       dom.dayEventsModal.find('.day-events-modal-box').addClass('dem-box-wide');
-      dom.demList.html('<div class="dem-loading">Loading\u2026</div>');
-
-      /* Ensure picklist metadata is loaded */
-      if (bprPicklistFields === null) {
-        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
-      }
-
-      /* Fetch CRM records for all events in parallel */
-      var crmRecordsMap = {};
-      var fetchPromises = evts.map(function (ev) {
-        return ZOHO.CRM.API.getRecord({
-          Entity:   'beatplanner__Daily_Beat_Plans',
-          RecordID: ev.id
-        }).then(function (resp) {
-          if (resp && resp.data && resp.data[0]) {
-            crmRecordsMap[ev.id] = resp.data[0];
-          }
-        }).catch(function (err) {
-          console.error('showDayEventsModal: failed to fetch record', ev.id, err);
-        });
-      });
-      await Promise.all(fetchPromises);
 
       if (evts.length === 0) {
         dom.demList.html('<div class="dem-loading">No events on this day.</div>');
         return;
       }
+
+      /* Ensure picklist metadata is loaded */
+      if (bprPicklistFields === null) {
+        dom.demList.html('<div class="dem-loading">Loading\u2026</div>');
+        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+      }
+
+      /* Build crmRecordsMap from already-loaded COQL event data – no API call needed */
+      var crmRecordsMap = {};
+      evts.forEach(function (ev) {
+        var synthetic = {};
+        /* Copy all stored string field values */
+        if (ev.bprFieldValues) {
+          Object.keys(ev.bprFieldValues).forEach(function (key) {
+            synthetic[key] = ev.bprFieldValues[key];
+          });
+        }
+        /* Restore the Meeting With lookup object so buildDemBulkTable can resolve id/name */
+        if (ev.mwLookupApi && ev.mwRecordId) {
+          synthetic[ev.mwLookupApi] = { id: ev.mwRecordId, name: ev.title || '' };
+        }
+        crmRecordsMap[ev.id] = synthetic;
+      });
 
       dom.demList.html(buildDemBulkTable(ds, evts, crmRecordsMap));
       return;
@@ -3094,16 +3095,6 @@ $(function () {
   ────────────────────────────────────────────────────────── */
 
   function navigate(dir) {
-    var c = state.cursor;
-    if (state.view === 'month') {
-      state.cursor = new Date(c.getFullYear(), c.getMonth() + dir, 1);
-    } else if (state.view === 'week') {
-      var d = new Date(c); d.setDate(d.getDate() + dir * 7);
-      state.cursor = d;
-    } else {
-      var d = new Date(c); d.setDate(d.getDate() + dir);
-      state.cursor = d;
-    }
     var c = state.cursor;
     if (state.view === 'month') {
       state.cursor = new Date(c.getFullYear(), c.getMonth() + dir, 1);
