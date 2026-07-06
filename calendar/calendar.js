@@ -2341,11 +2341,20 @@ $(function () {
     var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
 
     /* Apply the same metadata-driven styling as the .evt-chip being edited.
+       Use the fresh crmRecord Attendance/Leave Type values so the row colour
+       stays in sync with the record rather than the (potentially stale) COQL cache.
        With border-collapse:separate, border-* on <tr> does not render — the
        background is applied to the <tr>; all border sides go to individual <td>s:
        left + top + bottom borders on the first cell, top + bottom on middle cells,
        and top + bottom + right on the last cell. */
-    var editRowStyles = buildBprEventStyles(ev);
+    var styleEv = ev;
+    if (crmRecord && (attendApi || leaveApi)) {
+      var mergedVals = Object.assign({}, ev.bprFieldValues || {});
+      if (existingAttend) { mergedVals[attendApi] = existingAttend; }
+      if (existingLeave)  { mergedVals[leaveApi]  = existingLeave; }
+      styleEv = { bprFieldValues: mergedVals };
+    }
+    var editRowStyles = buildBprEventStyles(styleEv);
     var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
     var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
     var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
@@ -2529,6 +2538,17 @@ $(function () {
       if (lbl === 'end time')     { endTimeApi   = f.api_name || endTimeApi;   endTimeLbl   = f.field_label || endTimeLbl; }
       if (lbl === 'meetings for') { mfFieldApi   = f.api_name || mfFieldApi;   mfFieldLabel = f.field_label || mfFieldLabel; }
     });
+
+    /* ── Filter action bar (same #bpFilterBtn as in #eventModal) ── */
+    var demFilterBar =
+      '<div class="bp-attend-bar">' +
+        '<div class="bp-filter-action">' +
+          '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+            '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
+            'Filter' +
+          '</button>' +
+        '</div>' +
+      '</div>';
 
     /* ── Bulk-actions toolbar (hidden until at least one row is checked) ── */
     var toolbarHtml =
@@ -2719,6 +2739,7 @@ $(function () {
     tableHtml += '</tbody></table>';
 
     return '<div id="demBulkGrid" class="bp-plan-container" data-date="' + escHtml(date) + '">' +
+           demFilterBar +
            toolbarHtml +
            '<div class="bp-slots-wrap">' + tableHtml + '</div>' +
            '</div>';
@@ -2911,6 +2932,21 @@ $(function () {
       });
 
       dom.demList.html(buildDemBulkTable(ds, evts, crmRecordsMap));
+
+      /* Populate avatars from the photo cache — no new API calls needed */
+      evts.forEach(function (ev) {
+        if (!ev.mwAvatarImgSrc) return;
+        var $row = dom.demList.find('.bp-slot-row[data-edit-id="' + ev.id + '"]');
+        if (!$row.length) return;
+        var $avatar = $row.find('.bp-rec-avatar');
+        if (!$avatar.length) return;
+        $avatar.html('<img src="' + escHtml(ev.mwAvatarImgSrc) + '">')
+               .attr('data-img-src', ev.mwAvatarImgSrc)
+               .attr('data-photo-id', ev.mwPhotoId || '')
+               .addClass('bp-rec-avatar--show');
+      });
+
+      updateFilterBadge();
       return;
     }
 
@@ -3690,6 +3726,7 @@ $(function () {
           state.cursor = new Date(y, m, 1);
           closePicker();
           render();
+          if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
         } else {
           /* In week/day view: switch picker to day grid for chosen month */
           picker.viewYear  = y;
@@ -3716,6 +3753,23 @@ $(function () {
       }
       closePicker();
       render();
+      if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
+    });
+
+    /* Week row click (week/day view): navigate to the week containing this row */
+    $('#cpGrid').on('click', '.cp-week-row', function (e) {
+      e.stopPropagation();
+      if (state.view === 'month') return;
+      /* Find the first date in this row */
+      var $firstDay = $(this).find('.cp-day[data-date]').first();
+      var ds = $firstDay.data('date');
+      if (!ds) return;
+      var parts = ds.split('-');
+      var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      state.cursor = (state.view === 'week') ? weekStart(d) : d;
+      closePicker();
+      render();
+      if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
 
     /* Footer button – jump to current period */
@@ -3724,6 +3778,7 @@ $(function () {
       state.cursor = new Date();
       closePicker();
       render();
+      if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
 
     /* Close picker when clicking outside */
@@ -4032,12 +4087,20 @@ $(function () {
 
       /* Case 2 — Different user */
 
-      /* Step 1: Immediately clear all COQL-loaded events so the calendar appears
-         empty before the new user's events are fetched. */
+      /* Step 1: Immediately clear all COQL-loaded events and every piece of
+         owner-specific state so the calendar appears clean before the new
+         user's events are fetched. */
       if (beatPlanHasRefs && bpSavedRec) {
         state.events = state.events.filter(function (ev) { return !ev.fromCoql; });
+        saveEvents();
         render();
       }
+      /* Clear copied event state – clipboard events belong to the previous owner
+         and must not persist after switching users. */
+      state.clipboard       = null;
+      state.clipboardSource = null;
+      /* Clear any filter-based record collections derived for the previous owner. */
+      filteredModuleRecords = {};
 
       /* Step 2: Update #userProfile and the header with the selected user's details */
       activeUserId = userId;
