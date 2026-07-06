@@ -4753,20 +4753,22 @@ input, select, textarea {
   text-align: center;
   vertical-align: middle;
   width: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
+  white-space: nowrap;
 }
 .bp-row-cb {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   margin: 0;
   padding: 0;
-  flex-shrink: 0;
   cursor: pointer;
   accent-color: var(--accent, #1565C0);
   vertical-align: middle;
+}
+/* Keep a small gap between the colour dot and the checkbox */
+.bp-cb-cell .chip-marker {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
 }
 .bp-select-all-cb {
   width: 15px;
@@ -4870,39 +4872,40 @@ input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid transparent;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
   background: none;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background .1s, border-color .1s, color .1s;
+  transition: background .12s, color .12s;
   padding: 0;
+  flex-shrink: 0;
 }
 .bp-row-action svg {
   width: 14px;
   height: 14px;
   pointer-events: none;
 }
-.bp-row-save:hover  { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
-.bp-row-copy:hover  { background: #ede7f6; color: #4527a0; border-color: #4527a0; }
-.bp-row-paste:hover { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); border-color: var(--accent, #1565C0); }
-.bp-row-delete:hover  { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); border-color: var(--z-red, #C62828); }
-.bp-row-approve:hover { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
-.bp-row-reject:hover  { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); border-color: var(--z-red, #C62828); }
-.bp-row-paste:disabled { opacity: 0.38; cursor: not-allowed; }
-.bp-row-paste:disabled:hover { background: none; color: var(--text-secondary); border-color: transparent; }
+.bp-row-action:hover             { background: rgba(0,0,0,.08); color: var(--text-primary); }
+.bp-row-save:hover               { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); }
+.bp-row-copy:hover               { background: #ede7f6; color: #4527a0; }
+.bp-row-paste:hover              { background: var(--z-blue-pale, #E8F0FE); color: var(--accent, #1565C0); }
+.bp-row-delete:hover             { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); }
+.bp-row-approve:hover            { background: #e8f5e9; color: #2e7d32; }
+.bp-row-reject:hover             { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); }
+.bp-row-action[disabled],
+.bp-row-paste:disabled           { opacity: 0.3; pointer-events: none; cursor: not-allowed; }
 
 /* ── Approval / Rejection state indicators on row action buttons ── */
 /* Approved: approve icon is highlighted green; reject icon is dimmed */
-.bp-row-approve.is-approved          { color: #2e7d32; border-color: #2e7d32; background: #e8f5e9; opacity: 1; }
-.bp-row-approve.is-approved:hover    { color: #2e7d32; border-color: #2e7d32; background: #c8e6c9; }
-.bp-row-reject.is-approved           { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+.bp-row-approve.is-approved          { color: #2e7d32; background: #e8f5e9; opacity: 1; }
+.bp-row-approve.is-approved:hover    { color: #2e7d32; background: #c8e6c9; }
+.bp-row-reject.is-approved           { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 /* Rejected: reject icon is highlighted red; approve icon is dimmed */
-.bp-row-reject.is-rejected           { color: var(--z-red, #C62828); border-color: var(--z-red, #C62828); background: var(--z-red-pale, #FDECEA); opacity: 1; }
-.bp-row-reject.is-rejected:hover     { color: var(--z-red, #C62828); border-color: var(--z-red, #C62828); background: #ffcdd2; }
-.bp-row-approve.is-rejected          { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+.bp-row-reject.is-rejected           { color: var(--z-red, #C62828); background: var(--z-red-pale, #FDECEA); opacity: 1; }
+.bp-row-reject.is-rejected:hover     { color: var(--z-red, #C62828); background: #ffcdd2; }
+.bp-row-approve.is-rejected          { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 
 /* ── Edit row: white text and icon colours for readability on accent backgrounds ── */
 .bp-edit-row .bp-time-cell {
