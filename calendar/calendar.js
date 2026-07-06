@@ -2405,6 +2405,8 @@ $(function () {
     var evApprovalVal   = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
     var approvalLocked  = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
     var lockedAttr      = approvalLocked ? ' disabled' : '';
+    var approveClass    = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+    var rejectClass     = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                  ' data-date="' + escHtml(date) + '"' +
@@ -2493,8 +2495,8 @@ $(function () {
                  '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
                  '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                  '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                 '<button class="bp-row-action bp-row-approve" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                 '<button class="bp-row-action bp-row-reject"  type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                 '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                 '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
                  '</td>';
 
     tableHtml += '</tr>';
@@ -2691,6 +2693,8 @@ $(function () {
       var evApprovalVal  = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
       var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
       var lockedAttr     = approvalLocked ? ' disabled' : '';
+      var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+      var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
       tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                    ' data-date="' + escHtml(date) + '"' +
@@ -2768,8 +2772,8 @@ $(function () {
                    '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
                    '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                    '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                   '<button class="bp-row-action bp-row-approve" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                   '<button class="bp-row-action bp-row-reject"  type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
                    '</td>';
 
       tableHtml += '</tr>';
@@ -6565,16 +6569,58 @@ $(function () {
       $btn.prop('disabled', false);
     });
 
-    /* ── demBulkGrid: single-row Approve ── */
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve', function () {
-      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
-      if (editId) { doApprove(editId); }
+    /* ── demBulkGrid: single-row Approve – stays in modal, updates row in-place ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve', async function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      var editId = String($row.data('editId') || '');
+      if (!editId) { return; }
+      $btn.prop('disabled', true);
+      try {
+        await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+          data: [{ id: editId, beatplanner__Managers_Approval: 'Approved' }]
+        });
+        var ev = findEvent(editId);
+        if (ev && ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Approved'; }
+        saveEvents();
+        refreshCalendarCell($row.data('date') || '');
+        /* Update action buttons in-place to reflect approved state */
+        $row.find('.bp-row-approve').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
+        $row.find('.bp-row-reject').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
+        $row.find('.bp-row-delete').prop('disabled', true);
+        showToast('Record approved.');
+      } catch (err) {
+        console.error('Approve failed', err);
+        showToast('Failed to approve record.');
+        $btn.prop('disabled', false);
+      }
     });
 
-    /* ── demBulkGrid: single-row Reject ── */
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject', function () {
-      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
-      if (editId) { doReject(editId); }
+    /* ── demBulkGrid: single-row Reject – stays in modal, updates row in-place ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject', async function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      var editId = String($row.data('editId') || '');
+      if (!editId) { return; }
+      $btn.prop('disabled', true);
+      try {
+        await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+          data: [{ id: editId, beatplanner__Managers_Approval: 'Rejected' }]
+        });
+        var ev = findEvent(editId);
+        if (ev && ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Rejected'; }
+        saveEvents();
+        refreshCalendarCell($row.data('date') || '');
+        /* Update action buttons in-place to reflect rejected state */
+        $row.find('.bp-row-reject').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
+        $row.find('.bp-row-approve').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
+        $row.find('.bp-row-delete').prop('disabled', true);
+        showToast('Record rejected.');
+      } catch (err) {
+        console.error('Reject failed', err);
+        showToast('Failed to reject record.');
+        $btn.prop('disabled', false);
+      }
     });
 
     /* ── demBulkGrid: Mass Update ── */
