@@ -461,6 +461,33 @@ $(function () {
     };
   }
 
+  /**
+   * Return the display title for an event chip, time-event, or hover card.
+   * When Attendance = "Leave" (and bprPicklistFields are loaded), returns the
+   * Leave Type value as the title instead of the Meeting With name.
+   * Falls back to ev.title for all other cases.
+   */
+  function getEventDisplayTitle(ev) {
+    if (ev.bprFieldValues && bprPicklistFields && bprPicklistFields.length) {
+      var attendApi = '';
+      var leaveApi  = '';
+      for (var k = 0; k < bprPicklistFields.length; k++) {
+        var lbl = (bprPicklistFields[k].field_label || '').toLowerCase().trim();
+        if (lbl === 'attendance') { attendApi = bprPicklistFields[k].api_name; }
+        if (lbl === 'leave type') { leaveApi  = bprPicklistFields[k].api_name; }
+        if (attendApi && leaveApi) { break; }
+      }
+      if (attendApi && leaveApi) {
+        var attendVal = (ev.bprFieldValues[attendApi] || '').toLowerCase();
+        if (attendVal === 'leave') {
+          var leaveTypeVal = ev.bprFieldValues[leaveApi] || '';
+          if (leaveTypeVal) { return leaveTypeVal; }
+        }
+      }
+    }
+    return ev.title || '';
+  }
+
   function renderChip(ev, past) {
     var pastCls   = past ? ' evt-past' : '';
     var evtStyles = buildBprEventStyles(ev);
@@ -474,7 +501,7 @@ $(function () {
            bprAttr +
            '     style="' + evtStyles.styleStr + '">' +
            evtStyles.markerHtml +
-           '  <span class="chip-name">' + escHtml(ev.title) + '</span>' +
+           '  <span class="chip-name">' + escHtml(getEventDisplayTitle(ev)) + '</span>' +
            '  <span class="chip-time">' + fmtTime(ev.startTime) + '</span>' +
            '  <button class="chip-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
            '</div>';
@@ -770,7 +797,7 @@ $(function () {
            '     data-te-pos="' + posStyle + '"' +
            '     style="' + posStyle + evtStyles.styleStr + '">' +
            evtStyles.markerHtml +
-           '  <div class="te-title">' + escHtml(ev.title) + '</div>' +
+           '  <div class="te-title">' + escHtml(getEventDisplayTitle(ev)) + '</div>' +
            '  <div class="te-time">' + fmtTime(ev.startTime) + ' – ' + fmtTime(ev.endTime) + '</div>' +
            '  <button class="te-copy-btn" data-evid="' + ev.id + '" title="Copy event">' + SVG.copy + '</button>' +
            '</div>';
@@ -1601,7 +1628,7 @@ $(function () {
     var headerHtml =
       '<div class="hc-head" style="' + escHtml(style.cardStyle) + '">' +
       '  <div class="hc-head-top">' + markerHtml +
-      '    <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
+      '    <span class="hc-head-title">' + escHtml(getEventDisplayTitle(ev)) + '</span>' +
       '  </div>' +
       '</div>';
 
@@ -1865,18 +1892,19 @@ $(function () {
         await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
       }
 
-      /* Fetch the full CRM record so every field can be pre-populated */
-      var crmRecord = null;
-      try {
-        var recResp = await ZOHO.CRM.API.getRecord({
-          Entity:   'beatplanner__Daily_Beat_Plans',
-          RecordID: ev.id
+      /* Build a synthetic CRM record from the COQL event data already in memory.
+         This avoids a redundant API call — all required field values are stored in
+         ev.bprFieldValues (populated during loadBeatPlanEvents), which is the single
+         source of truth for the calendar.  The Meeting With lookup object is
+         reconstructed from ev.mwLookupApi / ev.mwRecordId. */
+      var crmRecord = {};
+      if (ev.bprFieldValues) {
+        Object.keys(ev.bprFieldValues).forEach(function (key) {
+          crmRecord[key] = ev.bprFieldValues[key];
         });
-        if (recResp && recResp.data && recResp.data[0]) {
-          crmRecord = recResp.data[0];
-        }
-      } catch (fetchErr) {
-        console.error('openBpEditModal: failed to fetch CRM record:', fetchErr);
+      }
+      if (ev.mwLookupApi && ev.mwRecordId) {
+        crmRecord[ev.mwLookupApi] = { id: ev.mwRecordId, name: ev.title || '' };
       }
 
       dom.slotPickerGrid.html(buildBpEditForm(ev.date, crmRecord, ev));
@@ -2268,7 +2296,7 @@ $(function () {
     var isLeaveMode = existingAttend.toLowerCase() === 'leave';
     var tableStyle  = isWorking   ? '' : 'display:none;';
     var leaveStyle  = isLeaveMode ? '' : 'display:none;';
-    var applyStyle  = isLeaveMode ? '' : 'display:none;';
+    var applyStyle  = (isLeaveMode && existingLeave && existingLeave !== '-None-') ? '' : 'display:none;';
     var filterStyle = isWorking   ? '' : 'display:none;';
 
     /* ── Attendance bar ── */
@@ -2500,8 +2528,9 @@ $(function () {
                    '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
     });
 
-    /* ── Collect ALL picklist columns (include Attendance + Leave Type as regular columns) ── */
-    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for'];
+    /* ── Collect picklist columns (exclude Attendance + Leave Type; they are no longer
+         shown as separate columns in the Day Events Modal table) ── */
+    var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for', 'attendance', 'leave type'];
     var tablePicklistCols = [];
 
     if (bprPicklistFields && bprPicklistFields.length) {
@@ -2976,7 +3005,7 @@ $(function () {
         '<div class="dem-card" data-evid="' + escHtml(ev.id) + '"' + disableActionsAttr + '>' +
         '  <div class="hc-head" style="' + escHtml(style.cardStyle) + '">' +
         '    <div class="hc-head-top">' + markerHtml +
-        '      <span class="hc-head-title">' + escHtml(ev.title) + '</span>' +
+        '      <span class="hc-head-title">' + escHtml(getEventDisplayTitle(ev)) + '</span>' +
         '    </div>' +
         '  </div>' +
         detailsHtml +
@@ -5514,7 +5543,9 @@ $(function () {
         var isLeave   = (label || '').toLowerCase() === 'leave';
         $grid.find('.bp-slots-table').toggle(isWorking);
         $grid.find('.bp-leave-type-field').toggle(isLeave);
-        $grid.find('.bp-apply-leave-btn').toggle(isLeave);
+        /* Always hide the Apply Leave button when Attendance changes — it becomes
+           visible only after a valid Leave Type is selected (see Leave Type handler). */
+        $grid.find('.bp-apply-leave-btn').hide();
         /* Show Filter button only when Working; hide and close panel otherwise */
         $grid.find('.bp-filter-action').toggle(isWorking);
         if (!isWorking) {
@@ -5525,6 +5556,17 @@ $(function () {
           $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
                .text('Select\u2026')
                .removeAttr('data-actual-val');
+        }
+      }
+
+      /* Leave Type controls Apply Leave button visibility: show only when a valid
+         Leave Type (non-empty, not "-None-") is selected in the attend bar. */
+      var isLeaveTypeDd = $wrap.closest('.bp-leave-type-field').length > 0;
+      if (isLeaveTypeDd) {
+        var $grid2 = $wrap.closest('#slotPickerGrid');
+        if ($grid2.length) {
+          var validLeaveType = actual && actual !== '-None-';
+          $grid2.find('.bp-apply-leave-btn').toggle(!!validLeaveType);
         }
       }
     });
@@ -7818,7 +7860,7 @@ $(function () {
       }).join('');
     }
 
-    $('#slotPickerGrid .bp-slot-row').each(function () {
+    $('#slotPickerGrid .bp-slot-row, #demBulkGrid .bp-slot-row').each(function () {
       var $row = $(this);
       var selectedApi = $row.find('.bp-mf-wrap .bp-dd-val').attr('data-selected-api');
       if (selectedApi !== modApi) { return; }

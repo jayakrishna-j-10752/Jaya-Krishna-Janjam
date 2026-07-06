@@ -4652,6 +4652,45 @@ input, select, textarea {
   height: 16px;
 }
 
+/* ── Apply Leave button ── */
+.bp-apply-leave-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 32px;
+  border: none;
+  border-radius: 9px;
+  background: var(--accent, #1565C0);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: .01em;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: 0 2px 6px rgba(21,101,192,.28);
+  transition: background .14s, box-shadow .14s, transform .1s;
+}
+.bp-apply-leave-btn:hover {
+  background: #1976D2;
+  box-shadow: 0 3px 10px rgba(21,101,192,.36);
+}
+.bp-apply-leave-btn:active {
+  background: #0D47A1;
+  box-shadow: 0 1px 4px rgba(21,101,192,.2);
+  transform: translateY(1px);
+}
+.bp-apply-leave-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+}
+.theme-dark .bp-apply-leave-btn,
+.theme-night .bp-apply-leave-btn {
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+
 
 /* ── Row checkbox column ── */
 .bp-cb-th {
