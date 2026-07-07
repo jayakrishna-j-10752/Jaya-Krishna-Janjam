@@ -572,6 +572,28 @@ input, select, textarea {
 }
 .bp-cal-filter-clear-btn:hover { background: var(--z-red-pale, #FDECEA); color: var(--z-red, #C62828); border-color: var(--z-red, #C62828); }
 
+/* ── Calendar filter bar: compact multi-select (reuses .bpf-ms-* component) ── */
+#bpCalFilterBar .cal-filter-ms-wrap {
+  min-width: 110px;
+  max-width: 180px;
+}
+#bpCalFilterBar .bpf-ms-trigger {
+  min-height: 26px;
+  padding: 2px 26px 2px 7px;
+  font-size: 12px;
+}
+#bpCalFilterBar .bpf-ms-chip {
+  font-size: 10px;
+  padding: 1px 5px;
+  max-width: 110px;
+}
+#bpCalFilterBar .bpf-ms-placeholder {
+  font-size: 12px;
+}
+#bpCalFilterBar .bpf-ms-panel {
+  min-width: 160px;
+}
+
 /* ══════════════════════════════════════════════════════════
    MONTH VIEW
 ══════════════════════════════════════════════════════════ */

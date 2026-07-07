@@ -232,14 +232,14 @@ $(function () {
   function eventsOn(ds) {
     return state.events.filter(function (e) {
       if (e.date !== ds) { return false; }
-      /* Apply active calendar event filters */
+      /* Apply active calendar event filters (each value is an array for multi-select) */
       var keys = Object.keys(calEventFilters);
       for (var i = 0; i < keys.length; i++) {
         var api = keys[i];
-        var sel = calEventFilters[api];
-        if (!sel) { continue; } /* empty string = "All" */
+        var sel = calEventFilters[api]; /* array of selected values */
+        if (!sel || sel.length === 0) { continue; } /* empty = "All" */
         var evVal = (e.bprFieldValues && e.bprFieldValues[api]) ? e.bprFieldValues[api] : '';
-        if (evVal !== sel) { return false; }
+        if (sel.indexOf(evVal) === -1) { return false; }
       }
       return true;
     }).sort(function (a, b) { return a.startTime.localeCompare(b.startTime); });
@@ -900,7 +900,16 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      openSlotPicker(date);
+      if (beatPlanHasRefs) {
+        var existAttend = getDateAttendance(date);
+        if (existAttend === 'leave') {
+          showToast('This day already has a Leave record. Working events cannot be added.');
+          return;
+        }
+        openSlotPicker(date, existAttend === 'working' ? 'Working' : null);
+      } else {
+        openSlotPicker(date);
+      }
     });
     dom.canvas.on('click.calview', '.cell-paste-btn', function (e) {
       e.stopPropagation();
@@ -954,7 +963,16 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      openSlotPicker(date);
+      if (beatPlanHasRefs) {
+        var existAttend = getDateAttendance(date);
+        if (existAttend === 'leave') {
+          showToast('This day already has a Leave record. Working events cannot be added.');
+          return;
+        }
+        openSlotPicker(date, existAttend === 'working' ? 'Working' : null);
+      } else {
+        openSlotPicker(date);
+      }
     });
     dom.canvas.on('click.calview', '.cell-copy-btn', function (e) {
       e.stopPropagation();
@@ -1022,7 +1040,16 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      openSlotPicker(date);
+      if (beatPlanHasRefs) {
+        var existAttend = getDateAttendance(date);
+        if (existAttend === 'leave') {
+          showToast('This day already has a Leave record. Working events cannot be added.');
+          return;
+        }
+        openSlotPicker(date, existAttend === 'working' ? 'Working' : null);
+      } else {
+        openSlotPicker(date);
+      }
     });
 
     /* Mobile toolbar – Copy all events */
@@ -1109,7 +1136,16 @@ $(function () {
       e.stopPropagation();
       var date = $(this).data('date');
       if (isPast(date)) return;
-      openSlotPicker(date);
+      if (beatPlanHasRefs) {
+        var existAttend = getDateAttendance(date);
+        if (existAttend === 'leave') {
+          showToast('This day already has a Leave record. Working events cannot be added.');
+          return;
+        }
+        openSlotPicker(date, existAttend === 'working' ? 'Working' : null);
+      } else {
+        openSlotPicker(date);
+      }
     });
   }
 
@@ -1117,8 +1153,21 @@ $(function () {
   function attachTimeGridHandlers() {
     dom.canvas.on('click.calview', '.slot-add-btn', function (e) {
       e.stopPropagation();
-      var h = parseInt($(this).data('hour'), 10);
-      openModal($(this).data('date'), hourToTime(h), hourToTime(h + 1));
+      var date = $(this).data('date');
+      var h    = parseInt($(this).data('hour'), 10);
+      if (beatPlanHasRefs) {
+        /* In beat plan mode: open the full slot picker (pre-set to Working) rather than
+           the simple event form, so the user gets the complete row-based UI. */
+        if (isPast(date)) return;
+        var existAttend = getDateAttendance(date);
+        if (existAttend === 'leave') {
+          showToast('This day already has a Leave record. Working events cannot be added.');
+          return;
+        }
+        openSlotPicker(date, existAttend === 'working' ? 'Working' : 'Working');
+      } else {
+        openModal(date, hourToTime(h), hourToTime(h + 1));
+      }
     });
     dom.canvas.on('click.calview', '.slot-paste-btn', function (e) {
       e.stopPropagation();
@@ -1770,8 +1819,69 @@ $(function () {
    * Open the modal in "slot picker" phase for the given date.
    * Renders all 24 hourly slots as a grid inside the modal body.
    * Taken slots are shown but disabled.
+   * @param {string}  date         – "YYYY-MM-DD"
+   * @param {string?} presetAttend – optional attendance value to pre-select (e.g. "Working")
    */
-  async function openSlotPicker(date) {
+
+  /** Returns the API name of the Attendance picklist field, falling back to the known default. */
+  function getAttendanceApiName() {
+    if (bprPicklistFields) {
+      for (var _k = 0; _k < bprPicklistFields.length; _k++) {
+        if ((bprPicklistFields[_k].field_label || '').toLowerCase().trim() === 'attendance') {
+          return bprPicklistFields[_k].api_name;
+        }
+      }
+    }
+    return 'beatplanner__Attendance';
+  }
+
+  /**
+   * Programmatically pre-select an Attendance value in a slot-picker grid.
+   * Toggles the slot table, leave-type field, and filter action accordingly.
+   * @param {jQuery} $grid   – the #slotPickerGrid or equivalent container
+   * @param {string} attend  – the attendance value to select (case-insensitive, e.g. "Working")
+   */
+  function preselectAttendance($grid, attend) {
+    var $attendWrap = $grid.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap').first();
+    if (!$attendWrap.length) { return; }
+    $attendWrap.find('.bp-dd-opt').each(function () {
+      var label  = $(this).data('label')  || '';
+      var actual = $(this).data('actual') || label;
+      if (actual.toLowerCase() === attend.toLowerCase() ||
+          label.toLowerCase()  === attend.toLowerCase()) {
+        $attendWrap.find('.bp-dd-val').text(label).attr('data-actual-val', actual);
+        var isWorking = actual.toLowerCase() === 'working';
+        var isLeave   = actual.toLowerCase() === 'leave';
+        $grid.find('.bp-slots-table').toggle(isWorking);
+        $grid.find('.bp-leave-type-field').toggle(isLeave);
+        $grid.find('.bp-apply-leave-btn').hide();
+        $grid.find('.bp-filter-action').toggle(isWorking);
+        if (!isLeave) {
+          $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
+               .text('Select\u2026')
+               .removeAttr('data-actual-val');
+        }
+        return false; /* break each() */
+      }
+    });
+  }
+
+  /**
+   * Returns the attendance value (lowercase) for the given date from state.events,
+   * or null if no event with attendance data exists.
+   * Returns 'leave' or 'working' (or null).
+   */
+  function getDateAttendance(date) {
+    var attendApi = getAttendanceApiName();
+    var evts = state.events.filter(function (e) { return e.date === date; });
+    for (var _i = 0; _i < evts.length; _i++) {
+      var val = ((evts[_i].bprFieldValues || {})[attendApi] || '').toLowerCase();
+      if (val === 'leave' || val === 'working') { return val; }
+    }
+    return null;
+  }
+
+  async function openSlotPicker(date, presetAttend) {
     /* Ensure no stale open beat-plan dropdown leaks into the new view */
     closeAllBpDropdowns();
 
@@ -1839,6 +1949,10 @@ $(function () {
       dom.slotPickerGrid.html(buildBeatPlanTable(date));
       updateFilterBadge();
       dom.modal.find('.modal-box').addClass('modal-box--wide');
+      /* Pre-select attendance value when requested (e.g. when re-opening for a Working day) */
+      if (presetAttend) {
+        preselectAttendance(dom.slotPickerGrid, presetAttend);
+      }
     } else {
       /* Standard mode: clickable slot buttons, 1-hour intervals 00:00 – 23:00 */
       dom.modal.find('.modal-box').removeClass('modal-box--wide');
@@ -2347,7 +2461,7 @@ $(function () {
                    '</div>' +
                    '</div>' +
                    '</div>';
-      attendBar += '<button class="bp-apply-leave-btn" type="button" style="' + applyStyle + '">Apply Leave</button>';
+      attendBar += '<button class="bp-apply-leave-btn" type="button" style="' + applyStyle + '">Update Leave</button>';
     }
     attendBar += '<div class="bp-filter-action" style="' + filterStyle + '">' +
                  '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
@@ -4229,7 +4343,7 @@ $(function () {
   var filteredModuleRecords = {};  /* {moduleName: [{id, name, photo_id}]} – records matching active filters */
 
   /* ── Calendar Event Filters state (client-side event filtering by BPR picklist values) ── */
-  var calEventFilters = {};  /* {fieldApiName: 'selectedValue'} – '' means "All" (no filter) */
+  var calEventFilters = {};  /* {fieldApiName: ['val1','val2',...]} – empty array / absent key = "All" */
 
   /* ── Hover preview card state ── */
   var hoverTimer    = null;  /* debounce timer – delays hiding the hover card */
@@ -5569,9 +5683,29 @@ $(function () {
         var $grid     = $('#slotPickerGrid');
         var isWorking = (label || '').toLowerCase() === 'working';
         var isLeave   = (label || '').toLowerCase() === 'leave';
+
+        /* ── Feature 3: Leave → Working in edit mode ──
+           When editing a Leave record and the user switches Attendance to Working,
+           replace the single edit row with the full slot table (all available hours),
+           and save the original Leave record ID so it can be deleted on save. */
+        if (isWorking) {
+          var $container = $grid.find('.bp-plan-container').first();
+          var leaveEditId = String($container.data('editId') || '');
+          if (leaveEditId) {
+            /* Generate the full slot table from buildBeatPlanTable and extract its slots-wrap */
+            var $fullTable = $('<div>').html(buildBeatPlanTable($container.data('date') || ''));
+            var $newSlotsWrap = $fullTable.find('.bp-slots-wrap');
+            $container.find('.bp-slots-wrap').replaceWith($newSlotsWrap);
+            /* Mark the container: remember the leave record ID for later deletion,
+               and remove data-edit-id to switch the container back to create mode. */
+            $container.attr('data-leave-edit-id', leaveEditId);
+            $container.removeAttr('data-edit-id');
+          }
+        }
+
         $grid.find('.bp-slots-table').toggle(isWorking);
         $grid.find('.bp-leave-type-field').toggle(isLeave);
-        /* Always hide the Apply Leave button when Attendance changes — it becomes
+        /* Always hide the Apply/Update Leave button when Attendance changes — it becomes
            visible only after a valid Leave Type is selected (see Leave Type handler). */
         $grid.find('.bp-apply-leave-btn').hide();
         /* Show Filter button only when Working; hide and close panel otherwise */
@@ -5646,6 +5780,22 @@ $(function () {
 
       var created = 0;
       var failed  = 0;
+
+      /* ── Feature 4: If this session began as a Leave edit, delete the Leave record first ── */
+      var leaveEditId = String($container.data('leaveEditId') || '');
+      if (leaveEditId) {
+        try {
+          await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + leaveEditId);
+          state.events = state.events.filter(function (e) { return e.id !== leaveEditId; });
+          $container.removeAttr('data-leave-edit-id');
+          console.log('Deleted leave record before mass-creating working records', leaveEditId);
+        } catch (err) {
+          console.error('Failed to delete leave record', err);
+          showToast('Failed to remove existing Leave record. Aborting.');
+          $btn.prop('disabled', false);
+          return;
+        }
+      }
 
       /* ── Build all record payloads and event metadata; send in a single batch request ── */
       var massPayloads = []; /* [{ recordData, massEv }] */
@@ -5824,10 +5974,11 @@ $(function () {
       $btn.prop('disabled', false);
     });
 
-    /* ── Apply Leave button ── */
+    /* ── Apply / Update Leave button ── */
     $(document).on('click', '#slotPickerGrid .bp-apply-leave-btn', async function () {
       var $btn       = $(this);
       var $container = $btn.closest('.bp-plan-container');
+      var editId     = String($container.data('editId') || '');
       var date       = $container.data('date') || '';
 
       /* Read shared attendance / leave-type values */
@@ -5874,45 +6025,69 @@ $(function () {
       var recordData = {};
       recordData[startTimeApi] = startIso;
       recordData[endTimeApi]   = endIso;
-      recordData['beatplanner__Date']           = date;
-      recordData[attendApi]                     = attendVal;
-      recordData[leaveApi]                      = leaveVal;
+      recordData['beatplanner__Date']              = date;
+      recordData[attendApi]                        = attendVal;
+      recordData[leaveApi]                         = leaveVal;
       recordData['beatplanner__Managers_Approval'] = 'Pending';
       recordData['Name'] = 'Leave \u2013 ' + leaveVal;
 
-      if (monthlyBeatPlanId) {
+      if (!editId && monthlyBeatPlanId) {
         recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
       }
       var ownerId = $('#userProfile').attr('data-userid');
-      if (ownerId) { recordData['Owner'] = { id: ownerId }; }
+      if (!editId && ownerId) { recordData['Owner'] = { id: ownerId }; }
 
       $btn.prop('disabled', true);
       try {
-        var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
-        console.log('Leave record created', resp);
+        if (editId) {
+          /* ── UPDATE mode: leave record already exists – update it via PUT ── */
+          await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+            data: [Object.assign({ id: editId }, recordData)]
+          });
+          console.log('Leave record updated', editId);
 
-        var newEv = {
-          id:             uid(),
-          title:          leaveVal,
-          date:           date,
-          startTime:      '00:00',
-          endTime:        '23:59',
-          color:          '#1565C0',
-          description:    '',
-          bprFieldValues: bprFieldValues
-        };
+          /* Update the in-memory event */
+          var evIdx = state.events.findIndex(function (e) { return e.id === editId; });
+          if (evIdx !== -1) {
+            var updEv = state.events[evIdx];
+            updEv.title          = leaveVal;
+            updEv.startTime      = '00:00';
+            updEv.endTime        = '23:59';
+            updEv.bprFieldValues = Object.assign({}, updEv.bprFieldValues || {}, bprFieldValues);
+          }
 
-        /* Update event ID with the CRM record ID */
-        var crmId = resp && resp.data && resp.data.data && resp.data.data[0] && resp.data.data[0].details && resp.data.data[0].details.id;
-        if (crmId) { newEv.id = crmId; }
+          saveEvents();
+          closeSlotPicker();
+          render();
+          showToast('Leave record updated.');
+        } else {
+          /* ── CREATE mode: new leave record ── */
+          var resp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: [recordData] });
+          console.log('Leave record created', resp);
 
-        state.events.push(newEv);
-        saveEvents();
-        render();
-        showToast('Leave record created.');
+          var newEv = {
+            id:             uid(),
+            title:          leaveVal,
+            date:           date,
+            startTime:      '00:00',
+            endTime:        '23:59',
+            color:          '#1565C0',
+            description:    '',
+            bprFieldValues: bprFieldValues
+          };
+
+          /* Update event ID with the CRM record ID */
+          var crmId = resp && resp.data && resp.data.data && resp.data.data[0] && resp.data.data[0].details && resp.data.data[0].details.id;
+          if (crmId) { newEv.id = crmId; }
+
+          state.events.push(newEv);
+          saveEvents();
+          render();
+          showToast('Leave record created.');
+        }
       } catch (err) {
-        console.error('Failed to create leave record', err);
-        showToast('Failed to create leave record.');
+        console.error('Failed to apply/update leave record', err);
+        showToast('Failed to apply leave record.');
       } finally {
         $btn.prop('disabled', false);
       }
@@ -6130,6 +6305,22 @@ $(function () {
 
       } else {
         /* ── CREATE MODE: call insertRecord, default Managers Approval to Pending ── */
+
+        /* ── Feature 4: If this session began as a Leave→Working edit, delete the Leave record first ── */
+        var createLeaveEditId = String($row.closest('.bp-plan-container').data('leaveEditId') || '');
+        if (createLeaveEditId) {
+          try {
+            await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + createLeaveEditId);
+            state.events = state.events.filter(function (e) { return e.id !== createLeaveEditId; });
+            $row.closest('.bp-plan-container').removeAttr('data-leave-edit-id');
+            console.log('Deleted leave record before creating working record', createLeaveEditId);
+          } catch (err) {
+            console.error('Failed to delete leave record', err);
+            showToast('Failed to remove existing Leave record. Aborting.');
+            $btn.prop('disabled', false);
+            return;
+          }
+        }
 
         /* Conflict check – prevent creating a record when a meeting already occupies
            an overlapping time slot on the same date. */
@@ -7045,25 +7236,133 @@ $(function () {
           $(this).find('.bpf-ms-list').css('max-height', '');
         });
       }
+      /* Close open cal-filter-bar multi-selects when clicking outside */
+      if (!$(e.target).closest('#bpCalFilterBar .cal-filter-ms-wrap').length) {
+        $('#bpCalFilterBar .cal-filter-ms-wrap').each(function () {
+          $(this).removeClass('bpf-ms-open');
+          $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+        });
+      }
     });
 
     /* ── Filter Panel event handlers ── */
 
-    /* Calendar event filter bar: a select changes → update calEventFilters and re-render */
-    $(document).on('change', '#bpCalFilterBar .bp-cal-filter-select', function () {
-      var api = String($(this).data('api') || '');
-      var val = $(this).val() || '';
-      if (api) {
-        if (val) {
-          calEventFilters[api] = val;
-          $(this).addClass('bp-cal-filter-select--active');
-        } else {
-          delete calEventFilters[api];
-          $(this).removeClass('bp-cal-filter-select--active');
+    /* Calendar filter bar: multi-select trigger toggle */
+    $(document).on('click', '#bpCalFilterBar .cal-filter-ms-wrap .bpf-ms-trigger', function (e) {
+      e.stopPropagation();
+      var $wrap  = $(this).closest('.cal-filter-ms-wrap');
+      var isOpen = $wrap.hasClass('bpf-ms-open');
+      /* Close all other cal filter wraps */
+      $('#bpCalFilterBar .cal-filter-ms-wrap').each(function () {
+        $(this).removeClass('bpf-ms-open');
+        $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+      });
+      if (!isOpen) {
+        $wrap.addClass('bpf-ms-open');
+        positionBpMsPanel($wrap);
+        $wrap.find('.bpf-ms-search').val('').focus();
+        $wrap.find('.bpf-ms-opt').show();
+      }
+    });
+
+    /* Prevent cal filter panel inner clicks from bubbling */
+    $(document).on('click', '#bpCalFilterBar .bpf-ms-panel', function (e) {
+      e.stopPropagation();
+    });
+
+    /* Cal filter bar: live search */
+    $(document).on('input', '#bpCalFilterBar .bpf-ms-search', function () {
+      var q = $(this).val().toLowerCase();
+      $(this).closest('.bpf-ms-panel').find('.bpf-ms-opt').each(function () {
+        $(this).toggle(String($(this).data('value')).toLowerCase().indexOf(q) !== -1);
+      });
+    });
+
+    /* Cal filter bar: toggle individual option */
+    $(document).on('click', '#bpCalFilterBar .cal-filter-opt', function (e) {
+      e.stopPropagation();
+      var $opt     = $(this);
+      var fieldApi = String($opt.data('calfield') || '');
+      var value    = String($opt.data('value') || '');
+      if (!calEventFilters[fieldApi]) { calEventFilters[fieldApi] = []; }
+      var arr = calEventFilters[fieldApi];
+      var idx = arr.indexOf(value);
+      var nowChecked;
+      if (idx === -1) {
+        arr.push(value);
+        nowChecked = true;
+      } else {
+        arr.splice(idx, 1);
+        nowChecked = false;
+        if (arr.length === 0) { delete calEventFilters[fieldApi]; }
+      }
+      $opt.find('input[type="checkbox"]').prop('checked', nowChecked);
+      refreshCalFilterTrigger($opt.closest('.cal-filter-ms-wrap'));
+      var hasActive = Object.keys(calEventFilters).some(function (k) {
+        return calEventFilters[k] && calEventFilters[k].length > 0;
+      });
+      $('#bpCalFilterClear').toggle(hasActive);
+      render();
+    });
+
+    /* Cal filter bar: chip remove */
+    $(document).on('click', '#bpCalFilterBar .cal-filter-chip .bpf-ms-chip-rm', function (e) {
+      e.stopPropagation();
+      var $chip    = $(this).closest('.cal-filter-chip');
+      var fieldApi = String($chip.data('calfield') || '');
+      var value    = String($chip.data('value') || '');
+      var $wrap    = $(this).closest('.cal-filter-ms-wrap');
+      if (calEventFilters[fieldApi]) {
+        var arr = calEventFilters[fieldApi];
+        var idx = arr.indexOf(value);
+        if (idx !== -1) {
+          arr.splice(idx, 1);
+          if (arr.length === 0) { delete calEventFilters[fieldApi]; }
         }
       }
-      /* Show/hide the Clear filters button */
-      var hasActive = Object.keys(calEventFilters).some(function (k) { return !!calEventFilters[k]; });
+      /* Uncheck the corresponding option */
+      $wrap.find('.cal-filter-opt').each(function () {
+        if (String($(this).data('value') || '') === value) {
+          $(this).find('input[type="checkbox"]').prop('checked', false);
+        }
+      });
+      refreshCalFilterTrigger($wrap);
+      var hasActive = Object.keys(calEventFilters).some(function (k) {
+        return calEventFilters[k] && calEventFilters[k].length > 0;
+      });
+      $('#bpCalFilterClear').toggle(hasActive);
+      render();
+    });
+
+    /* Cal filter bar: Select All visible options */
+    $(document).on('click', '#bpCalFilterBar .cal-filter-sel-all', function (e) {
+      e.stopPropagation();
+      var fieldApi = String($(this).data('calfield') || '');
+      var $wrap    = $(this).closest('.cal-filter-ms-wrap');
+      if (!calEventFilters[fieldApi]) { calEventFilters[fieldApi] = []; }
+      $wrap.find('.bpf-ms-opt:visible').each(function () {
+        var v = String($(this).data('value') || '');
+        if (calEventFilters[fieldApi].indexOf(v) === -1) {
+          calEventFilters[fieldApi].push(v);
+        }
+        $(this).find('input[type="checkbox"]').prop('checked', true);
+      });
+      refreshCalFilterTrigger($wrap);
+      $('#bpCalFilterClear').show();
+      render();
+    });
+
+    /* Cal filter bar: Clear All for a single field */
+    $(document).on('click', '#bpCalFilterBar .cal-filter-clr-all', function (e) {
+      e.stopPropagation();
+      var fieldApi = String($(this).data('calfield') || '');
+      var $wrap    = $(this).closest('.cal-filter-ms-wrap');
+      delete calEventFilters[fieldApi];
+      $wrap.find('.bpf-ms-opt input[type="checkbox"]').prop('checked', false);
+      refreshCalFilterTrigger($wrap);
+      var hasActive = Object.keys(calEventFilters).some(function (k) {
+        return calEventFilters[k] && calEventFilters[k].length > 0;
+      });
       $('#bpCalFilterClear').toggle(hasActive);
       render();
     });
@@ -7071,7 +7370,7 @@ $(function () {
     /* Calendar event filter bar: Clear All button */
     $(document).on('click', '#bpCalFilterClear', function () {
       calEventFilters = {};
-      buildCalFilterBar(); /* rebuild to reset all selects to "All" */
+      buildCalFilterBar(); /* rebuild to reset all multi-selects to "All" */
       render();
     });
 
@@ -7236,6 +7535,8 @@ $(function () {
     $(window).on('resize.bpms', function () {
       var $open = $('#bpFilterBody .bpf-ms-wrap.bpf-ms-open');
       if ($open.length) { positionBpMsPanel($open); }
+      var $calOpen = $('#bpCalFilterBar .cal-filter-ms-wrap.bpf-ms-open');
+      if ($calOpen.length) { positionBpMsPanel($calOpen); }
     });
 
     /* ── Image preview ── */
@@ -7833,9 +8134,8 @@ $(function () {
 
   /**
    * Build and render the calendar event filter bar (#bpCalFilterBar).
-   * Called once after bprPicklistFields are loaded and beatPlanHasRefs is true.
-   * Generates one <select> per picklist field from beatplanner__Daily_Beat_Plans,
-   * omitting purely internal fields that are not useful as event filters.
+   * Uses the same reusable multi-select dropdown component as #bpFilterBody,
+   * supporting search, multi-select, Select All, Clear All, and checkbox selection.
    */
   function buildCalFilterBar() {
     var $bar = $('#bpCalFilterBar');
@@ -7852,21 +8152,11 @@ $(function () {
       var lbl = (f.field_label || '').toLowerCase().trim();
       if (EXCLUDED.indexOf(lbl) !== -1) { return; }
       if (!f.options || !f.options.length) { return; }
-
-      var currentVal = calEventFilters[f.api_name] || '';
-      var activeClass = currentVal ? ' bp-cal-filter-select--active' : '';
-
+      var selectedVals = calEventFilters[f.api_name] || [];
       html += '<div class="bp-cal-filter-item">' +
               '<span class="bp-cal-filter-lbl">' + escHtml(f.field_label) + '</span>' +
-              '<select class="bp-cal-filter-select' + activeClass + '" data-api="' + escHtml(f.api_name) + '">' +
-              '<option value="">All</option>';
-      f.options.forEach(function (opt) {
-        var display = (typeof opt === 'object') ? (opt.display || opt.actual || '') : String(opt);
-        var actual  = (typeof opt === 'object') ? (opt.actual  || opt.display || '') : String(opt);
-        var sel = (actual === currentVal || display === currentVal) ? ' selected' : '';
-        html += '<option value="' + escHtml(actual) + '"' + sel + '>' + escHtml(display) + '</option>';
-      });
-      html += '</select></div>';
+              buildCalFilterMultiSelect(f, selectedVals) +
+              '</div>';
     });
 
     if (!html) {
@@ -7875,11 +8165,79 @@ $(function () {
     }
 
     /* Add a "Clear filters" button at the right end */
-    var hasActive = Object.values(calEventFilters).some(function (v) { return !!v; });
+    var hasActive = Object.keys(calEventFilters).some(function (k) {
+      return calEventFilters[k] && calEventFilters[k].length > 0;
+    });
     html += '<button class="bp-cal-filter-clear-btn" id="bpCalFilterClear" type="button"' +
             (hasActive ? '' : ' style="display:none;"') + '>Clear filters</button>';
 
     $bar.html(html).show();
+  }
+
+  /**
+   * Build the HTML for one multi-select filter dropdown for the calendar filter bar.
+   * Uses the same bpf-ms-* CSS classes as the filter panel component.
+   * @param {Object} field       – {api_name, field_label, options}
+   * @param {Array}  selectedVals – currently selected actual values
+   */
+  function buildCalFilterMultiSelect(field, selectedVals) {
+    var chevSvg = '<svg class="bpf-ms-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+    var chipsHtml = '';
+    selectedVals.forEach(function (v) {
+      chipsHtml += '<span class="bpf-ms-chip cal-filter-chip" data-calfield="' + escHtml(field.api_name) +
+                   '" data-value="' + escHtml(v) + '">' + escHtml(v) +
+                   '<span class="bpf-ms-chip-rm" role="button" aria-label="Remove ' + escHtml(v) + '">\u00d7</span>' +
+                   '</span>';
+    });
+    var placeholder = selectedVals.length === 0 ? '<span class="bpf-ms-placeholder">All</span>' : '';
+    var optsHtml = '';
+    field.options.forEach(function (opt) {
+      var display = (typeof opt === 'object') ? (opt.display || opt.actual || '') : String(opt);
+      var actual  = (typeof opt === 'object') ? (opt.actual  || opt.display || '') : String(opt);
+      var checked = selectedVals.indexOf(actual) !== -1;
+      optsHtml += '<li class="bpf-ms-opt cal-filter-opt" data-calfield="' + escHtml(field.api_name) +
+                  '" data-value="' + escHtml(actual) + '">' +
+                  '<input type="checkbox"' + (checked ? ' checked' : '') + ' tabindex="-1" />' +
+                  escHtml(display) +
+                  '</li>';
+    });
+    return '<div class="bpf-ms-wrap cal-filter-ms-wrap" data-calfield="' + escHtml(field.api_name) + '">' +
+           '<div class="bpf-ms-trigger" tabindex="0">' + chipsHtml + placeholder + chevSvg + '</div>' +
+           '<div class="bpf-ms-panel">' +
+           '<div class="bpf-ms-panel-head">' +
+           '<input class="bpf-ms-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+           '<button class="bpf-ms-panel-act cal-filter-sel-all" type="button" data-calfield="' + escHtml(field.api_name) + '">All</button>' +
+           '<button class="bpf-ms-panel-act cal-filter-clr-all" type="button" data-calfield="' + escHtml(field.api_name) + '">Clear</button>' +
+           '</div>' +
+           '<ul class="bpf-ms-list">' + optsHtml + '</ul>' +
+           '</div>' +
+           '</div>';
+  }
+
+  /**
+   * Refresh the chips and placeholder inside a .cal-filter-ms-wrap trigger
+   * based on the current calEventFilters state for that wrap's field.
+   */
+  function refreshCalFilterTrigger($wrap) {
+    var fieldApi     = String($wrap.data('calfield') || '');
+    var selectedVals = calEventFilters[fieldApi] || [];
+    var $trigger     = $wrap.find('.bpf-ms-trigger');
+    $trigger.find('.cal-filter-chip, .bpf-ms-placeholder').remove();
+    var $chev = $trigger.find('.bpf-ms-chev');
+    if (selectedVals.length > 0) {
+      var chipsHtml = '';
+      selectedVals.forEach(function (v) {
+        chipsHtml += '<span class="bpf-ms-chip cal-filter-chip" data-calfield="' + escHtml(fieldApi) +
+                     '" data-value="' + escHtml(v) + '">' + escHtml(v) +
+                     '<span class="bpf-ms-chip-rm" role="button" aria-label="Remove ' + escHtml(v) + '">\u00d7</span>' +
+                     '</span>';
+      });
+      $chev.before(chipsHtml);
+    } else {
+      $chev.before('<span class="bpf-ms-placeholder">All</span>');
+    }
   }
 
 
