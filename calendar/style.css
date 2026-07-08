@@ -808,13 +808,24 @@ input, select, textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #fff !important;
+  color: inherit;
 }
 .chip-time {
   font-size: 10px;
   opacity: .8;
   flex-shrink: 0;
-  color: #fff !important;
+  color: inherit;
+}
+/* Default chip text colour per theme (overridden by inline style when a solid bg is applied) */
+.theme-light .evt-chip .chip-name,
+.theme-light .evt-chip .chip-time {
+  color: #1A1A2E;
+}
+.theme-dark .evt-chip .chip-name,
+.theme-dark .evt-chip .chip-time,
+.theme-night .evt-chip .chip-name,
+.theme-night .evt-chip .chip-time {
+  color: #E0E0F0;
 }
 
 /* Approval status badge on event chip */

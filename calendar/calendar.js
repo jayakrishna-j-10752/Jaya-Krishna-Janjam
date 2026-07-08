@@ -432,7 +432,7 @@ $(function () {
         var leaveBorderLeft = leaveStyle.borderLeft || leaveColor;
         bgStr         = 'background:' + leaveColor + ';';
         borderLeftStr = 'border-left-color:' + leaveBorderLeft + ';border-left-style:solid;border-left-width:3px;';
-        styleStr      = bgStr + borderLeftStr;
+        styleStr      = bgStr + borderLeftStr + 'color:#fff;';
         if (leaveStyle.markerColor) {
           markerHtml = '<span class="chip-marker" style="background:' + escHtml(leaveStyle.markerColor) + ';" aria-hidden="true"></span>';
         }
@@ -451,6 +451,8 @@ $(function () {
         /* When no bg-colour is resolved but a left-border color exists, derive a tinted
            background from the border colour to keep the event visually distinct. */
         if (!s.bg && s.borderLeft) { bgStr = 'background:' + s.borderLeft + '22;'; styleStr += bgStr; }
+        /* Apply white text only when a solid background colour is configured */
+        if (s.bg) { styleStr += 'color:#fff;'; }
       }
     } else {
       /* Fallback: use the event's manually chosen colour (background + border only) */
@@ -3309,12 +3311,17 @@ $(function () {
       var d = new Date(c); d.setDate(d.getDate() + dir);
       state.cursor = d;
     }
+    /* Discard stale COQL events so the initial render does not show events
+       from the previous date range while the new fetch is in progress. */
+    state.events = state.events.filter(function (e) { return !e.fromCoql; });
     render();
     if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
   }
 
   function goToday() {
     state.cursor = new Date();
+    /* Discard stale COQL events before rendering the new date range. */
+    state.events = state.events.filter(function (e) { return !e.fromCoql; });
     render();
     if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
   }
@@ -5384,6 +5391,10 @@ $(function () {
       if (isMobile()) return;
       state.view = $(this).data('view');
       updateViewTab(state.view);
+      /* Discard stale COQL events so the view switch renders a clean slate
+         while the new range fetch is in progress. This prevents month-view
+         events from being mis-positioned when switching to week or day view. */
+      state.events = state.events.filter(function (e) { return !e.fromCoql; });
       render();
       if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
@@ -7579,11 +7590,23 @@ $(function () {
         case 'ArrowRight': navigate(1);  break;
         case 't':          goToday();    break;
         case 'm': case 'M':
-          state.view = 'month'; updateViewTab('month'); render(); break;
+          state.view = 'month'; updateViewTab('month');
+          state.events = state.events.filter(function (e) { return !e.fromCoql; });
+          render();
+          if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
+          break;
         case 'w': case 'W':
-          state.view = 'week';  updateViewTab('week');  render(); break;
+          state.view = 'week';  updateViewTab('week');
+          state.events = state.events.filter(function (e) { return !e.fromCoql; });
+          render();
+          if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
+          break;
         case 'd': case 'D':
-          state.view = 'day';   updateViewTab('day');   render(); break;
+          state.view = 'day';   updateViewTab('day');
+          state.events = state.events.filter(function (e) { return !e.fromCoql; });
+          render();
+          if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
+          break;
       }
     });
 
@@ -7633,10 +7656,95 @@ $(function () {
     $settingsBackBtn.show();
   });
 
-  /* Back button → show global loader while the Beat Planner re-initializes */
-  $settingsBackBtn.on('click', function () {
+  /**
+   * Re-initialize the calendar after returning from Settings (either via the
+   * back button or after saving with setupSave).  Replaces location.reload() so
+   * the entire page does not need to be hard-refreshed:
+   *
+   *   1. Re-fetch the latest Beat Plan References record.
+   *   2. Restore slot assignments, bprStyleConfig, and legend chips.
+   *   3. Re-fetch picklist field metadata (fields may have changed).
+   *   4. Rebuild the calendar event filter bar.
+   *   5. Re-render the legends display strip.
+   *   6. Clear stale COQL events, show main content, and render.
+   *   7. Re-apply BPR chip styles to any events already in the DOM.
+   *   8. Load fresh beat plan events for the current view range.
+   */
+  async function reinitializeCalendar() {
     $('#widgetLoaderOverlay').show();
-    location.reload();
+    try {
+      var prefFields = [
+        'id',
+        'beatplanner__Background_Colour_Field_Label_Name', 'beatplanner__Background_Colour_Field_Api_Name',
+        'beatplanner__Marker_Field_Name',                  'beatplanner__Marker_Field_API_Name',
+        'beatplanner__Top_Border_Field_Name',              'beatplanner__Top_Border_Field_Api_Name',
+        'beatplanner__Bottom_Border_Field_Name',           'beatplanner__BottomBorder_Field_Api_Name',
+        'beatplanner__Left_Border_Field_Name',             'beatplanner__Left_Border_Field_Api_Name',
+        'beatplanner__Right_Border_Field_Name',            'beatplanner__Right_Border_Field_Api_Name',
+        'beatplanner__Meetings_For_Modules',               'beatplanner__Meetings_For_Apis',
+        'beatplanner__Legends_Field_Api_Name',             'beatplanner__Legends_Field_Label_Name'
+      ].join(',');
+
+      var resp = await zrc.get('/crm/v8/beatplanner__Beat_Plan_References?fields=' + prefFields);
+      var hasRecords = resp &&
+                       resp.data &&
+                       resp.data.data &&
+                       resp.data.data.length > 0;
+      var savedRec = hasRecords ? resp.data.data[0] : null;
+
+      beatPlanHasRefs = hasRecords;
+
+      if (hasRecords && savedRec) {
+        bpSavedRec = savedRec;
+
+        /* Rebuild mfSelected and beatPlanModulesList from the saved record */
+        mfSelected = (savedRec['beatplanner__Meetings_For_Apis'] || '').split(',').filter(Boolean);
+        var bpModLabels = (savedRec['beatplanner__Meetings_For_Modules'] || '').split(',').filter(Boolean);
+        var bpModApis   = (savedRec['beatplanner__Meetings_For_Apis']    || '').split(',').filter(Boolean);
+        beatPlanModulesList = bpModLabels.map(function (label, i) {
+          return { label: label.trim(), api: (bpModApis[i] || '').trim() };
+        });
+
+        /* Force a fresh fetch of picklist metadata (slot assignments may have changed) */
+        bprPicklistFields = null;
+        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+
+        /* Restore slot assignments and bprStyleConfig from the latest saved record */
+        restorePreferences(savedRec);
+
+        /* Rebuild the calendar event filter bar with the updated picklist metadata */
+        buildCalFilterBar();
+
+        /* Re-render the legends display strip */
+        var savedLegApiNames = (savedRec['beatplanner__Legends_Field_Api_Name']   || '').split(',').filter(Boolean);
+        var savedMfModLabels = (savedRec['beatplanner__Meetings_For_Modules']     || '').split(',').filter(Boolean);
+        await renderLegendsDisplay(savedLegApiNames, savedMfModLabels).catch(function (e) {
+          console.error('Legend render error:', e);
+        });
+
+        /* Clear stale COQL events so the calendar does not display data from the
+           previous configuration while fresh events are being fetched. */
+        state.events = state.events.filter(function (e) { return !e.fromCoql; });
+
+        showMainContent();
+        render();
+        applyBprChipStyles();
+
+        /* Load fresh beat plan events for the current view date range */
+        await loadBeatPlanEvents();
+      } else {
+        showMeetingsBarOnly();
+      }
+    } catch (err) {
+      console.error('Failed to reinitialize calendar:', err);
+    } finally {
+      $('#widgetLoaderOverlay').hide();
+    }
+  }
+
+  /* Back button → re-initialize the calendar without a full page reload */
+  $settingsBackBtn.on('click', function () {
+    reinitializeCalendar();
   });
 
   /* ──────────────────────────────────────────────────────────
@@ -7833,7 +7941,7 @@ $(function () {
       if (leaveColor) {
         var leaveBorderLeft = s.borderLeft || leaveColor;
         styleStr = 'background:' + leaveColor + ';border-left-color:' + leaveBorderLeft +
-                   ';border-left-style:solid;border-left-width:3px;';
+                   ';border-left-style:solid;border-left-width:3px;color:#fff;';
       } else {
         if (s.bg)           { styleStr += 'background:' + s.bg + ';'; }
         if (s.borderTop)    { styleStr += 'border-top-color:'    + s.borderTop    + ';border-top-style:solid;border-top-width:2px;'; }
@@ -7842,6 +7950,8 @@ $(function () {
         if (s.borderRight)  { styleStr += 'border-right-color:'  + s.borderRight  + ';border-right-style:solid;border-right-width:2px;'; }
         /* When no bg-colour is resolved but a left-border color exists, derive a tinted background. */
         if (!s.bg && s.borderLeft) { styleStr += 'background:' + s.borderLeft + '22;'; }
+        /* Apply white text only when a solid background colour is configured */
+        if (s.bg) { styleStr += 'color:#fff;'; }
       }
 
       /* Always replace the element style so any stale fallback colour is cleared.
@@ -8936,9 +9046,9 @@ $(function () {
       console.error('Failed to save Beat Plan Reference:', err);
     }
 
-    /* ── Reload the widget so all components are rebuilt using the
-       latest configuration fetched fresh from the API ── */
-    location.reload();
+    /* ── Re-initialize the calendar in place so all components are rebuilt using
+       the latest configuration fetched fresh from the API, without a hard reload ── */
+    await reinitializeCalendar();
   });
 
   /* setupCancel – discard the legend selection and hide the bar */
