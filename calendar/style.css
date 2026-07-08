@@ -828,6 +828,23 @@ input, select, textarea {
   color: #E0E0F0;
 }
 
+/* ── Dynamic text colour based on Background Colour field mapping ── */
+/* Light theme default (no bg-colour mapping): near-black text on event elements */
+.theme-light .te-title,
+.theme-light .te-time,
+.theme-light .hc-head-title {
+  color: #1A1A2E;
+}
+
+/* Case 1 – bg-colour field IS configured: white text for contrast against coloured backgrounds */
+.cal-bg-colour-mapped .chip-name,
+.cal-bg-colour-mapped .chip-time,
+.cal-bg-colour-mapped .hc-head-title,
+.cal-bg-colour-mapped .te-title,
+.cal-bg-colour-mapped .te-time {
+  color: #fff !important;
+}
+
 /* Approval status badge on event chip */
 /* Copy icon visible on chip hover */
 .chip-copy-btn {
@@ -2886,28 +2903,16 @@ input, select, textarea {
     align-items: center;
   }
 
-  /* Assign flex order so user-profile and nav-group sit on the first row,
-     while period-group drops to a dedicated second row */
-  .user-profile     { order: 1; }
-  .nav-group        { order: 2; }
+  /* .header-left::before no longer needed – period-group is now a direct sibling */
 
-  /* Invisible flex-break forces period-group onto a new row */
-  .header-left::before {
-    content: '';
-    flex: 0 0 100%;
-    order: 3;
-    height: 0;
-  }
-
-  /* Period-group takes the second row */
+  /* Period-group and header-right share the same row below header-left */
   .period-group {
-    order: 4;
     flex: 1;
     min-width: 0;
   }
 
   .header-right {
-    flex: 1 1 100%;
+    flex: 0 0 auto;
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 8px;
@@ -5186,4 +5191,206 @@ input, select, textarea {
 /* Disable all pointer interactions on the calendar body while events are loading */
 .cal-body--loading {
   pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════
+   SLOT FOCUSED HIGHLIGHT (Add Event click)
+══════════════════════════════════════════════════════════ */
+.hour-slot.slot-focused {
+  background: rgba(21, 101, 192, 0.08);
+  outline: 1px solid rgba(21, 101, 192, 0.25);
+  outline-offset: -1px;
+  border-radius: 2px;
+  transition: background .2s, outline .2s;
+  z-index: 1;
+  position: relative;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CALENDAR TOOLBAR – ACTIONS DROPDOWN
+══════════════════════════════════════════════════════════ */
+.cal-actions-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.cal-actions-btn {
+  /* inherits .toolbar-btn styles */
+}
+
+.cal-actions-chevron {
+  flex-shrink: 0;
+  pointer-events: none;
+  transition: transform .15s;
+}
+.cal-actions-btn[aria-expanded="true"] .cal-actions-chevron {
+  transform: rotate(180deg);
+}
+
+.cal-actions-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 3500;
+  padding: 4px 0;
+  list-style: none;
+  margin: 0;
+}
+
+.cal-actions-item {
+  position: relative;
+}
+
+.cal-actions-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background .1s, color .1s;
+  white-space: nowrap;
+}
+.cal-actions-option:hover {
+  background: var(--z-blue-pale);
+  color: var(--z-blue);
+}
+
+.cal-sub-chevron {
+  flex-shrink: 0;
+  pointer-events: none;
+  margin-left: 8px;
+  opacity: .6;
+}
+
+/* Submenu (Mass Create options) */
+.cal-actions-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  min-width: 150px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 3600;
+  padding: 4px 0;
+}
+
+/* ── Responsive: on narrow screens, submenu opens below instead of to the right ── */
+@media (max-width: 540px) {
+  .cal-actions-submenu {
+    position: static;
+    box-shadow: none;
+    border: none;
+    border-left: 2px solid var(--border);
+    border-radius: 0;
+    margin-left: 12px;
+    padding: 0;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   BETWEEN DATE RANGE MODAL
+══════════════════════════════════════════════════════════ */
+.cal-between-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .35);
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cal-between-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cal-between-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cal-between-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.cal-between-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cal-between-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cal-between-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cal-between-input {
+  padding: 7px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface);
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+}
+.cal-between-input:focus {
+  border-color: var(--z-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--z-blue) 12%, transparent);
+}
+.cal-between-input.input-err {
+  border-color: #C62828;
+}
+
+.cal-between-err {
+  font-size: 11px;
+  color: #C62828;
+  min-height: 14px;
+  display: none;
+}
+.cal-between-err.show {
+  display: block;
+}
+
+.cal-between-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
 }

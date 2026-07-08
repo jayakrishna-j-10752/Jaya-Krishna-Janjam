@@ -257,6 +257,42 @@
             </svg>
             Download
           </button>
+
+          <!-- ── Actions Dropdown ── -->
+          <div class="cal-actions-wrap" id="calActionsWrap">
+            <button class="toolbar-btn cal-actions-btn" id="calActionsBtn" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="3" y1="4" x2="13" y2="4"/>
+                <line x1="3" y1="8" x2="13" y2="8"/>
+                <line x1="3" y1="12" x2="13" y2="12"/>
+              </svg>
+              Actions
+              <svg class="cal-actions-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="6">
+                <path d="M1 1l4 4 4-4"/>
+              </svg>
+            </button>
+            <div class="cal-actions-menu" id="calActionsMenu" role="menu" aria-labelledby="calActionsBtn" style="display:none;">
+              <!-- Mass Create with submenu -->
+              <div class="cal-actions-item cal-actions-has-sub">
+                <button class="cal-actions-option cal-mass-create-btn" type="button" role="menuitem" aria-haspopup="true" aria-expanded="false">
+                  Mass Create
+                  <svg class="cal-sub-chevron" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="6" height="10">
+                    <path d="M1 1l4 4-4 4"/>
+                  </svg>
+                </button>
+                <div class="cal-actions-submenu" id="calMassCreateSubmenu" role="menu" style="display:none;">
+                  <button class="cal-actions-option" type="button" role="menuitem" data-mass-create="tomorrow">For Tomorrow</button>
+                  <button class="cal-actions-option" type="button" role="menuitem" data-mass-create="next-week">For Next Week</button>
+                  <button class="cal-actions-option" type="button" role="menuitem" data-mass-create="next-month">For Next Month</button>
+                  <button class="cal-actions-option cal-between-trigger" type="button" role="menuitem" data-mass-create="between">Between</button>
+                </div>
+              </div>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-update">Mass Update</button>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-delete">Mass Delete</button>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-approve">Mass Approve</button>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-reject">Mass Reject</button>
+            </div>
+          </div>
         </div>
         <div class="toolbar-right">
           <button class="toolbar-settings-btn" id="settingsIconBtn" title="Settings" aria-label="Settings">
@@ -305,15 +341,15 @@
             <button class="nav-arrow" id="btnNext" title="Next">&#8250;</button>
           </div>
 
-          <div class="period-group">
-            <svg class="cal-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect x="2" y="4" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M2 8h16" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M6 2v4M14 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <h2 class="period-label" id="periodLabel"></h2>
-          </div>
+        </div>
 
+        <div class="period-group">
+          <svg class="cal-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="4" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2 8h16" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 2v4M14 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h2 class="period-label" id="periodLabel"></h2>
         </div>
 
         <div class="header-right">
@@ -358,6 +394,32 @@
     </div>
 
   </div><!-- /.cal-app -->
+
+  <!-- ══════════════════════ BETWEEN DATE RANGE MODAL ══════════════════════ -->
+  <div class="cal-between-overlay" id="calBetweenOverlay" role="dialog" aria-modal="true" aria-labelledby="calBetweenHeading" style="display:none;">
+    <div class="cal-between-box">
+      <div class="cal-between-head">
+        <h3 class="cal-between-heading" id="calBetweenHeading">Mass Create – Between</h3>
+        <button class="modal-x" id="calBetweenClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="cal-between-body">
+        <div class="cal-between-field">
+          <label class="cal-between-label" for="calBetweenFrom">From</label>
+          <input type="date" id="calBetweenFrom" class="cal-between-input" />
+          <span class="cal-between-err" id="calBetweenFromErr"></span>
+        </div>
+        <div class="cal-between-field">
+          <label class="cal-between-label" for="calBetweenTo">To</label>
+          <input type="date" id="calBetweenTo" class="cal-between-input" />
+          <span class="cal-between-err" id="calBetweenToErr"></span>
+        </div>
+      </div>
+      <div class="cal-between-foot">
+        <button class="modal-cancel" id="calBetweenCancel" type="button">Cancel</button>
+        <button class="modal-save" id="calBetweenSubmit" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
 
 
   <!-- ══════════════════════ EVENT MODAL ══════════════════════ -->
