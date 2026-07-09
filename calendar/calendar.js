@@ -582,9 +582,11 @@ $(function () {
 
       /* Hour slots – paste button inside slots only for chip/te copy */
       for (var h = 0; h < 24; h++) {
+        /* On today, only show add/paste for current hour onwards */
+        var slotAddAllowed = valid && !(isT && h < new Date().getHours());
         var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
-        if (valid) {
+        if (slotAddAllowed) {
           var evAtSlot = eventAtHour(ds, h);
           /* When a time-event occupies this slot, show a copy button instead of
              the add button to prevent the + icon from overlapping the event block. */
@@ -679,11 +681,14 @@ $(function () {
     html += '</div>';
 
     /* Day column with hour slots and events */
+    var isTodayMW = selDs === tdStr;
     html += '<div class="day-col" data-date="' + selDs + '">';
     for (var h = 0; h < 24; h++) {
+      /* On today, only show add/paste for current hour onwards */
+      var slotAddAllowed = valid && !(isTodayMW && h < new Date().getHours());
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + selDs + '" data-hour="' + h + '">';
-      if (valid) {
+      if (slotAddAllowed) {
         var evAtSlot = eventAtHour(selDs, h);
         if (evAtSlot) {
           html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
@@ -758,9 +763,11 @@ $(function () {
     /* Single day column – paste button inside hour slots only for chip/te copy */
     html += '<div class="day-col" data-date="' + ds + '">';
     for (var h = 0; h < 24; h++) {
+      /* On today, only show add/paste for current hour onwards */
+      var slotAddAllowed = valid && !(isT && h < new Date().getHours());
       var slotCls = 'hour-slot' + (valid ? ' slot-valid' : '');
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
-      if (valid) {
+      if (slotAddAllowed) {
         var evAtSlot = eventAtHour(ds, h);
         if (evAtSlot) {
           html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
@@ -1155,8 +1162,16 @@ $(function () {
   function attachTimeGridHandlers() {
     dom.canvas.on('click.calview', '.slot-add-btn', function (e) {
       e.stopPropagation();
-      var date = $(this).data('date');
-      var h    = parseInt($(this).data('hour'), 10);
+      var $btn  = $(this);
+      var date  = $btn.data('date');
+      var h     = parseInt($btn.data('hour'), 10);
+
+      /* Scroll the clicked hour-slot into view so the form opens in context */
+      var slotEl = $btn.closest('.hour-slot')[0];
+      if (slotEl) {
+        slotEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
       if (beatPlanHasRefs) {
         /* In beat plan mode: open the full slot picker (pre-set to Working) rather than
            the simple event form, so the user gets the complete row-based UI. */
@@ -5406,6 +5421,156 @@ $(function () {
       setTheme(themes[(idx + 1) % themes.length]);
     });
 
+    /* ── Actions Dropdown ── */
+    $('#calActionsBtn').on('click', function (e) {
+      e.stopPropagation();
+      var $menu    = $('#calActionsMenu');
+      var $btn     = $(this);
+      var isOpen   = $menu.is(':visible');
+      /* Close any open submenu first */
+      $('#calMassCreateSubmenu').hide();
+      $('.cal-mass-create-btn').attr('aria-expanded', 'false');
+      if (isOpen) {
+        $menu.hide();
+        $btn.attr('aria-expanded', 'false');
+      } else {
+        $menu.show();
+        $btn.attr('aria-expanded', 'true');
+      }
+    });
+
+    /* Mass Create – toggle submenu on click/hover */
+    $(document).on('click mouseenter', '.cal-mass-create-btn', function (e) {
+      e.stopPropagation();
+      var $sub = $('#calMassCreateSubmenu');
+      var $btn = $(this);
+      $sub.show();
+      $btn.attr('aria-expanded', 'true');
+    });
+
+    /* Close submenu when hovering other items in the main menu */
+    $(document).on('mouseenter', '#calActionsMenu .cal-actions-option:not(.cal-mass-create-btn)', function () {
+      $('#calMassCreateSubmenu').hide();
+      $('.cal-mass-create-btn').attr('aria-expanded', 'false');
+    });
+
+    /* Close Actions dropdown and submenu when clicking outside */
+    $(document).on('click.calActions', function (e) {
+      if (!$(e.target).closest('#calActionsWrap').length) {
+        $('#calActionsMenu').hide();
+        $('#calMassCreateSubmenu').hide();
+        $('#calActionsBtn').attr('aria-expanded', 'false');
+        $('.cal-mass-create-btn').attr('aria-expanded', 'false');
+      }
+    });
+
+    /* Mass Create submenu options */
+    $(document).on('click', '#calMassCreateSubmenu .cal-actions-option:not(.cal-between-trigger)', function () {
+      var action = $(this).data('mass-create');
+      $('#calActionsMenu').hide();
+      $('#calMassCreateSubmenu').hide();
+      $('#calActionsBtn').attr('aria-expanded', 'false');
+      $('.cal-mass-create-btn').attr('aria-expanded', 'false');
+      /* Placeholder – wire up actual mass-create logic per action */
+      showToast('Mass Create – ' + $(this).text().trim());
+    });
+
+    /* Between trigger – open the Between date range modal */
+    $(document).on('click', '.cal-between-trigger', function (e) {
+      e.stopPropagation();
+      $('#calActionsMenu').hide();
+      $('#calMassCreateSubmenu').hide();
+      $('#calActionsBtn').attr('aria-expanded', 'false');
+      $('.cal-mass-create-btn').attr('aria-expanded', 'false');
+      /* Reset fields and errors */
+      $('#calBetweenFrom').val('').removeClass('input-err');
+      $('#calBetweenTo').val('').removeClass('input-err');
+      $('#calBetweenFromErr').text('').removeClass('show');
+      $('#calBetweenToErr').text('').removeClass('show');
+      /* Set min date for From input to today */
+      $('#calBetweenFrom').attr('min', todayStr());
+      $('#calBetweenOverlay').show();
+    });
+
+    /* Between modal – close */
+    function closeBetweenModal() {
+      $('#calBetweenOverlay').hide();
+    }
+    $('#calBetweenClose, #calBetweenCancel').on('click', closeBetweenModal);
+    $('#calBetweenOverlay').on('click', function (e) {
+      if (e.target === this) { closeBetweenModal(); }
+    });
+
+    /* Between modal – live validation on date change */
+    function validateBetweenDates() {
+      var today   = todayStr();
+      var fromVal = $('#calBetweenFrom').val();
+      var toVal   = $('#calBetweenTo').val();
+      var valid   = true;
+
+      if (fromVal && fromVal < today) {
+        $('#calBetweenFrom').addClass('input-err');
+        $('#calBetweenFromErr').text('The From date cannot be earlier than today.').addClass('show');
+        valid = false;
+      } else {
+        $('#calBetweenFrom').removeClass('input-err');
+        $('#calBetweenFromErr').text('').removeClass('show');
+      }
+
+      if (fromVal && toVal && toVal < fromVal) {
+        $('#calBetweenTo').addClass('input-err');
+        $('#calBetweenToErr').text('The To date must be the same as or later than the From date.').addClass('show');
+        valid = false;
+      } else if (toVal) {
+        $('#calBetweenTo').removeClass('input-err');
+        $('#calBetweenToErr').text('').removeClass('show');
+      }
+
+      return valid;
+    }
+
+    $('#calBetweenFrom').on('change', function () {
+      /* Update the To input's min attribute to match the From date */
+      var fromVal = $(this).val();
+      if (fromVal) { $('#calBetweenTo').attr('min', fromVal); }
+      validateBetweenDates();
+    });
+
+    $('#calBetweenTo').on('change', function () {
+      validateBetweenDates();
+    });
+
+    /* Between modal – submit */
+    $('#calBetweenSubmit').on('click', function () {
+      var fromVal = $('#calBetweenFrom').val();
+      var toVal   = $('#calBetweenTo').val();
+
+      if (!fromVal) {
+        $('#calBetweenFrom').addClass('input-err');
+        $('#calBetweenFromErr').text('Please select a From date.').addClass('show');
+        return;
+      }
+      if (!toVal) {
+        $('#calBetweenTo').addClass('input-err');
+        $('#calBetweenToErr').text('Please select a To date.').addClass('show');
+        return;
+      }
+      if (!validateBetweenDates()) { return; }
+
+      closeBetweenModal();
+      /* Placeholder – wire up actual mass-create Between logic */
+      showToast('Mass Create Between ' + fromVal + ' and ' + toVal);
+    });
+
+    /* Other Actions menu items */
+    $(document).on('click', '#calActionsMenu .cal-actions-option[data-action]', function () {
+      var action = $(this).data('action');
+      $('#calActionsMenu').hide();
+      $('#calActionsBtn').attr('aria-expanded', 'false');
+      /* Placeholder – wire up actual mass action logic */
+      showToast($(this).text().trim());
+    });
+
     /* Modal controls */
     dom.modalClose.on('click',  closeModal);
     dom.modalCancel.on('click', closeModal);
@@ -7728,6 +7893,7 @@ $(function () {
 
         showMainContent();
         render();
+        updateBgColourClass();
         applyBprChipStyles();
 
         /* Load fresh beat plan events for the current view date range */
@@ -7915,6 +8081,17 @@ $(function () {
       break;
     }
     return '';
+  }
+
+  /**
+   * Add or remove the `cal-bg-colour-mapped` class on #calApp based on whether
+   * the Background Colour field has been configured in the BPR record.
+   * - Mapped   → adds class → CSS rule forces white text on chip/time-event labels.
+   * - Unmapped → removes class → CSS rule forces near-black text in light theme.
+   */
+  function updateBgColourClass() {
+    var isMapped = !!(bprStyleConfig && bprStyleConfig['bg-colour']);
+    $('#calApp').toggleClass('cal-bg-colour-mapped', isMapped);
   }
 
   /**
@@ -9279,6 +9456,7 @@ $(function () {
          after picklist metadata is loaded, so bprStyleConfig is always set before
          any user interaction can trigger event rendering. */
       restorePreferences(savedRec);
+      updateBgColourClass();
       applyBprChipStyles();
 
       /* Build the calendar event filter bar now that picklist metadata is available. */

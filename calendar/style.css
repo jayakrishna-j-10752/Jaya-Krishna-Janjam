@@ -2905,16 +2905,20 @@ input, select, textarea {
 
   /* .header-left::before no longer needed – period-group is now a direct sibling */
 
-  /* Period-group and header-right share the same row below header-left */
+  /* Period-group and header-right share the same row below header-left.
+     flex-shrink: 0 on header-right prevents it from ever being pushed to a
+     separate line; overflow: hidden on period-group absorbs any excess width. */
   .period-group {
-    flex: 1;
+    flex: 1 1 0;
     min-width: 0;
+    overflow: hidden;
   }
 
   .header-right {
     flex: 0 0 auto;
+    flex-shrink: 0;
     justify-content: flex-end;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
   }
 
