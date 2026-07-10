@@ -835,7 +835,9 @@ input, select, textarea {
 .theme-light .hc-head-title {
   color: #1A1A2E;
 }
-/* Case 2 – bp table elements: black text/icons in light theme when no bg-colour mapping */
+/* Case 2 – bp table elements (including edit rows): black text/icons in light theme
+   when no bg-colour mapping is configured. The !important Case 1 rule below overrides
+   these when the cal-bg-colour-mapped body class is present. */
 .theme-light .bp-row-action,
 .theme-light .bp-time-cell {
   color: #1A1A2E;
