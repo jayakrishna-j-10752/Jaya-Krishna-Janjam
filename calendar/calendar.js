@@ -4378,6 +4378,9 @@ $(function () {
   var hoverTimer    = null;  /* debounce timer – delays hiding the hover card */
   var hoverActiveId = null;  /* event id of the currently-visible hover card */
 
+  /* ── Mass Create submenu hover state ── */
+  var submenuHideTimer = null;  /* debounce timer – delays hiding the mass-create submenu */
+
   /* ── Chip colors: { [apiName]: '#rrggbb' } – persisted in localStorage ── */
   var mfColors = (function () {
     try { return JSON.parse(localStorage.getItem('zcrm_mf_colors') || '{}'); }
@@ -5467,17 +5470,38 @@ $(function () {
       }
     });
 
-    /* Mass Create – toggle submenu on click/hover */
+    /* Mass Create – show submenu on click/hover; use a timer to avoid flicker
+       when the cursor moves between the parent button and the submenu panel.    */
+    function showMassCreateSubmenu() {
+      clearTimeout(submenuHideTimer);
+      $('#calMassCreateSubmenu').show();
+      $('.cal-mass-create-btn').attr('aria-expanded', 'true');
+    }
+    function hideMassCreateSubmenuDelayed() {
+      submenuHideTimer = setTimeout(function () {
+        $('#calMassCreateSubmenu').hide();
+        $('.cal-mass-create-btn').attr('aria-expanded', 'false');
+      }, 120);
+    }
+
     $(document).on('click mouseenter', '.cal-mass-create-btn', function (e) {
       e.stopPropagation();
-      var $sub = $('#calMassCreateSubmenu');
-      var $btn = $(this);
-      $sub.show();
-      $btn.attr('aria-expanded', 'true');
+      showMassCreateSubmenu();
     });
 
-    /* Close submenu when hovering other items in the main menu */
-    $(document).on('mouseenter', '#calActionsMenu .cal-actions-option:not(.cal-mass-create-btn)', function () {
+    /* Keep submenu open while cursor is inside it */
+    $(document).on('mouseenter', '#calMassCreateSubmenu', function () {
+      clearTimeout(submenuHideTimer);
+    });
+
+    /* Start hide timer when cursor leaves the button or the submenu panel */
+    $(document).on('mouseleave', '.cal-mass-create-btn, #calMassCreateSubmenu', function () {
+      hideMassCreateSubmenuDelayed();
+    });
+
+    /* Close submenu immediately when hovering DIRECT main-menu items (not submenu options) */
+    $(document).on('mouseenter', '#calActionsMenu > .cal-actions-option', function () {
+      clearTimeout(submenuHideTimer);
       $('#calMassCreateSubmenu').hide();
       $('.cal-mass-create-btn').attr('aria-expanded', 'false');
     });
@@ -5485,6 +5509,7 @@ $(function () {
     /* Close Actions dropdown and submenu when clicking outside */
     $(document).on('click.calActions', function (e) {
       if (!$(e.target).closest('#calActionsWrap').length) {
+        clearTimeout(submenuHideTimer);
         $('#calActionsMenu').hide();
         $('#calMassCreateSubmenu').hide();
         $('#calActionsBtn').attr('aria-expanded', 'false');
@@ -6981,6 +7006,62 @@ $(function () {
     });
 
     /* ── demBulkGrid: single-row Approve – stays in modal, updates row in-place ── */
+    /**
+     * Re-apply metadata-driven border/background styles to a .bp-slot-row inside
+     * #demBulkGrid after the event's bprFieldValues have changed (e.g. approve/reject).
+     * Also refreshes the hover card header if it is currently showing the same event.
+     *
+     * @param {jQuery} $row – the .bp-slot-row element to update
+     * @param {Object} ev   – the updated local event object
+     */
+    function refreshDemRowStyles($row, ev) {
+      var newStyles  = buildBprEventStyles(ev);
+      var newCellTB  = newStyles.borderTopStr + newStyles.borderBottomStr;
+      var newCbStyle = newStyles.borderLeftStr + newCellTB;
+      var newActStyle = newCellTB + newStyles.borderRightStr;
+
+      /* Row background */
+      if (newStyles.bgStr) {
+        $row.attr('style', newStyles.bgStr);
+      } else {
+        $row.removeAttr('style');
+      }
+
+      /* Checkbox cell – carries left border */
+      $row.find('.bp-cb-cell').attr('style', newCbStyle || '');
+
+      /* Time cells – carry top/bottom borders only */
+      $row.find('.bp-time-cell').each(function () {
+        $(this).attr('style', newCellTB || '');
+      });
+
+      /* Action cell – carries right border */
+      $row.find('.bp-action-cell').attr('style', newActStyle || '');
+
+      /* If the hover card is currently showing this event, update its header styling */
+      if (hoverActiveId === ev.id) {
+        var hcStyle = buildHoverCardHeaderStyle(ev);
+        dom.hoverCard.find('.hc-head').attr('style', hcStyle.cardStyle || '');
+        var $hcMarker = dom.hoverCard.find('.hc-marker');
+        if (hcStyle.markerColor) {
+          if ($hcMarker.length) {
+            $hcMarker.css('background', hcStyle.markerColor);
+          } else {
+            dom.hoverCard.find('.hc-head-top').prepend(
+              '<span class="hc-marker" style="background:' + escHtml(hcStyle.markerColor) + ';" aria-hidden="true"></span>'
+            );
+          }
+        } else {
+          $hcMarker.remove();
+        }
+        /* Update arrow to match new header style */
+        dom.hoverArrow.css({
+          'background':    hcStyle.arrowBg         || 'var(--surface)',
+          'border-color':  hcStyle.arrowBorderColor || hcStyle.arrowBg || 'var(--border-strong)'
+        });
+      }
+    }
+
     $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
@@ -6999,6 +7080,8 @@ $(function () {
         $row.find('.bp-row-approve').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
         $row.find('.bp-row-reject').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
         $row.find('.bp-row-delete').prop('disabled', true);
+        /* Refresh row border/background and hover card to reflect new approval status */
+        if (ev) { refreshDemRowStyles($row, ev); }
         showToast('Record approved.');
       } catch (err) {
         console.error('Approve failed', err);
@@ -7026,6 +7109,8 @@ $(function () {
         $row.find('.bp-row-reject').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
         $row.find('.bp-row-approve').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
         $row.find('.bp-row-delete').prop('disabled', true);
+        /* Refresh row border/background and hover card to reflect new rejection status */
+        if (ev) { refreshDemRowStyles($row, ev); }
         showToast('Record rejected.');
       } catch (err) {
         console.error('Reject failed', err);
@@ -8130,14 +8215,18 @@ $(function () {
   }
 
   /**
-   * Add or remove the `cal-bg-colour-mapped` class on #calApp based on whether
+   * Add or remove the `cal-bg-colour-mapped` class on <body> based on whether
    * the Background Colour field has been configured in the BPR record.
    * - Mapped   → adds class → CSS rule forces white text on chip/time-event labels.
    * - Unmapped → removes class → CSS rule forces near-black text in light theme.
+   *
+   * Applied to <body> (instead of #calApp) so that the class propagates into
+   * all UI surfaces: calendar views, #eventModal, #dayEventsModal, #evtHoverCard,
+   * editable rows, and every other element rendered outside #calApp.
    */
   function updateBgColourClass() {
     var isMapped = !!(bprStyleConfig && bprStyleConfig['bg-colour']);
-    $('#calApp').toggleClass('cal-bg-colour-mapped', isMapped);
+    $('body').toggleClass('cal-bg-colour-mapped', isMapped);
   }
 
   /**
