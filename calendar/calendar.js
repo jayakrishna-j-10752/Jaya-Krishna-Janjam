@@ -3194,6 +3194,223 @@ $(function () {
   }
 
   /* ──────────────────────────────────────────────────────────
+     MASS ACTIONS POPUP
+  ────────────────────────────────────────────────────────── */
+
+  /** Tracks which action is currently open in the Mass Actions popup */
+  var massActionsCurrentAction = '';
+
+  /**
+   * Return all currently visible events grouped by date string.
+   * Respects active calendar filters via eventsOn().
+   * @returns {Array<{date: string, events: Array}>} sorted ascending by date
+   */
+  function getVisibleEventsByDate() {
+    var c    = state.cursor;
+    var dates = [];
+
+    if (state.view === 'month') {
+      var year  = c.getFullYear();
+      var month = c.getMonth();
+      var days  = daysInMonth(year, month);
+      for (var d = 1; d <= days; d++) {
+        var dt = new Date(year, month, d);
+        dates.push(dateToStr(dt));
+      }
+    } else if (state.view === 'week') {
+      var ws = weekStart(c);
+      for (var w = 0; w < 7; w++) {
+        var wd = new Date(ws); wd.setDate(ws.getDate() + w);
+        dates.push(dateToStr(wd));
+      }
+    } else {
+      dates.push(dateToStr(c));
+    }
+
+    var groups = [];
+    dates.forEach(function (ds) {
+      var evts = eventsOn(ds);
+      if (evts.length > 0) {
+        groups.push({ date: ds, events: evts });
+      }
+    });
+    return groups;
+  }
+
+  /**
+   * Format a YYYY-MM-DD string into a human-readable label.
+   * Example: "2026-07-10" → "Friday, July 10, 2026"
+   */
+  function fmtDateLabel(ds) {
+    var parts = ds.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  /**
+   * Build and return the HTML content for the Mass Actions popup body.
+   * @param {Array} groups – output of getVisibleEventsByDate()
+   */
+  function buildMassActionsBodyHtml(groups) {
+    if (!groups.length) { return ''; }
+
+    var html = '';
+    groups.forEach(function (group) {
+      html += '<div class="map-day-group" data-date="' + escHtml(group.date) + '">' +
+              '  <div class="map-day-header">' +
+              '    <label class="map-cb-label">' +
+              '      <input type="checkbox" class="map-cb map-day-cb" data-date="' + escHtml(group.date) + '" />' +
+              '      <span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(group.date)) + '</span>' +
+              '    </label>' +
+              '  </div>';
+
+      group.events.forEach(function (ev) {
+        var timeLabel = fmtTime(ev.startTime) + ' \u2013 ' + fmtTime(ev.endTime);
+        var title     = ev.title || '(No title)';
+
+        /* Build meta items */
+        var metaHtml = '';
+        if (ev.bprFieldValues) {
+          var bprVals = ev.bprFieldValues;
+
+          /* Meetings For */
+          var mfVal = bprVals['beatplanner__Meetings_For'] || '';
+          if (!mfVal && bpDailyAllFields && bpDailyAllFields.length) {
+            bpDailyAllFields.forEach(function (f) {
+              if ((f.field_label || '').toLowerCase() === 'meetings for') {
+                mfVal = bprVals[f.api_name] || '';
+              }
+            });
+          }
+          if (mfVal) {
+            metaHtml += '<span class="map-event-meta-item"><strong>Meetings For:</strong> ' + escHtml(mfVal) + '</span>';
+          }
+
+          /* Approval status */
+          var approval = bprVals['beatplanner__Managers_Approval'] || '';
+          if (approval) {
+            metaHtml += '<span class="map-event-meta-item"><strong>Approval:</strong> ' + escHtml(approval) + '</span>';
+          }
+
+          /* Other picklist fields (up to 2 extra) */
+          var extraCount = 0;
+          if (bprPicklistFields && bprPicklistFields.length) {
+            var hiddenLabels = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for', 'attendance', 'leave type'];
+            for (var pi = 0; pi < bprPicklistFields.length && extraCount < 2; pi++) {
+              var pf  = bprPicklistFields[pi];
+              var lbl = (pf.field_label || '').toLowerCase().trim();
+              if (hiddenLabels.indexOf(lbl) !== -1) { continue; }
+              if (pf.api_name === 'beatplanner__Date_Time_From' || pf.api_name === 'beatplanner__Date_Time_To') { continue; }
+              var val = bprVals[pf.api_name];
+              if (val && val !== 'Select\u2026') {
+                metaHtml += '<span class="map-event-meta-item"><strong>' + escHtml(pf.field_label) + ':</strong> ' + escHtml(val) + '</span>';
+                extraCount++;
+              }
+            }
+          }
+        }
+
+        html += '<div class="map-event-row" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '">' +
+                '  <label class="map-cb-label" style="align-self:flex-start;margin-top:1px;">' +
+                '    <input type="checkbox" class="map-cb map-event-cb" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '" />' +
+                '  </label>' +
+                '  <div class="map-event-info">' +
+                '    <div class="map-event-time">' + escHtml(timeLabel) + '</div>' +
+                '    <div class="map-event-title">' + escHtml(title) + '</div>' +
+                (metaHtml ? '<div class="map-event-meta">' + metaHtml + '</div>' : '') +
+                '  </div>' +
+                '</div>';
+      });
+
+      html += '</div>';
+    });
+
+    return html;
+  }
+
+  /** Open the Mass Actions popup for a given action */
+  function openMassActionsPopup(action) {
+    var titleMap = {
+      'mass-update':  'Mass Update',
+      'mass-delete':  'Mass Delete',
+      'mass-approve': 'Mass Approve',
+      'mass-reject':  'Mass Reject'
+    };
+    var confirmMap = {
+      'mass-update':  'Update Selected',
+      'mass-delete':  'Delete Selected',
+      'mass-approve': 'Approve Selected',
+      'mass-reject':  'Reject Selected'
+    };
+
+    massActionsCurrentAction = action;
+
+    var groups = getVisibleEventsByDate();
+
+    $('#massActionsTitle').text(titleMap[action] || 'Mass Action');
+    $('#massActionsConfirm').text(confirmMap[action] || 'Confirm');
+    $('#massActionsSelectAll').prop('checked', false).prop('indeterminate', false);
+    $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
+    $('#mapSelCount').text('');
+
+    $('#massActionsOverlay').css('display', 'flex');
+    /* Trigger reflow before adding open class for CSS transition */
+    $('#massActionsOverlay')[0].offsetWidth; // eslint-disable-line no-unused-expressions
+    $('#massActionsOverlay').addClass('map-open');
+  }
+
+  /** Close the Mass Actions popup */
+  function closeMassActionsPopup() {
+    $('#massActionsOverlay').removeClass('map-open');
+    setTimeout(function () {
+      $('#massActionsOverlay').css('display', 'none');
+      $('#massActionsBody').empty();
+    }, 220);
+  }
+
+  /** Synchronize the Select All checkbox state based on all event checkboxes */
+  function syncMassActionsSelectAll() {
+    var $allEvtCbs  = $('#massActionsBody .map-event-cb');
+    var $checked    = $allEvtCbs.filter(':checked');
+    var total       = $allEvtCbs.length;
+    var checkedCount = $checked.length;
+    var $selectAll  = $('#massActionsSelectAll');
+
+    if (total === 0) {
+      $selectAll.prop('checked', false).prop('indeterminate', false);
+    } else if (checkedCount === total) {
+      $selectAll.prop('checked', true).prop('indeterminate', false);
+    } else if (checkedCount === 0) {
+      $selectAll.prop('checked', false).prop('indeterminate', false);
+    } else {
+      $selectAll.prop('checked', false).prop('indeterminate', true);
+    }
+
+    var label = checkedCount === 0
+      ? ''
+      : checkedCount + ' event' + (checkedCount === 1 ? '' : 's') + ' selected';
+    $('#mapSelCount').text(label);
+  }
+
+  /** Synchronize a day checkbox based on its events' checked state */
+  function syncMassActionsDayCb($dayCb) {
+    var date     = $dayCb.data('date');
+    var $evtCbs  = $('#massActionsBody .map-event-cb[data-date="' + date + '"]');
+    var total    = $evtCbs.length;
+    var checked  = $evtCbs.filter(':checked').length;
+
+    if (total === 0) {
+      $dayCb.prop('checked', false).prop('indeterminate', false);
+    } else if (checked === total) {
+      $dayCb.prop('checked', true).prop('indeterminate', false);
+    } else if (checked === 0) {
+      $dayCb.prop('checked', false).prop('indeterminate', false);
+    } else {
+      $dayCb.prop('checked', false).prop('indeterminate', true);
+    }
+  }
+
+  /* ──────────────────────────────────────────────────────────
      MODAL (CREATE / EDIT)
   ────────────────────────────────────────────────────────── */
 
@@ -5617,13 +5834,173 @@ $(function () {
       showToast('Mass Create Between ' + fromVal + ' and ' + toVal);
     });
 
-    /* Other Actions menu items */
+    /* Other Actions menu items – open Mass Actions popup */
     $(document).on('click', '#calActionsMenu .cal-actions-option[data-action]', function () {
       var action = $(this).data('action');
       $('#calActionsMenu').hide();
       $('#calActionsBtn').attr('aria-expanded', 'false');
-      /* Placeholder – wire up actual mass action logic */
-      showToast($(this).text().trim());
+      openMassActionsPopup(action);
+    });
+
+    /* Mass Actions popup – close */
+    $(document).on('click', '#massActionsClose, #massActionsCancel', function () {
+      closeMassActionsPopup();
+    });
+    $(document).on('click', '#massActionsOverlay', function (e) {
+      if (e.target === this) { closeMassActionsPopup(); }
+    });
+
+    /* Mass Actions popup – Select All checkbox */
+    $(document).on('change', '#massActionsSelectAll', function () {
+      var checked = $(this).prop('checked');
+      $('#massActionsBody .map-event-cb').prop('checked', checked);
+      $('#massActionsBody .map-day-cb').prop('checked', checked).prop('indeterminate', false);
+      var total = $('#massActionsBody .map-event-cb').length;
+      var label = checked && total > 0
+        ? total + ' event' + (total === 1 ? '' : 's') + ' selected'
+        : '';
+      $('#mapSelCount').text(label);
+    });
+
+    /* Mass Actions popup – day checkbox */
+    $(document).on('change', '#massActionsBody .map-day-cb', function () {
+      var date    = $(this).data('date');
+      var checked = $(this).prop('checked');
+      $('#massActionsBody .map-event-cb[data-date="' + date + '"]').prop('checked', checked);
+      syncMassActionsSelectAll();
+    });
+
+    /* Mass Actions popup – individual event checkbox */
+    $(document).on('change', '#massActionsBody .map-event-cb', function () {
+      var date = $(this).data('date');
+      var $dayCb = $('#massActionsBody .map-day-cb[data-date="' + date + '"]');
+      syncMassActionsDayCb($dayCb);
+      syncMassActionsSelectAll();
+    });
+
+    /* Mass Actions popup – Confirm button */
+    $(document).on('click', '#massActionsConfirm', async function () {
+      var $btn    = $(this);
+      var action  = massActionsCurrentAction;
+      var selIds  = [];
+      $('#massActionsBody .map-event-cb:checked').each(function () {
+        var evid = String($(this).data('evid') || '');
+        if (evid) { selIds.push(evid); }
+      });
+
+      if (selIds.length === 0) {
+        showToast('No events selected.');
+        return;
+      }
+
+      $btn.prop('disabled', true);
+
+      if (action === 'mass-delete') {
+        if (!window.confirm('Delete ' + selIds.length + ' selected event(s)?')) {
+          $btn.prop('disabled', false);
+          return;
+        }
+        /* Batch delete */
+        var deletedIds = {};
+        try {
+          var bpIds    = selIds.filter(function (id) { var ev = findEvent(id); return ev && ev.bprFieldValues && Object.keys(ev.bprFieldValues).length; });
+          var localIds = selIds.filter(function (id) { return bpIds.indexOf(id) === -1; });
+
+          if (bpIds.length > 0) {
+            var delResp = await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + bpIds.join(','));
+            var delData = (delResp && delResp.data && delResp.data.data) ? delResp.data.data : [];
+            delData.forEach(function (entry) {
+              if (entry && entry.status === 'success' && entry.details && entry.details.id) {
+                deletedIds[entry.details.id] = true;
+              }
+            });
+            if (delData.length === 0) { bpIds.forEach(function (id) { deletedIds[id] = true; }); }
+          }
+          localIds.forEach(function (id) { deletedIds[id] = true; });
+        } catch (err) {
+          console.error('Mass delete failed', err);
+          showToast('Mass delete failed.');
+          $btn.prop('disabled', false);
+          return;
+        }
+
+        var deleted = 0;
+        selIds.forEach(function (id) {
+          if (deletedIds[id]) {
+            state.events = state.events.filter(function (e) { return e.id !== id; });
+            if (state.clipboard) {
+              state.clipboard = state.clipboard.filter(function (e) { return e.id !== id; });
+              if (state.clipboard.length === 0) { state.clipboard = null; state.clipboardSource = null; }
+            }
+            deleted++;
+          }
+        });
+        saveEvents();
+        render();
+        closeMassActionsPopup();
+        showToast(deleted + ' event(s) deleted.');
+
+      } else if (action === 'mass-approve' || action === 'mass-reject') {
+        var approvalVal = action === 'mass-approve' ? 'Approved' : 'Rejected';
+        var batchData   = selIds.map(function (id) { return { id: id, beatplanner__Managers_Approval: approvalVal }; });
+        var updated     = 0;
+        var failed      = 0;
+        try {
+          var arResp    = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', { data: batchData });
+          var arResults = (arResp && arResp.data && arResp.data.data) ? arResp.data.data : [];
+          selIds.forEach(function (id, idx) {
+            var res = arResults[idx] || {};
+            if (res.status === 'success') {
+              var ev = findEvent(id);
+              if (ev) {
+                if (!ev.bprFieldValues) { ev.bprFieldValues = {}; }
+                ev.bprFieldValues['beatplanner__Managers_Approval'] = approvalVal;
+              }
+              updated++;
+            } else {
+              console.error('Mass ' + action + ' failed for', id, res);
+              failed++;
+            }
+          });
+        } catch (err) {
+          console.error('Mass ' + action + ' batch request failed', err);
+          failed = selIds.length;
+        }
+        saveEvents();
+        render();
+        closeMassActionsPopup();
+        var actionLabel = action === 'mass-approve' ? 'approved' : 'rejected';
+        if (failed > 0) {
+          showToast(updated + ' record(s) ' + actionLabel + '. ' + failed + ' failed.');
+        } else {
+          showToast(updated + ' record(s) ' + actionLabel + '.');
+        }
+
+      } else if (action === 'mass-update') {
+        /* For mass-update: close this popup and open the Day Events Modal in bulk-edit mode
+           for the first date that has selected events. Pre-check the selected rows there. */
+        /* Determine the first date with selected events before closing the popup */
+        var firstDate = null;
+        for (var mui = 0; mui < selIds.length && !firstDate; mui++) {
+          var muEv = findEvent(selIds[mui]);
+          if (muEv && muEv.date) { firstDate = muEv.date; }
+        }
+        var selIdsCopy = selIds.slice();
+        closeMassActionsPopup();
+        if (firstDate) {
+          setTimeout(function () {
+            showDayEventsModal(firstDate).then(function () {
+              /* Pre-check rows matching selected IDs */
+              selIdsCopy.forEach(function (id) {
+                $('#demBulkGrid .bp-slot-row[data-edit-id="' + id + '"] .bp-row-cb').prop('checked', true);
+              });
+              syncDemBulkToolbar();
+            }).catch(function () {});
+          }, 250);
+        }
+      }
+
+      $btn.prop('disabled', false);
     });
 
     /* Modal controls */
@@ -7865,7 +8242,7 @@ $(function () {
     $(document).on('keydown', function (e) {
       if (dom.modal.hasClass('modal-open')) return; /* modal captures input */
       switch (e.key) {
-        case 'Escape':     hideHoverCard(); closeDayEventsModal(); closeSlotPicker(); break;
+        case 'Escape':     hideHoverCard(); closeDayEventsModal(); closeSlotPicker(); closeMassActionsPopup(); break;
         case 'ArrowLeft':  navigate(-1); break;
         case 'ArrowRight': navigate(1);  break;
         case 't':          goToday();    break;
