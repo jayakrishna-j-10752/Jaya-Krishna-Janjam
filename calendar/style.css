@@ -835,13 +835,20 @@ input, select, textarea {
 .theme-light .hc-head-title {
   color: #1A1A2E;
 }
+/* Case 2 – bp table elements: black text/icons in light theme when no bg-colour mapping */
+.theme-light .bp-row-action,
+.theme-light .bp-time-cell {
+  color: #1A1A2E;
+}
 
 /* Case 1 – bg-colour field IS configured: white text for contrast against coloured backgrounds */
 .cal-bg-colour-mapped .chip-name,
 .cal-bg-colour-mapped .chip-time,
 .cal-bg-colour-mapped .hc-head-title,
 .cal-bg-colour-mapped .te-title,
-.cal-bg-colour-mapped .te-time {
+.cal-bg-colour-mapped .te-time,
+.cal-bg-colour-mapped .bp-row-action,
+.cal-bg-colour-mapped .bp-time-cell {
   color: #fff !important;
 }
 

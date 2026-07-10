@@ -1181,7 +1181,7 @@ $(function () {
           showToast('This day already has a Leave record. Working events cannot be added.');
           return;
         }
-        openSlotPicker(date, existAttend === 'working' ? 'Working' : 'Working');
+        openSlotPicker(date, existAttend === 'working' ? 'Working' : 'Working', h);
       } else {
         openModal(date, hourToTime(h), hourToTime(h + 1));
       }
@@ -1898,7 +1898,7 @@ $(function () {
     return null;
   }
 
-  async function openSlotPicker(date, presetAttend) {
+  async function openSlotPicker(date, presetAttend, targetHour) {
     /* Ensure no stale open beat-plan dropdown leaks into the new view */
     closeAllBpDropdowns();
 
@@ -1969,6 +1969,13 @@ $(function () {
       /* Pre-select attendance value when requested (e.g. when re-opening for a Working day) */
       if (presetAttend) {
         preselectAttendance(dom.slotPickerGrid, presetAttend);
+      }
+      /* When opened from a specific hour slot, show only that row and hide the rest
+         so the user can immediately create an event for the selected time slot. */
+      if (targetHour !== null && targetHour !== undefined) {
+        dom.slotPickerGrid.find('.bp-slot-row').each(function () {
+          $(this).toggle(parseInt($(this).data('hour'), 10) === targetHour);
+        });
       }
     } else {
       /* Standard mode: clickable slot buttons, 1-hour intervals 00:00 – 23:00 */
@@ -5404,7 +5411,28 @@ $(function () {
     /* View tabs – on mobile week view is always enforced */
     dom.viewTabs.on('click', function () {
       if (isMobile()) return;
-      state.view = $(this).data('view');
+      var newView = $(this).data('view');
+      /* When switching TO the Day view from Month or Week, normalize the cursor to
+         today if the currently displayed period contains today.  This prevents the
+         Day view from opening on the first-of-month or week-start date when the
+         user was simply viewing the current period. */
+      if (newView === 'day' && state.view !== 'day') {
+        var tdStr = todayStr();
+        var today = new Date();
+        if (state.view === 'month') {
+          var c = state.cursor;
+          if (c.getFullYear() === today.getFullYear() && c.getMonth() === today.getMonth()) {
+            state.cursor = today;
+          }
+        } else if (state.view === 'week') {
+          var ws = weekStart(state.cursor);
+          var we = new Date(ws); we.setDate(ws.getDate() + 6);
+          if (dateToStr(ws) <= tdStr && tdStr <= dateToStr(we)) {
+            state.cursor = today;
+          }
+        }
+      }
+      state.view = newView;
       updateViewTab(state.view);
       /* Discard stale COQL events so the view switch renders a clean slate
          while the new range fetch is in progress. This prevents month-view
@@ -7767,6 +7795,24 @@ $(function () {
           if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
           break;
         case 'd': case 'D':
+          /* Normalize cursor to today when switching to Day via keyboard shortcut,
+             same logic as the view tab click handler. */
+          if (state.view !== 'day') {
+            var _tdStr = todayStr();
+            var _today = new Date();
+            if (state.view === 'month') {
+              var _c = state.cursor;
+              if (_c.getFullYear() === _today.getFullYear() && _c.getMonth() === _today.getMonth()) {
+                state.cursor = _today;
+              }
+            } else if (state.view === 'week') {
+              var _ws = weekStart(state.cursor);
+              var _we = new Date(_ws); _we.setDate(_ws.getDate() + 6);
+              if (dateToStr(_ws) <= _tdStr && _tdStr <= dateToStr(_we)) {
+                state.cursor = _today;
+              }
+            }
+          }
           state.view = 'day';   updateViewTab('day');
           state.events = state.events.filter(function (e) { return !e.fromCoql; });
           render();
