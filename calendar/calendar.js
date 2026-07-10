@@ -3613,7 +3613,9 @@ $(function () {
 
   function setTheme(theme) {
     state.theme = theme;
-    $('body').attr('class', 'theme-' + theme);
+    /* Swap only the theme-* class so that other body classes (e.g. cal-bg-colour-mapped)
+       are preserved across theme switches. */
+    $('body').removeClass('theme-light theme-dark theme-night').addClass('theme-' + theme);
     try { localStorage.setItem('zcrm_cal_theme', theme); } catch (e) { /* ignore */ }
   }
 

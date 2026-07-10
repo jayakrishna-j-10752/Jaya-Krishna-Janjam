@@ -5026,13 +5026,11 @@ input, select, textarea {
 .bp-row-reject.is-rejected:hover     { color: var(--z-red, #C62828); }
 .bp-row-approve.is-rejected          { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 
-/* ── Edit row: white text and icon colours for readability on accent backgrounds ── */
-.bp-edit-row .bp-time-cell {
-  color: #fff;
-}
-.bp-edit-row .bp-row-action {
-  color: #fff;
-}
+/* ── Edit row text colour is governed by the cal-bg-colour-mapped body class.
+   When Background Colour Mapping is configured, the cal-bg-colour-mapped rules
+   above (with !important) apply white text to every .bp-time-cell and
+   .bp-row-action including those inside edit rows.  When no mapping is
+   configured the theme defaults apply (black in light theme). ── */
 
 /* ══════════════════════════════════════════════════════════
    LEGENDS DISPLAY STRIP
