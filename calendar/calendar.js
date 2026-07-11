@@ -6104,7 +6104,9 @@ $(function () {
         for (var dci = 0; dci < bpChunks.length; dci++) {
           setMapProgress('Deleting batch ' + (dci + 1) + ' of ' + bpChunks.length + '\u2026');
           try {
-            var delResp = await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_delete?ids=' + bpChunks[dci].join(','));
+            var delResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_delete', {
+              data: [{ ids: bpChunks[dci] }]
+            });
             var delData = (delResp && delResp.data && delResp.data.data) ? delResp.data.data : [];
             delData.forEach(function (entry) {
               if (entry && entry.status === 'success' && entry.details && entry.details.id) {
@@ -6136,6 +6138,8 @@ $(function () {
         setMapProgress('');
         saveEvents();
         render();
+        hideHoverCard();
+        if (dom.modal.hasClass('modal-open')) { closeModal(); }
         /* Refresh day events modal if currently open */
         if (demCurrentDs && dom.dayEventsModal.hasClass('dem-open')) {
           showDayEventsModal(demCurrentDs).catch(function () {});
@@ -6156,9 +6160,10 @@ $(function () {
         for (var arci = 0; arci < arChunks.length; arci++) {
           setMapProgress('Processing batch ' + (arci + 1) + ' of ' + arChunks.length + '\u2026');
           try {
-            var arResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
-              data: [{ beatplanner__Managers_Approval: approvalVal }],
-              ids:  arChunks[arci]
+            var arResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
+              data: [{ Managers_Approval: approvalVal }],
+              over_write: true,
+              ids: arChunks[arci]
             });
             var arResults = (arResp && arResp.data && arResp.data.data) ? arResp.data.data : [];
             /* mass_update returns one result per ID in the same order */
@@ -6185,6 +6190,8 @@ $(function () {
         setMapProgress('');
         saveEvents();
         render();
+        hideHoverCard();
+        if (dom.modal.hasClass('modal-open')) { closeModal(); }
         /* Refresh day events modal if currently open */
         if (demCurrentDs && dom.dayEventsModal.hasClass('dem-open')) {
           showDayEventsModal(demCurrentDs).catch(function () {});
