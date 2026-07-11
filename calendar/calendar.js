@@ -6105,7 +6105,7 @@ $(function () {
           setMapProgress('Deleting batch ' + (dci + 1) + ' of ' + bpChunks.length + '\u2026');
           try {
             var delResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_delete', {
-              data: [{ ids: bpChunks[dci] }]
+              ids: bpChunks[dci]
             });
             var delData = (delResp && delResp.data && delResp.data.data) ? delResp.data.data : [];
             delData.forEach(function (entry) {
