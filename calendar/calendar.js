@@ -6161,7 +6161,7 @@ $(function () {
           setMapProgress('Processing batch ' + (arci + 1) + ' of ' + arChunks.length + '\u2026');
           try {
             var arResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
-              data: [{ Managers_Approval: approvalVal }],
+              data: [{ beatplanner__Managers_Approval: approvalVal }],
               over_write: true,
               ids: arChunks[arci]
             });
