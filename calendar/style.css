@@ -5539,6 +5539,7 @@ input, select, textarea {
   position: sticky;
   top: 0;
   z-index: 1;
+  cursor: pointer;
 }
 .map-day-label {
   font-size: 12px;
@@ -5546,6 +5547,42 @@ input, select, textarea {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: .04em;
+}
+
+/* Accordion toggle button */
+.map-day-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color .15s;
+}
+.map-day-toggle:hover {
+  color: var(--text-primary);
+}
+.map-day-toggle-chev {
+  width: 10px;
+  height: 6px;
+  transition: transform .2s cubic-bezier(.4,0,.2,1);
+}
+.map-day-group.map-day-collapsed .map-day-toggle-chev {
+  transform: rotate(-90deg);
+}
+
+/* Accordion body */
+.map-day-events {
+  overflow: hidden;
+}
+.map-day-group.map-day-collapsed .map-day-events {
+  display: none;
 }
 
 /* Individual event row */

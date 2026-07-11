@@ -3265,6 +3265,9 @@ $(function () {
   function buildMassActionsBodyHtml(groups) {
     if (!groups.length) { return ''; }
 
+    var chevSvg = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
     var html = '';
     groups.forEach(function (group) {
       html += '<div class="map-day-group" data-date="' + escHtml(group.date) + '">' +
@@ -3273,7 +3276,9 @@ $(function () {
               '      <input type="checkbox" class="map-cb map-day-cb" data-date="' + escHtml(group.date) + '" />' +
               '      <span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(group.date)) + '</span>' +
               '    </label>' +
-              '  </div>';
+              '    <button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>' +
+              '  </div>' +
+              '  <div class="map-day-events">';
 
       group.events.forEach(function (ev) {
         var timeLabel = fmtTime(ev.startTime) + ' \u2013 ' + fmtTime(ev.endTime);
@@ -3346,7 +3351,8 @@ $(function () {
                 '</div>';
       });
 
-      html += '</div>';
+      html += '  </div>'; /* close map-day-events */
+      html += '</div>';   /* close map-day-group */
     });
 
     return html;
@@ -3467,14 +3473,14 @@ $(function () {
         var attrVal = String($row.attr('data-pf-' + api.toLowerCase()) || '');
         if (sel.indexOf(attrVal) === -1) { visible = false; break; }
       }
-      $row.toggle(visible);
+      $row.toggleClass('map-filter-hidden', !visible).toggle(visible);
       if (!visible) { $row.find('.map-event-cb').prop('checked', false); }
     });
 
-    /* Hide day groups where every event row is hidden; show those with at least one visible row */
+    /* Hide day groups where every event row is filtered out */
     $('#massActionsBody .map-day-group').each(function () {
       var $group = $(this);
-      var anyVisible = $group.find('.map-event-row:visible').length > 0;
+      var anyVisible = $group.find('.map-event-row:not(.map-filter-hidden)').length > 0;
       $group.toggle(anyVisible);
     });
 
@@ -3533,8 +3539,8 @@ $(function () {
 
   /** Synchronize the Select All checkbox state based on visible event checkboxes */
   function syncMassActionsSelectAll() {
-    /* Only consider event checkboxes whose parent row is visible (not filtered out) */
-    var $allEvtCbs  = $('#massActionsBody .map-event-row:visible .map-event-cb');
+    /* Only consider event checkboxes that are not filtered out */
+    var $allEvtCbs  = $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb');
     var $checked    = $allEvtCbs.filter(':checked');
     var total       = $allEvtCbs.length;
     var checkedCount = $checked.length;
@@ -3559,8 +3565,8 @@ $(function () {
   /** Synchronize a day checkbox based on its visible events' checked state */
   function syncMassActionsDayCb($dayCb) {
     var date     = $dayCb.data('date');
-    /* Only count visible event rows for this date */
-    var $evtCbs  = $('#massActionsBody .map-event-row:visible .map-event-cb[data-date="' + date + '"]');
+    /* Only count non-filtered event rows for this date */
+    var $evtCbs  = $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb[data-date="' + date + '"]');
     var total    = $evtCbs.length;
     var checked  = $evtCbs.filter(':checked').length;
 
@@ -6024,8 +6030,8 @@ $(function () {
     /* Mass Actions popup – Select All checkbox */
     $(document).on('change', '#massActionsSelectAll', function () {
       var checked = $(this).prop('checked');
-      /* Only operate on currently visible (not filtered-out) rows */
-      var $visibleEvtCbs = $('#massActionsBody .map-event-row:visible .map-event-cb');
+      /* Only operate on non-filtered-out rows (accordion-collapsed rows are included) */
+      var $visibleEvtCbs = $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb');
       var $visibleDayCbs = $('#massActionsBody .map-day-group:visible .map-day-cb');
       $visibleEvtCbs.prop('checked', checked);
       $visibleDayCbs.prop('checked', checked).prop('indeterminate', false);
@@ -6040,8 +6046,8 @@ $(function () {
     $(document).on('change', '#massActionsBody .map-day-cb', function () {
       var date    = $(this).data('date');
       var checked = $(this).prop('checked');
-      /* Only check/uncheck visible event rows for this date */
-      $('#massActionsBody .map-event-row:visible .map-event-cb[data-date="' + date + '"]').prop('checked', checked);
+      /* Check/uncheck non-filtered event rows for this date (includes accordion-collapsed) */
+      $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb[data-date="' + date + '"]').prop('checked', checked);
       syncMassActionsSelectAll();
     });
 
@@ -6051,6 +6057,15 @@ $(function () {
       var $dayCb = $('#massActionsBody .map-day-cb[data-date="' + date + '"]');
       syncMassActionsDayCb($dayCb);
       syncMassActionsSelectAll();
+    });
+
+    /* Mass Actions popup – accordion day header toggle */
+    $(document).on('click', '#massActionsBody .map-day-header', function (e) {
+      /* Ignore clicks on the checkbox label (let the checkbox handle those) */
+      if ($(e.target).closest('.map-cb-label').length) { return; }
+      var $group = $(this).closest('.map-day-group');
+      var collapsed = $group.toggleClass('map-day-collapsed').hasClass('map-day-collapsed');
+      $(this).find('.map-day-toggle').attr('aria-expanded', String(!collapsed));
     });
 
     /* Mass Actions popup – Confirm button */
