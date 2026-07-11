@@ -5477,7 +5477,7 @@ input, select, textarea {
   padding: 12px 0;
 }
 .mass-actions-body:empty::after {
-  content: 'No events visible in the current view.';
+  content: 'No pending events in the current view.';
   display: block;
   padding: 24px 18px;
   font-size: 13px;
@@ -5595,4 +5595,61 @@ input, select, textarea {
 .map-event-meta-item strong {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+/* ── Mass Actions popup: inline filter bar ── */
+.mass-actions-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.mass-actions-filter-bar .bp-cal-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.mass-actions-filter-bar .bp-cal-filter-lbl {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+}
+.mass-actions-filter-bar .map-filter-ms-wrap {
+  min-width: 100px;
+  max-width: 160px;
+}
+.mass-actions-filter-bar .bpf-ms-trigger {
+  min-height: 26px;
+  padding: 2px 24px 2px 7px;
+  font-size: 12px;
+}
+.mass-actions-filter-bar .bpf-ms-chip {
+  font-size: 10px;
+  padding: 1px 5px;
+  max-width: 100px;
+}
+.mass-actions-filter-bar .bpf-ms-placeholder {
+  font-size: 12px;
+}
+.mass-actions-filter-bar .bpf-ms-panel {
+  min-width: 150px;
+  z-index: 10100;
+}
+.mass-actions-filter-bar .bp-cal-filter-clear-btn {
+  margin-left: auto;
+}
+
+/* ── Mass Actions popup: progress message ── */
+.map-progress-msg {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
 }

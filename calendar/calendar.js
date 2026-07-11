@@ -3085,6 +3085,9 @@ $(function () {
     var d     = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     dom.demDate.text(WDAYS_LONG[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear());
 
+    /* Track the currently open DEM date for post-action refreshes */
+    demCurrentDs = ds;
+
     /* Open the overlay immediately (show loading state) */
     dom.demList.removeClass('dem-table-mode');
     dom.dayEventsModal.find('.day-events-modal-box').removeClass('dem-box-wide');
@@ -3185,6 +3188,7 @@ $(function () {
 
   function closeDayEventsModal() {
     closeAllBpDropdowns();
+    demCurrentDs = '';
     dom.dayEventsModal.removeClass('dem-open');
     /* Defer class cleanup until after the fade-out transition */
     setTimeout(function () {
@@ -3201,8 +3205,11 @@ $(function () {
   var massActionsCurrentAction = '';
 
   /**
-   * Return all currently visible events grouped by date string.
-   * Respects active calendar filters via eventsOn().
+   * Return all currently visible *Pending* events grouped by date string.
+   * Only events whose beatplanner__Managers_Approval equals "Pending" are
+   * included – Approved and Rejected events are excluded from the Mass Actions
+   * overlay.  Active calendar filters (calEventFilters) are also respected via
+   * eventsOn().
    * @returns {Array<{date: string, events: Array}>} sorted ascending by date
    */
   function getVisibleEventsByDate() {
@@ -3229,7 +3236,11 @@ $(function () {
 
     var groups = [];
     dates.forEach(function (ds) {
-      var evts = eventsOn(ds);
+      /* Only include events with Pending approval status */
+      var evts = eventsOn(ds).filter(function (ev) {
+        var approval = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+        return approval === 'Pending';
+      });
       if (evts.length > 0) {
         groups.push({ date: ds, events: evts });
       }
@@ -3310,7 +3321,20 @@ $(function () {
           }
         }
 
-        html += '<div class="map-event-row" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '">' +
+        /* Build data-pf-* attributes for popup filter matching.
+           HTML attribute names are lowercased by browsers, so we store the
+           api_name in lowercase and look it up in lowercase as well. */
+        var pfAttrs = '';
+        if (ev.bprFieldValues && bprPicklistFields && bprPicklistFields.length) {
+          bprPicklistFields.forEach(function (pf2) {
+            var v2 = ev.bprFieldValues[pf2.api_name];
+            if (v2) {
+              pfAttrs += ' data-pf-' + escHtml(pf2.api_name.toLowerCase()) + '="' + escHtml(v2) + '"';
+            }
+          });
+        }
+
+        html += '<div class="map-event-row" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '"' + pfAttrs + '>' +
                 '  <label class="map-cb-label" style="align-self:flex-start;margin-top:1px;">' +
                 '    <input type="checkbox" class="map-cb map-event-cb" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '" />' +
                 '  </label>' +
@@ -3326,6 +3350,135 @@ $(function () {
     });
 
     return html;
+  }
+
+  /**
+   * Build the HTML for the filter bar rendered inside the Mass Actions popup.
+   * Reuses buildCalFilterMultiSelect() with the massActionsPopupFilters state.
+   * Returns an empty string when no picklist fields are available.
+   */
+  function buildMassActionsFilterBarHtml() {
+    if (!beatPlanHasRefs || !bprPicklistFields || !bprPicklistFields.length) { return ''; }
+
+    var EXCLUDED = ['record status', 'currency', 'unsubscribed mode', 'managers approval'];
+    var html = '';
+    bprPicklistFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase().trim();
+      if (EXCLUDED.indexOf(lbl) !== -1) { return; }
+      if (!f.options || !f.options.length) { return; }
+      var selectedVals = massActionsPopupFilters[f.api_name] || [];
+      html += '<div class="bp-cal-filter-item">' +
+              '<span class="bp-cal-filter-lbl">' + escHtml(f.field_label) + '</span>' +
+              buildMassActionsFilterMultiSelect(f, selectedVals) +
+              '</div>';
+    });
+    if (!html) { return ''; }
+
+    var hasActive = Object.keys(massActionsPopupFilters).some(function (k) {
+      return massActionsPopupFilters[k] && massActionsPopupFilters[k].length > 0;
+    });
+    html += '<button class="bp-cal-filter-clear-btn" id="mapFilterClear" type="button"' +
+            (hasActive ? '' : ' style="display:none;"') + '>Clear filters</button>';
+
+    return '<div class="mass-actions-filter-bar" id="massActionsFilterBar">' + html + '</div>';
+  }
+
+  /**
+   * Build the HTML for one multi-select filter dropdown inside the Mass Actions popup.
+   * Uses map-popup-filter-* markers to scope event delegation away from the cal filter bar.
+   */
+  function buildMassActionsFilterMultiSelect(field, selectedVals) {
+    var chevSvg = '<svg class="bpf-ms-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+    var chipsHtml = '';
+    selectedVals.forEach(function (v) {
+      chipsHtml += '<span class="bpf-ms-chip map-filter-chip" data-mapfield="' + escHtml(field.api_name) +
+                   '" data-value="' + escHtml(v) + '">' + escHtml(v) +
+                   '<span class="bpf-ms-chip-rm" role="button" aria-label="Remove ' + escHtml(v) + '">\u00d7</span>' +
+                   '</span>';
+    });
+    var placeholder = selectedVals.length === 0 ? '<span class="bpf-ms-placeholder">All</span>' : '';
+    var optsHtml = '';
+    field.options.forEach(function (opt) {
+      var display = (typeof opt === 'object') ? (opt.display || opt.actual || '') : String(opt);
+      var actual  = (typeof opt === 'object') ? (opt.actual  || opt.display || '') : String(opt);
+      var checked = selectedVals.indexOf(actual) !== -1;
+      optsHtml += '<li class="bpf-ms-opt map-filter-opt" data-mapfield="' + escHtml(field.api_name) +
+                  '" data-value="' + escHtml(actual) + '">' +
+                  '<input type="checkbox"' + (checked ? ' checked' : '') + ' tabindex="-1" />' +
+                  escHtml(display) +
+                  '</li>';
+    });
+    return '<div class="bpf-ms-wrap map-filter-ms-wrap" data-mapfield="' + escHtml(field.api_name) + '">' +
+           '<div class="bpf-ms-trigger" tabindex="0">' + chipsHtml + placeholder + chevSvg + '</div>' +
+           '<div class="bpf-ms-panel">' +
+           '<div class="bpf-ms-panel-head">' +
+           '<input class="bpf-ms-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+           '<button class="bpf-ms-panel-act map-filter-sel-all" type="button" data-mapfield="' + escHtml(field.api_name) + '">All</button>' +
+           '<button class="bpf-ms-panel-act map-filter-clr-all" type="button" data-mapfield="' + escHtml(field.api_name) + '">Clear</button>' +
+           '</div>' +
+           '<ul class="bpf-ms-list">' + optsHtml + '</ul>' +
+           '</div>' +
+           '</div>';
+  }
+
+  /**
+   * Refresh the chips and placeholder inside a .map-filter-ms-wrap trigger
+   * based on the current massActionsPopupFilters state for that wrap's field.
+   */
+  function refreshMapFilterTrigger($wrap) {
+    var fieldApi     = String($wrap.data('mapfield') || '');
+    var selectedVals = massActionsPopupFilters[fieldApi] || [];
+    var $trigger     = $wrap.find('.bpf-ms-trigger');
+    $trigger.find('.map-filter-chip, .bpf-ms-placeholder').remove();
+    var $chev = $trigger.find('.bpf-ms-chev');
+    if (selectedVals.length > 0) {
+      var chipsHtml = '';
+      selectedVals.forEach(function (v) {
+        chipsHtml += '<span class="bpf-ms-chip map-filter-chip" data-mapfield="' + escHtml(fieldApi) +
+                     '" data-value="' + escHtml(v) + '">' + escHtml(v) +
+                     '<span class="bpf-ms-chip-rm" role="button" aria-label="Remove ' + escHtml(v) + '">\u00d7</span>' +
+                     '</span>';
+      });
+      $chev.before(chipsHtml);
+    } else {
+      $chev.before('<span class="bpf-ms-placeholder">All</span>');
+    }
+  }
+
+  /**
+   * Apply massActionsPopupFilters to show/hide .map-event-row elements
+   * and collapse/show .map-day-group elements that become empty.
+   * Also unchecks hidden rows and resyncs the Select All state.
+   */
+  function applyMassActionsPopupFilters() {
+    var keys = Object.keys(massActionsPopupFilters).filter(function (k) {
+      return massActionsPopupFilters[k] && massActionsPopupFilters[k].length > 0;
+    });
+
+    $('#massActionsBody .map-event-row').each(function () {
+      var $row    = $(this);
+      var visible = true;
+      for (var i = 0; i < keys.length; i++) {
+        var api     = keys[i];
+        var sel     = massActionsPopupFilters[api];
+        /* Attribute names are lowercased by the browser; match accordingly */
+        var attrVal = String($row.attr('data-pf-' + api.toLowerCase()) || '');
+        if (sel.indexOf(attrVal) === -1) { visible = false; break; }
+      }
+      $row.toggle(visible);
+      if (!visible) { $row.find('.map-event-cb').prop('checked', false); }
+    });
+
+    /* Hide day groups where every event row is hidden; show those with at least one visible row */
+    $('#massActionsBody .map-day-group').each(function () {
+      var $group = $(this);
+      var anyVisible = $group.find('.map-event-row:visible').length > 0;
+      $group.toggle(anyVisible);
+    });
+
+    syncMassActionsSelectAll();
   }
 
   /** Open the Mass Actions popup for a given action */
@@ -3344,6 +3497,7 @@ $(function () {
     };
 
     massActionsCurrentAction = action;
+    massActionsPopupFilters  = {};
 
     var groups = getVisibleEventsByDate();
 
@@ -3353,6 +3507,13 @@ $(function () {
     $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
     $('#mapSelCount').text('');
 
+    /* Inject filter bar */
+    $('#massActionsFilterBar').remove();
+    var filterBarHtml = buildMassActionsFilterBarHtml();
+    if (filterBarHtml) {
+      $('.mass-actions-select-all-row').after(filterBarHtml);
+    }
+
     $('#massActionsOverlay').css('display', 'flex');
     /* Trigger reflow before adding open class for CSS transition */
     $('#massActionsOverlay')[0].offsetWidth; // eslint-disable-line no-unused-expressions
@@ -3361,16 +3522,19 @@ $(function () {
 
   /** Close the Mass Actions popup */
   function closeMassActionsPopup() {
+    massActionsPopupFilters = {};
     $('#massActionsOverlay').removeClass('map-open');
     setTimeout(function () {
       $('#massActionsOverlay').css('display', 'none');
       $('#massActionsBody').empty();
+      $('#massActionsFilterBar').remove();
     }, 220);
   }
 
-  /** Synchronize the Select All checkbox state based on all event checkboxes */
+  /** Synchronize the Select All checkbox state based on visible event checkboxes */
   function syncMassActionsSelectAll() {
-    var $allEvtCbs  = $('#massActionsBody .map-event-cb');
+    /* Only consider event checkboxes whose parent row is visible (not filtered out) */
+    var $allEvtCbs  = $('#massActionsBody .map-event-row:visible .map-event-cb');
     var $checked    = $allEvtCbs.filter(':checked');
     var total       = $allEvtCbs.length;
     var checkedCount = $checked.length;
@@ -3392,10 +3556,11 @@ $(function () {
     $('#mapSelCount').text(label);
   }
 
-  /** Synchronize a day checkbox based on its events' checked state */
+  /** Synchronize a day checkbox based on its visible events' checked state */
   function syncMassActionsDayCb($dayCb) {
     var date     = $dayCb.data('date');
-    var $evtCbs  = $('#massActionsBody .map-event-cb[data-date="' + date + '"]');
+    /* Only count visible event rows for this date */
+    var $evtCbs  = $('#massActionsBody .map-event-row:visible .map-event-cb[data-date="' + date + '"]');
     var total    = $evtCbs.length;
     var checked  = $evtCbs.filter(':checked').length;
 
@@ -4592,6 +4757,12 @@ $(function () {
 
   /* ── Calendar Event Filters state (client-side event filtering by BPR picklist values) ── */
   var calEventFilters = {};  /* {fieldApiName: ['val1','val2',...]} – empty array / absent key = "All" */
+
+  /* ── Mass Actions popup filter state (scoped to the overlay, independent of calEventFilters) ── */
+  var massActionsPopupFilters = {};  /* same shape as calEventFilters; applied to .map-event-row visibility */
+
+  /* ── Day Events Modal (DEM) current date ── */
+  var demCurrentDs = '';  /* YYYY-MM-DD of the currently open Day Events Modal, '' when closed */
 
   /* ── Hover preview card state ── */
   var hoverTimer    = null;  /* debounce timer – delays hiding the hover card */
@@ -5853,9 +6024,12 @@ $(function () {
     /* Mass Actions popup – Select All checkbox */
     $(document).on('change', '#massActionsSelectAll', function () {
       var checked = $(this).prop('checked');
-      $('#massActionsBody .map-event-cb').prop('checked', checked);
-      $('#massActionsBody .map-day-cb').prop('checked', checked).prop('indeterminate', false);
-      var total = $('#massActionsBody .map-event-cb').length;
+      /* Only operate on currently visible (not filtered-out) rows */
+      var $visibleEvtCbs = $('#massActionsBody .map-event-row:visible .map-event-cb');
+      var $visibleDayCbs = $('#massActionsBody .map-day-group:visible .map-day-cb');
+      $visibleEvtCbs.prop('checked', checked);
+      $visibleDayCbs.prop('checked', checked).prop('indeterminate', false);
+      var total = $visibleEvtCbs.length;
       var label = checked && total > 0
         ? total + ' event' + (total === 1 ? '' : 's') + ' selected'
         : '';
@@ -5866,7 +6040,8 @@ $(function () {
     $(document).on('change', '#massActionsBody .map-day-cb', function () {
       var date    = $(this).data('date');
       var checked = $(this).prop('checked');
-      $('#massActionsBody .map-event-cb[data-date="' + date + '"]').prop('checked', checked);
+      /* Only check/uncheck visible event rows for this date */
+      $('#massActionsBody .map-event-row:visible .map-event-cb[data-date="' + date + '"]').prop('checked', checked);
       syncMassActionsSelectAll();
     });
 
@@ -5895,34 +6070,57 @@ $(function () {
 
       $btn.prop('disabled', true);
 
+      /* Helper: show progress text in the footer */
+      function setMapProgress(msg) {
+        var $p = $('#mapProgressMsg');
+        if (!$p.length) {
+          $('.mass-actions-foot').prepend('<span class="map-progress-msg" id="mapProgressMsg"></span>');
+          $p = $('#mapProgressMsg');
+        }
+        if (msg) { $p.text(msg).show(); } else { $p.hide(); }
+      }
+
+      /* Helper: chunk an array into sub-arrays of at most size n */
+      function chunkArray(arr, n) {
+        var chunks = [];
+        for (var ci = 0; ci < arr.length; ci += n) { chunks.push(arr.slice(ci, ci + n)); }
+        return chunks;
+      }
+
+      var BATCH_SIZE = 500;
+
       if (action === 'mass-delete') {
         if (!window.confirm('Delete ' + selIds.length + ' selected event(s)?')) {
           $btn.prop('disabled', false);
           return;
         }
-        /* Batch delete */
-        var deletedIds = {};
-        try {
-          var bpIds    = selIds.filter(function (id) { var ev = findEvent(id); return ev && ev.bprFieldValues && Object.keys(ev.bprFieldValues).length; });
-          var localIds = selIds.filter(function (id) { return bpIds.indexOf(id) === -1; });
 
-          if (bpIds.length > 0) {
-            var delResp = await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + bpIds.join(','));
+        var bpIds    = selIds.filter(function (id) { var ev = findEvent(id); return ev && ev.bprFieldValues && Object.keys(ev.bprFieldValues).length; });
+        var localIds = selIds.filter(function (id) { return bpIds.indexOf(id) === -1; });
+        var deletedIds = {};
+        var delFailed  = 0;
+
+        var bpChunks = chunkArray(bpIds, BATCH_SIZE);
+        for (var dci = 0; dci < bpChunks.length; dci++) {
+          setMapProgress('Deleting batch ' + (dci + 1) + ' of ' + bpChunks.length + '\u2026');
+          try {
+            var delResp = await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_delete?ids=' + bpChunks[dci].join(','));
             var delData = (delResp && delResp.data && delResp.data.data) ? delResp.data.data : [];
             delData.forEach(function (entry) {
               if (entry && entry.status === 'success' && entry.details && entry.details.id) {
                 deletedIds[entry.details.id] = true;
               }
             });
-            if (delData.length === 0) { bpIds.forEach(function (id) { deletedIds[id] = true; }); }
+            /* If response has no per-record status, treat all in chunk as success */
+            if (delData.length === 0) {
+              bpChunks[dci].forEach(function (id) { deletedIds[id] = true; });
+            }
+          } catch (delErr) {
+            console.error('Mass delete batch ' + (dci + 1) + ' failed', delErr);
+            delFailed += bpChunks[dci].length;
           }
-          localIds.forEach(function (id) { deletedIds[id] = true; });
-        } catch (err) {
-          console.error('Mass delete failed', err);
-          showToast('Mass delete failed.');
-          $btn.prop('disabled', false);
-          return;
         }
+        localIds.forEach(function (id) { deletedIds[id] = true; });
 
         var deleted = 0;
         selIds.forEach(function (id) {
@@ -5935,43 +6133,66 @@ $(function () {
             deleted++;
           }
         });
+        setMapProgress('');
         saveEvents();
         render();
+        /* Refresh day events modal if currently open */
+        if (demCurrentDs && dom.dayEventsModal.hasClass('dem-open')) {
+          showDayEventsModal(demCurrentDs).catch(function () {});
+        }
         closeMassActionsPopup();
-        showToast(deleted + ' event(s) deleted.');
+        if (delFailed > 0) {
+          showToast(deleted + ' event(s) deleted. ' + delFailed + ' failed.');
+        } else {
+          showToast(deleted + ' event(s) deleted.');
+        }
 
       } else if (action === 'mass-approve' || action === 'mass-reject') {
-        var approvalVal = action === 'mass-approve' ? 'Approved' : 'Rejected';
-        var batchData   = selIds.map(function (id) { return { id: id, beatplanner__Managers_Approval: approvalVal }; });
-        var updated     = 0;
-        var failed      = 0;
-        try {
-          var arResp    = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', { data: batchData });
-          var arResults = (arResp && arResp.data && arResp.data.data) ? arResp.data.data : [];
-          selIds.forEach(function (id, idx) {
-            var res = arResults[idx] || {};
-            if (res.status === 'success') {
-              var ev = findEvent(id);
-              if (ev) {
-                if (!ev.bprFieldValues) { ev.bprFieldValues = {}; }
-                ev.bprFieldValues['beatplanner__Managers_Approval'] = approvalVal;
+        var approvalVal  = action === 'mass-approve' ? 'Approved' : 'Rejected';
+        var updated      = 0;
+        var arFailed     = 0;
+        var arChunks     = chunkArray(selIds, BATCH_SIZE);
+
+        for (var arci = 0; arci < arChunks.length; arci++) {
+          setMapProgress('Processing batch ' + (arci + 1) + ' of ' + arChunks.length + '\u2026');
+          try {
+            var arResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
+              data: [{ beatplanner__Managers_Approval: approvalVal }],
+              ids:  arChunks[arci]
+            });
+            var arResults = (arResp && arResp.data && arResp.data.data) ? arResp.data.data : [];
+            /* mass_update returns one result per ID in the same order */
+            arChunks[arci].forEach(function (id, idx) {
+              var res = arResults[idx] || {};
+              if (res.status === 'success') {
+                var ev = findEvent(id);
+                if (ev) {
+                  if (!ev.bprFieldValues) { ev.bprFieldValues = {}; }
+                  ev.bprFieldValues['beatplanner__Managers_Approval'] = approvalVal;
+                }
+                updated++;
+              } else {
+                console.error('Mass ' + action + ' failed for', id, res);
+                arFailed++;
               }
-              updated++;
-            } else {
-              console.error('Mass ' + action + ' failed for', id, res);
-              failed++;
-            }
-          });
-        } catch (err) {
-          console.error('Mass ' + action + ' batch request failed', err);
-          failed = selIds.length;
+            });
+          } catch (arErr) {
+            console.error('Mass ' + action + ' batch ' + (arci + 1) + ' failed', arErr);
+            arFailed += arChunks[arci].length;
+          }
         }
+
+        setMapProgress('');
         saveEvents();
         render();
+        /* Refresh day events modal if currently open */
+        if (demCurrentDs && dom.dayEventsModal.hasClass('dem-open')) {
+          showDayEventsModal(demCurrentDs).catch(function () {});
+        }
         closeMassActionsPopup();
         var actionLabel = action === 'mass-approve' ? 'approved' : 'rejected';
-        if (failed > 0) {
-          showToast(updated + ' record(s) ' + actionLabel + '. ' + failed + ' failed.');
+        if (arFailed > 0) {
+          showToast(updated + ' record(s) ' + actionLabel + '. ' + arFailed + ' failed.');
         } else {
           showToast(updated + ' record(s) ' + actionLabel + '.');
         }
@@ -7911,6 +8132,13 @@ $(function () {
           $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
         });
       }
+      /* Close open mass-actions popup filter multi-selects when clicking outside */
+      if (!$(e.target).closest('#massActionsFilterBar .map-filter-ms-wrap').length) {
+        $('#massActionsFilterBar .map-filter-ms-wrap').each(function () {
+          $(this).removeClass('bpf-ms-open');
+          $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+        });
+      }
     });
 
     /* ── Filter Panel event handlers ── */
@@ -8040,6 +8268,138 @@ $(function () {
       calEventFilters = {};
       buildCalFilterBar(); /* rebuild to reset all multi-selects to "All" */
       render();
+    });
+
+    /* ── Mass Actions popup filter bar event handlers ── */
+
+    /* Popup filter: multi-select trigger toggle */
+    $(document).on('click', '#massActionsFilterBar .map-filter-ms-wrap .bpf-ms-trigger', function (e) {
+      e.stopPropagation();
+      var $wrap  = $(this).closest('.map-filter-ms-wrap');
+      var isOpen = $wrap.hasClass('bpf-ms-open');
+      /* Close all other popup filter wraps */
+      $('#massActionsFilterBar .map-filter-ms-wrap').each(function () {
+        $(this).removeClass('bpf-ms-open');
+        $(this).find('.bpf-ms-panel').css({ position: '', top: '', bottom: '', left: '', right: '', width: '' });
+      });
+      if (!isOpen) {
+        $wrap.addClass('bpf-ms-open');
+        positionBpMsPanel($wrap);
+        $wrap.find('.bpf-ms-search').val('').focus();
+        $wrap.find('.bpf-ms-opt').show();
+      }
+    });
+
+    /* Prevent popup filter panel inner clicks from bubbling */
+    $(document).on('click', '#massActionsFilterBar .bpf-ms-panel', function (e) {
+      e.stopPropagation();
+    });
+
+    /* Popup filter: live search */
+    $(document).on('input', '#massActionsFilterBar .bpf-ms-search', function () {
+      var q = $(this).val().toLowerCase();
+      $(this).closest('.bpf-ms-panel').find('.bpf-ms-opt').each(function () {
+        $(this).toggle(String($(this).data('value')).toLowerCase().indexOf(q) !== -1);
+      });
+    });
+
+    /* Popup filter: toggle individual option */
+    $(document).on('click', '#massActionsFilterBar .map-filter-opt', function (e) {
+      e.stopPropagation();
+      var $opt     = $(this);
+      var fieldApi = String($opt.data('mapfield') || '');
+      var value    = String($opt.data('value') || '');
+      if (!massActionsPopupFilters[fieldApi]) { massActionsPopupFilters[fieldApi] = []; }
+      var arr = massActionsPopupFilters[fieldApi];
+      var idx = arr.indexOf(value);
+      var nowChecked;
+      if (idx === -1) {
+        arr.push(value);
+        nowChecked = true;
+      } else {
+        arr.splice(idx, 1);
+        nowChecked = false;
+        if (arr.length === 0) { delete massActionsPopupFilters[fieldApi]; }
+      }
+      $opt.find('input[type="checkbox"]').prop('checked', nowChecked);
+      refreshMapFilterTrigger($opt.closest('.map-filter-ms-wrap'));
+      var hasActive = Object.keys(massActionsPopupFilters).some(function (k) {
+        return massActionsPopupFilters[k] && massActionsPopupFilters[k].length > 0;
+      });
+      $('#mapFilterClear').toggle(hasActive);
+      applyMassActionsPopupFilters();
+    });
+
+    /* Popup filter: chip remove */
+    $(document).on('click', '#massActionsFilterBar .map-filter-chip .bpf-ms-chip-rm', function (e) {
+      e.stopPropagation();
+      var $chip    = $(this).closest('.map-filter-chip');
+      var fieldApi = String($chip.data('mapfield') || '');
+      var value    = String($chip.data('value') || '');
+      var $wrap    = $(this).closest('.map-filter-ms-wrap');
+      if (massActionsPopupFilters[fieldApi]) {
+        var arr = massActionsPopupFilters[fieldApi];
+        var idx = arr.indexOf(value);
+        if (idx !== -1) {
+          arr.splice(idx, 1);
+          if (arr.length === 0) { delete massActionsPopupFilters[fieldApi]; }
+        }
+      }
+      $wrap.find('.map-filter-opt').each(function () {
+        if (String($(this).data('value') || '') === value) {
+          $(this).find('input[type="checkbox"]').prop('checked', false);
+        }
+      });
+      refreshMapFilterTrigger($wrap);
+      var hasActive = Object.keys(massActionsPopupFilters).some(function (k) {
+        return massActionsPopupFilters[k] && massActionsPopupFilters[k].length > 0;
+      });
+      $('#mapFilterClear').toggle(hasActive);
+      applyMassActionsPopupFilters();
+    });
+
+    /* Popup filter: Select All visible options */
+    $(document).on('click', '#massActionsFilterBar .map-filter-sel-all', function (e) {
+      e.stopPropagation();
+      var fieldApi = String($(this).data('mapfield') || '');
+      var $wrap    = $(this).closest('.map-filter-ms-wrap');
+      if (!massActionsPopupFilters[fieldApi]) { massActionsPopupFilters[fieldApi] = []; }
+      $wrap.find('.bpf-ms-opt:visible').each(function () {
+        var v = String($(this).data('value') || '');
+        if (massActionsPopupFilters[fieldApi].indexOf(v) === -1) {
+          massActionsPopupFilters[fieldApi].push(v);
+        }
+        $(this).find('input[type="checkbox"]').prop('checked', true);
+      });
+      refreshMapFilterTrigger($wrap);
+      $('#mapFilterClear').show();
+      applyMassActionsPopupFilters();
+    });
+
+    /* Popup filter: Clear All for a single field */
+    $(document).on('click', '#massActionsFilterBar .map-filter-clr-all', function (e) {
+      e.stopPropagation();
+      var fieldApi = String($(this).data('mapfield') || '');
+      var $wrap    = $(this).closest('.map-filter-ms-wrap');
+      delete massActionsPopupFilters[fieldApi];
+      $wrap.find('.bpf-ms-opt input[type="checkbox"]').prop('checked', false);
+      refreshMapFilterTrigger($wrap);
+      var hasActive = Object.keys(massActionsPopupFilters).some(function (k) {
+        return massActionsPopupFilters[k] && massActionsPopupFilters[k].length > 0;
+      });
+      $('#mapFilterClear').toggle(hasActive);
+      applyMassActionsPopupFilters();
+    });
+
+    /* Popup filter: Clear All filters button */
+    $(document).on('click', '#mapFilterClear', function () {
+      massActionsPopupFilters = {};
+      /* Rebuild filter bar to reset all dropdowns to "All" */
+      var filterBarHtml = buildMassActionsFilterBarHtml();
+      if (filterBarHtml) {
+        $('#massActionsFilterBar').replaceWith(filterBarHtml);
+      }
+      applyMassActionsPopupFilters();
     });
 
     /* Open filter panel when Filter button is clicked */
@@ -9051,13 +9411,13 @@ $(function () {
     var below = vpH - rect.bottom;
     var above = rect.top;
 
-    /* Offset correction: if an ancestor .modal-box still has an active CSS
+    /* Offset correction: if an ancestor .modal-box or .mass-actions-box has an active CSS
        transform it becomes the containing block for position:fixed descendants.
        Detect and compensate so the panel renders at the correct viewport position. */
     var offsetTop    = 0;
     var offsetLeft   = 0;
     var offsetBottom = vpH;
-    var $box = $wrap.closest('.modal-box');
+    var $box = $wrap.closest('.modal-box, .mass-actions-box');
     if ($box.length) {
       var cs = window.getComputedStyle($box[0]);
       if (cs.transform && cs.transform !== 'none') {
