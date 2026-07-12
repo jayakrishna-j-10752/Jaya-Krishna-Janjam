@@ -2445,7 +2445,6 @@ $(function () {
     var isLeaveMode = existingAttend.toLowerCase() === 'leave';
     var tableStyle  = isWorking   ? '' : 'display:none;';
     var leaveStyle  = isLeaveMode ? '' : 'display:none;';
-    var applyStyle  = (isLeaveMode && existingLeave && existingLeave !== '-None-') ? '' : 'display:none;';
     var filterStyle = isWorking   ? '' : 'display:none;';
 
     /* ── Leave Type colour applied to the attend-bar (not the container) ── */
@@ -2458,6 +2457,13 @@ $(function () {
     }
     var attendBarBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
     var labelColorStyle  = containerLeaveColor ? ' style="color:white;"' : '';
+
+    /* ── Approval state (needed early for Leave-mode attend-bar action buttons) ── */
+    var evApprovalVal   = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+    var approvalLocked  = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+    var lockedAttr      = approvalLocked ? ' disabled' : '';
+    var approveClass    = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+    var rejectClass     = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     /* ── Attendance bar ── */
     var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
@@ -2496,13 +2502,29 @@ $(function () {
                    '</div>' +
                    '</div>' +
                    '</div>';
-      attendBar += '<button class="bp-apply-leave-btn" type="button" style="' + applyStyle + '">Update Leave</button>';
+      /* "Update Leave" button rendered only for non-leave records so Working→Leave
+         transitions in edit mode still have a save path; it's hidden initially and
+         shown by the Leave Type change handler once a valid leave type is selected. */
+      if (!isLeaveMode) {
+        attendBar += '<button class="bp-apply-leave-btn" type="button" style="display:none;">Update Leave</button>';
+      }
     }
     attendBar += '<div class="bp-filter-action" style="' + filterStyle + '">' +
                  '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
                  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
                  'Filter</button>' +
                  '</div>';
+    /* Leave mode: action buttons live in the attend-bar (right-aligned) instead of
+       a table action-cell row. They are toggled by the attendance change handler. */
+    if (isLeaveMode) {
+      attendBar += '<div class="bp-attend-leave-actions"' + (containerLeaveColor ? ' style="color:white;"' : '') + '>' +
+                   '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
+                   '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
+                   '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '</div>';
+    }
     /* No Mass Create button in edit mode */
     attendBar += '</div>';
 
@@ -2563,13 +2585,6 @@ $(function () {
       var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
       if (actualVal) { originalVals[f.api_name] = actualVal; }
     });
-
-    /* Disable approve/reject/delete when the record is already Approved or Rejected */
-    var evApprovalVal   = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
-    var approvalLocked  = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
-    var lockedAttr      = approvalLocked ? ' disabled' : '';
-    var approveClass    = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
-    var rejectClass     = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                  ' data-date="' + escHtml(date) + '"' +
@@ -2665,10 +2680,11 @@ $(function () {
     tableHtml += '</tr>';
     tableHtml += '</tbody></table>';
 
-    /* For leave mode: replace the full (hidden) table with a minimal table that shows
-       only the action cell, keeping the row in the DOM so all button handlers work. */
+    /* For leave mode: replace the full (hidden) table with a hidden data-only row.
+       Action buttons are rendered in the attend-bar instead of a table action-cell.
+       The row is kept in the DOM so button handlers can find editId, date, etc. */
     if (isLeaveMode) {
-      tableHtml = '<table class="bp-slots-table">' +
+      tableHtml = '<table class="bp-slots-table" style="display:none;">' +
                   '<tbody>' +
                   '<tr class="bp-slot-row bp-edit-row"' +
                   ' data-date="' + escHtml(date) + '"' +
@@ -2676,13 +2692,6 @@ $(function () {
                   ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
                   ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
                   ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '">' +
-                  '<td class="bp-action-cell">' +
-                  '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
-                  '<button class="bp-row-action bp-row-copy" type="button" title="Copy record">' + SVG.copy + '</button>' +
-                  '<button class="bp-row-action bp-row-delete" type="button" title="Delete record"' + lockedAttr + '>' + SVG.trash + '</button>' +
-                  '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                  '<button class="bp-row-action bp-row-reject' + rejectClass + '" type="button" title="Reject record"' + lockedAttr + '>' + SVG.reject + '</button>' +
-                  '</td>' +
                   '</tr>' +
                   '</tbody></table>';
     }
@@ -3119,7 +3128,6 @@ $(function () {
     var isWorking   = existingAttend.toLowerCase() === 'working';
     var tableStyle  = isWorking   ? '' : 'display:none;';
     var leaveStyle  = isLeaveMode ? '' : 'display:none;';
-    var applyStyle  = (isLeaveMode && existingLeave && existingLeave !== '-None-') ? '' : 'display:none;';
 
     /* Leave Type colour applied to the attend-bar (not the container) */
     var containerLeaveColor = '';
@@ -3131,6 +3139,13 @@ $(function () {
     }
     var attendBarBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
     var muLabelColorStyle = containerLeaveColor ? ' style="color:white;"' : '';
+
+    /* Approval state (needed early for Leave-mode attend-bar action buttons) */
+    var evApprovalVal  = bprVals['beatplanner__Managers_Approval'] || '';
+    var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+    var lockedAttr     = approvalLocked ? ' disabled' : '';
+    var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+    var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     /* Attend bar */
     var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
@@ -3161,7 +3176,21 @@ $(function () {
                    '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
                    '<ul class="bp-dd-list">' + buildOptList(leaveTypeField.options) + '</ul>' +
                    '</div></div></div>';
-      attendBar += '<button class="bp-apply-leave-btn" type="button" style="' + applyStyle + '">Update Leave</button>';
+      /* "Update Leave" button rendered only for non-leave records so Working→Leave
+         transitions still have a save path via the attend-bar Leave Type handler. */
+      if (!isLeaveMode) {
+        attendBar += '<button class="bp-apply-leave-btn" type="button" style="display:none;">Update Leave</button>';
+      }
+    }
+    /* Leave mode: action buttons rendered in the attend-bar (right-aligned). */
+    if (isLeaveMode) {
+      attendBar += '<div class="bp-attend-leave-actions"' + (containerLeaveColor ? ' style="color:white;"' : '') + '>' +
+                   '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
+                   '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
+                   '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '</div>';
     }
     attendBar += '</div>';
 
@@ -3195,13 +3224,6 @@ $(function () {
       var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
       if (actualVal) { originalVals[f.api_name] = actualVal; }
     });
-
-    /* Approval state */
-    var evApprovalVal  = bprVals['beatplanner__Managers_Approval'] || '';
-    var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
-    var lockedAttr     = approvalLocked ? ' disabled' : '';
-    var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
-    var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     /* data-pf-* attributes for filter matching */
     var pfAttrs = '';
@@ -3306,8 +3328,9 @@ $(function () {
 
     tableHtml += '</tr></tbody></table>';
 
-    /* For leave mode: replace the full (hidden) table with a minimal table showing
-       a checkbox (for mass-action selection) and the action cell only. */
+    /* For leave mode: replace the full (hidden) table with a checkbox-only row.
+       Action buttons are in the attend-bar. The checkbox is kept visible so the
+       user can select this Leave record for mass operations. */
     if (isLeaveMode) {
       tableHtml = '<table class="bp-slots-table">' +
                   '<tbody>' +
@@ -3321,13 +3344,6 @@ $(function () {
                   '<td class="bp-cb-cell">' +
                   editRowStyles.markerHtml +
                   '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>' +
-                  '<td class="bp-action-cell">' +
-                  '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
-                  '<button class="bp-row-action bp-row-copy" type="button" title="Copy record">' + SVG.copy + '</button>' +
-                  '<button class="bp-row-action bp-row-delete" type="button" title="Delete record"' + lockedAttr + '>' + SVG.trash + '</button>' +
-                  '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                  '<button class="bp-row-action bp-row-reject' + rejectClass + '" type="button" title="Reject record"' + lockedAttr + '>' + SVG.reject + '</button>' +
-                  '</td>' +
                   '</tr>' +
                   '</tbody></table>';
     }
@@ -7127,6 +7143,8 @@ $(function () {
           $mc.find('.bp-slots-table').toggle(isWorking);
           $mc.find('.bp-leave-type-field').toggle(isLeave);
           $mc.find('.bp-apply-leave-btn').hide();
+          /* Toggle leave-mode action buttons in the attend-bar */
+          $mc.find('.bp-attend-leave-actions').toggle(isLeave);
           if (!isLeave) {
             /* Reset Leave Type and clear attend-bar background + label colours */
             $mc.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
@@ -7134,6 +7152,7 @@ $(function () {
                .removeAttr('data-actual-val');
             $mc.find('.bp-attend-bar').css('background', '');
             $mc.find('.bp-attend-label').css('color', '');
+            $mc.find('.bp-attend-leave-actions').css('color', '');
           }
         } else {
           /* ── slotPickerGrid (single-event edit modal) handling ── */
@@ -7163,6 +7182,8 @@ $(function () {
           /* Always hide the Apply/Update Leave button when Attendance changes — it becomes
              visible only after a valid Leave Type is selected (see Leave Type handler). */
           $grid.find('.bp-apply-leave-btn').hide();
+          /* Toggle leave-mode action buttons in the attend-bar */
+          $grid.find('.bp-attend-leave-actions').toggle(isLeave);
           /* Show Filter button only when Working; hide and close panel otherwise */
           $grid.find('.bp-filter-action').toggle(isWorking);
           if (!isWorking) {
@@ -7173,9 +7194,10 @@ $(function () {
             $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
                  .text('Select\u2026')
                  .removeAttr('data-actual-val');
-            /* Clear attend-bar background colour and label colours */
+            /* Clear attend-bar background colour and label/action-button colours */
             $grid.find('.bp-attend-bar').css('background', '');
             $grid.find('.bp-attend-label').css('color', '');
+            $grid.find('.bp-attend-leave-actions').css('color', '');
           }
         }
       }
@@ -7199,9 +7221,11 @@ $(function () {
             var leaveColor3  = getLeaveTypeColor(fv3);
             $container3.find('.bp-attend-bar').css('background', leaveColor3 || '');
             $container3.find('.bp-attend-label').css('color', leaveColor3 ? 'white' : '');
+            $container3.find('.bp-attend-leave-actions').css('color', leaveColor3 ? 'white' : '');
           } else {
             $container3.find('.bp-attend-bar').css('background', '');
             $container3.find('.bp-attend-label').css('color', '');
+            $container3.find('.bp-attend-leave-actions').css('color', '');
           }
         }
       }
@@ -7571,6 +7595,10 @@ $(function () {
     $(document).on('click', '#slotPickerGrid .bp-row-save', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
+      /* For Leave mode the Save button lives in the attend-bar, not inside a row. */
+      if (!$row.length) {
+        $row = $btn.closest('.bp-plan-container').find('.bp-slot-row').first();
+      }
       var editId = String($row.data('editId') || '');
       var date   = $row.data('date') || '';
       var hour   = $row.data('hour');  /* undefined in edit mode */
@@ -7875,6 +7903,10 @@ $(function () {
     /* ── Beat plan row: Copy ── */
     $(document).on('click', '#slotPickerGrid .bp-row-copy', function () {
       var $row  = $(this).closest('.bp-slot-row');
+      /* For Leave mode the Copy button lives in the attend-bar, not inside a row. */
+      if (!$row.length) {
+        $row = $(this).closest('.bp-plan-container').find('.bp-slot-row').first();
+      }
       var data  = {};
 
       /* Meetings For */
@@ -8001,21 +8033,30 @@ $(function () {
     });
 
     /* ── Beat plan edit row: Delete ── */
-    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-delete', function () {
-      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-delete, #slotPickerGrid .bp-attend-bar .bp-row-delete', function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      if (!$row.length) { $row = $btn.closest('.bp-plan-container').find('.bp-slot-row').first(); }
+      var editId = String($row.data('editId') || '');
       if (!editId) { return; }
       if (window.confirm('Delete this event?')) { deleteEvent(editId); }
     });
 
     /* ── Beat plan edit row: Approve ── */
-    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-approve', function () {
-      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-approve, #slotPickerGrid .bp-attend-bar .bp-row-approve', function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      if (!$row.length) { $row = $btn.closest('.bp-plan-container').find('.bp-slot-row').first(); }
+      var editId = String($row.data('editId') || '');
       if (editId) { doApprove(editId); }
     });
 
     /* ── Beat plan edit row: Reject ── */
-    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-reject', function () {
-      var editId = String($(this).closest('.bp-slot-row').data('editId') || '');
+    $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-reject, #slotPickerGrid .bp-attend-bar .bp-row-reject', function () {
+      var $btn   = $(this);
+      var $row   = $btn.closest('.bp-slot-row');
+      if (!$row.length) { $row = $btn.closest('.bp-plan-container').find('.bp-slot-row').first(); }
+      var editId = String($row.data('editId') || '');
       if (editId) { doReject(editId); }
     });
 
@@ -8076,6 +8117,10 @@ $(function () {
     $(document).on('click', '#demBulkGrid .bp-row-save, #massActionsBody .bp-row-save', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
+      /* For Leave mode the Save button lives in the attend-bar, not inside a row. */
+      if (!$row.length) {
+        $row = $btn.closest('.bp-plan-container, .map-event-container').find('.bp-slot-row').first();
+      }
       var editId = String($row.data('editId') || '');
       var date   = $row.data('date') || '';
 
@@ -8245,16 +8290,20 @@ $(function () {
     });
 
     /* ── demBulkGrid / massActionsBody: single-row Delete ── */
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-delete, #massActionsBody .bp-edit-row .bp-row-delete', async function () {
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-delete, #massActionsBody .bp-edit-row .bp-row-delete, #massActionsBody .bp-attend-bar .bp-row-delete', async function () {
       var $btn      = $(this);
       var $row      = $btn.closest('.bp-slot-row');
+      /* For Leave mode the Delete button may be in the attend-bar. */
+      if (!$row.length) {
+        $row = $btn.closest('.bp-plan-container, .map-event-container').find('.bp-slot-row').first();
+      }
       var editId    = String($row.data('editId') || '');
       if (!editId) { return; }
       if (!window.confirm('Delete this event?')) { return; }
 
       /* Capture context before async operation (row may be removed from DOM) */
-      var inMassOverlay = $row.closest('#massActionsBody').length > 0;
-      var $dayGroup     = inMassOverlay ? $row.closest('.map-day-group') : null;
+      var inMassOverlay = $btn.closest('#massActionsBody').length > 0;
+      var $dayGroup     = inMassOverlay ? $btn.closest('.map-day-group') : null;
       var rowDate       = $row.data('date') || '';
 
       $btn.prop('disabled', true);
@@ -8347,9 +8396,13 @@ $(function () {
       }
     }
 
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve, #massActionsBody .bp-edit-row .bp-row-approve', async function () {
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve, #massActionsBody .bp-edit-row .bp-row-approve, #massActionsBody .bp-attend-bar .bp-row-approve', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
+      /* For Leave mode the Approve button may be in the attend-bar. */
+      if (!$row.length) {
+        $row = $btn.closest('.bp-plan-container, .map-event-container').find('.bp-slot-row').first();
+      }
       var editId = String($row.data('editId') || '');
       if (!editId) { return; }
       $btn.prop('disabled', true);
@@ -8361,10 +8414,12 @@ $(function () {
         if (ev && ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Approved'; }
         saveEvents();
         refreshCalendarCell($row.data('date') || '');
-        /* Update action buttons in-place to reflect approved state */
-        $row.find('.bp-row-approve').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
-        $row.find('.bp-row-reject').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
-        $row.find('.bp-row-delete').prop('disabled', true);
+        /* Update action buttons in-place (search container to cover attend-bar buttons too) */
+        var $btnsScope = $btn.closest('.bp-plan-container, .map-event-container');
+        if (!$btnsScope.length) { $btnsScope = $row; }
+        $btnsScope.find('.bp-row-approve').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
+        $btnsScope.find('.bp-row-reject').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
+        $btnsScope.find('.bp-row-delete').prop('disabled', true);
         /* Refresh row border/background and hover card to reflect new approval status */
         if (ev) { refreshDemRowStyles($row, ev); }
         showToast('Record approved.');
@@ -8376,9 +8431,13 @@ $(function () {
     });
 
     /* ── demBulkGrid / massActionsBody: single-row Reject – updates row in-place ── */
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject, #massActionsBody .bp-edit-row .bp-row-reject', async function () {
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject, #massActionsBody .bp-edit-row .bp-row-reject, #massActionsBody .bp-attend-bar .bp-row-reject', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
+      /* For Leave mode the Reject button may be in the attend-bar. */
+      if (!$row.length) {
+        $row = $btn.closest('.bp-plan-container, .map-event-container').find('.bp-slot-row').first();
+      }
       var editId = String($row.data('editId') || '');
       if (!editId) { return; }
       $btn.prop('disabled', true);
@@ -8390,10 +8449,12 @@ $(function () {
         if (ev && ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Rejected'; }
         saveEvents();
         refreshCalendarCell($row.data('date') || '');
-        /* Update action buttons in-place to reflect rejected state */
-        $row.find('.bp-row-reject').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
-        $row.find('.bp-row-approve').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
-        $row.find('.bp-row-delete').prop('disabled', true);
+        /* Update action buttons in-place (search container to cover attend-bar buttons too) */
+        var $btnsScope2 = $btn.closest('.bp-plan-container, .map-event-container');
+        if (!$btnsScope2.length) { $btnsScope2 = $row; }
+        $btnsScope2.find('.bp-row-reject').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
+        $btnsScope2.find('.bp-row-approve').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
+        $btnsScope2.find('.bp-row-delete').prop('disabled', true);
         /* Refresh row border/background and hover card to reflect new rejection status */
         if (ev) { refreshDemRowStyles($row, ev); }
         showToast('Record rejected.');

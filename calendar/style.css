@@ -4856,6 +4856,26 @@ input, select, textarea {
   box-shadow: 0 2px 8px rgba(0,0,0,.4);
 }
 
+/* ── Leave-mode action buttons inside .bp-attend-bar ── */
+.bp-attend-leave-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  margin-left: auto;
+}
+/* Inherit colour so white propagates when attend-bar has a leave-type background */
+.bp-attend-leave-actions .bp-row-action {
+  color: inherit;
+}
+.bp-attend-leave-actions .bp-row-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+}
+.theme-dark .bp-attend-leave-actions .bp-row-action:hover,
+.theme-night .bp-attend-leave-actions .bp-row-action:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 
 /* ── Row checkbox column ── */
 .bp-cb-th {
