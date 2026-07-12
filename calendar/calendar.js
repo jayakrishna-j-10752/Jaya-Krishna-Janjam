@@ -3915,10 +3915,11 @@ $(function () {
     var groups = getVisibleEventsByDate();
 
     /* For all beat-plan actions (mass-update, mass-approve, mass-reject, mass-delete),
-       use per-event editable containers (attend bar + slot row / leave action row).
-       Leave records show only the attend bar and action buttons; working records show the full slot row. */
+       use the original bp-slots-table layout (one table per day via buildMassActionsBodyHtml).
+       This is the same event view that was originally used by mass-delete, mass-approve
+       and mass-reject; mass-update now adopts this layout for a consistent UI. */
     if (beatPlanHasRefs) {
-      $('#massActionsBody').html(buildMassUpdateBodyHtml(groups));
+      $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
 
       /* Populate cached avatars immediately and schedule async load for the rest */
       groups.forEach(function (group) {
