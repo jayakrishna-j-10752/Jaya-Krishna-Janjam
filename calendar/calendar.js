@@ -2513,9 +2513,12 @@ $(function () {
     var startLbl = fmtTime(ev.startTime || '00:00');
     var endLbl   = fmtTime(ev.endTime   || '00:00');
 
-    /* Avatar: show initials immediately; openBpEditModal replaces with actual image */
-    var avatarInitials = existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '';
-    var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
+    /* Avatar: use cached profile image if available, otherwise show initials.
+       openBpEditModal will still load uncached images asynchronously. */
+    var avatarHtml  = ev.mwAvatarImgSrc
+      ? '<img src="' + escHtml(ev.mwAvatarImgSrc) + '">'
+      : (existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '');
+    var avatarClass = existingMwName ? ' bp-rec-avatar--show' : '';
 
     /* Apply the same metadata-driven styling as the .evt-chip being edited.
        Use the fresh crmRecord Attendance/Leave Type values so the row colour
@@ -2596,7 +2599,7 @@ $(function () {
                  '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
                  '<div class="bp-dd-trigger" tabindex="0">' +
                  '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
-                 ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarInitials + '</span>' +
+                 ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarHtml + '</span>' +
                  '<span class="bp-dd-val"' +
                  (existingMwId ? ' data-selected-id="' + escHtml(existingMwId) + '"' : '') + '>' +
                  escHtml(existingMwName || 'Select\u2026') + '</span>' +
@@ -2651,7 +2654,17 @@ $(function () {
     tableHtml += '</tr>';
     tableHtml += '</tbody></table>';
 
-    return '<div class="bp-plan-container" data-date="' + escHtml(date) + '" data-edit-id="' + escHtml(ev.id) + '">' +
+    /* Apply Leave Type picklist colour as container background when Attendance = Leave */
+    var containerLeaveColor = '';
+    if (isLeaveMode && existingLeave && existingLeave !== '-None-') {
+      var containerColorFv = {};
+      containerColorFv[attendApi] = existingAttend;
+      containerColorFv[leaveApi]  = existingLeave;
+      containerLeaveColor = getLeaveTypeColor(containerColorFv);
+    }
+    var containerBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
+
+    return '<div class="bp-plan-container"' + containerBgStyle + ' data-date="' + escHtml(date) + '" data-edit-id="' + escHtml(ev.id) + '">' +
            attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
   }
 
@@ -2836,9 +2849,11 @@ $(function () {
         }
       }
 
-      /* Avatar */
-      var avatarInitials = existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '';
-      var avatarClass    = existingMwName ? ' bp-rec-avatar--show' : '';
+      /* Avatar – use cached profile image if available, else initials */
+      var avatarHtml  = ev.mwAvatarImgSrc
+        ? '<img src="' + escHtml(ev.mwAvatarImgSrc) + '">'
+        : (existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '');
+      var avatarClass = existingMwName ? ' bp-rec-avatar--show' : '';
 
       /* Row styling (same as single-edit row) */
       var editRowStyles = buildBprEventStyles(ev);
@@ -2914,7 +2929,7 @@ $(function () {
                    '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
-                   ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarInitials + '</span>' +
+                   ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarHtml + '</span>' +
                    '<span class="bp-dd-val"' + (existingMwId ? ' data-selected-id="' + escHtml(existingMwId) + '"' : '') + '>' +
                    escHtml(existingMwName || 'Select\u2026') + '</span>' +
                    chevSvg + '</div>' +
@@ -2962,6 +2977,351 @@ $(function () {
 
     tableHtml += '</tbody></table>';
     return tableHtml;
+  }
+
+  /**
+   * Build one .bp-plan-container for a single event inside the Mass Update popup.
+   * Renders an editable attend bar (Attendance + Leave Type) at the top.
+   * For Working records the full slot table is shown (one .bp-slot-row.bp-edit-row
+   * with an enabled checkbox). For Leave records only the attend bar is visible.
+   * Leave Type picklist colour is applied as an inline background on the container.
+   *
+   * @param {Object} ev – calendar event from state.events
+   * @returns {string} HTML string
+   */
+  function buildMassUpdateEventHtml(ev) {
+    if (!ev) { return ''; }
+
+    var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
+                  ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+
+    /* Meetings For options */
+    var mfOptions = '';
+    beatPlanModulesList.forEach(function (mod) {
+      mfOptions += '<li class="bp-dd-opt" data-api="' + escHtml(mod.api) +
+                   '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
+    });
+
+    /* Separate BPR picklist fields */
+    var HIDDEN_BPR_LABELS_MU = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for'];
+    var tablePicklistCols = [];
+    var attendanceField   = null;
+    var leaveTypeField    = null;
+
+    if (bprPicklistFields && bprPicklistFields.length) {
+      bprPicklistFields.forEach(function (f) {
+        var lbl = (f.field_label || '').toLowerCase().trim();
+        if (HIDDEN_BPR_LABELS_MU.indexOf(lbl) !== -1) { return; }
+        if (lbl === 'attendance') { attendanceField = f; return; }
+        if (lbl === 'leave type') { leaveTypeField  = f; return; }
+        tablePicklistCols.push(f);
+      });
+    }
+
+    function buildOptList(opts) {
+      if (!opts || !opts.length) {
+        return '<li class="bp-dd-empty">No options available</li>';
+      }
+      return opts.map(function (v) {
+        var display = (typeof v === 'object') ? v.display : v;
+        var actual  = (typeof v === 'object') ? v.actual  : v;
+        return '<li class="bp-dd-opt" data-label="' + escHtml(display) +
+               '" data-actual="' + escHtml(actual) + '">' + escHtml(display) + '</li>';
+      }).join('');
+    }
+
+    /* Resolve field metadata */
+    var startTimeApi = 'beatplanner__Date_Time_From', startTimeLbl = 'Date Time From';
+    var endTimeApi   = 'beatplanner__Date_Time_To',   endTimeLbl   = 'Date Time To';
+    var mfFieldApi   = 'beatplanner__Meetings_For',   mfFieldLabel = 'Meetings For';
+    bpDailyAllFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase();
+      if (lbl === 'start time')   { startTimeApi = f.api_name || startTimeApi; startTimeLbl = f.field_label || startTimeLbl; }
+      if (lbl === 'end time')     { endTimeApi   = f.api_name || endTimeApi;   endTimeLbl   = f.field_label || endTimeLbl; }
+      if (lbl === 'meetings for') { mfFieldApi   = f.api_name || mfFieldApi;   mfFieldLabel = f.field_label || mfFieldLabel; }
+    });
+
+    /* Read existing field values */
+    var attendApi      = (attendanceField && attendanceField.api_name) || 'beatplanner__Attendance';
+    var leaveApi       = (leaveTypeField  && leaveTypeField.api_name)  || 'beatplanner__Leave_Type';
+    var bprVals        = ev.bprFieldValues || {};
+    var existingAttend = String(bprVals[attendApi]  || '');
+    var existingLeave  = String(bprVals[leaveApi]   || '');
+
+    /* Meetings For */
+    var existingMfVal = String(bprVals[mfFieldApi] || '');
+    var existingMfApi = '';
+    beatPlanModulesList.forEach(function (mod) {
+      if (mod.label === existingMfVal) { existingMfApi = mod.api; }
+    });
+
+    /* Meeting With */
+    var mwLookupApiName = '';
+    var existingMwId    = ev.mwRecordId || '';
+    var existingMwName  = ev.title || '';
+    if (existingMfApi) {
+      for (var fi = 0; fi < bpDailyAllFields.length; fi++) {
+        var fld = bpDailyAllFields[fi];
+        if (fld.data_type === 'lookup' && fld.lookup && fld.lookup.module) {
+          var modApiName = fld.lookup.module.api_name || fld.lookup.module.module || '';
+          var fldLbl     = (fld.field_label || '').toLowerCase();
+          if (modApiName === existingMfApi || fldLbl === existingMfVal.toLowerCase()) {
+            mwLookupApiName = fld.api_name;
+            break;
+          }
+        }
+      }
+    }
+
+    /* Meeting With option list */
+    var mwOpts = '';
+    if (existingMfApi) {
+      var mwRecords = filteredModuleRecords.hasOwnProperty(existingMfApi)
+        ? filteredModuleRecords[existingMfApi]
+        : (moduleRecordsMap[existingMfApi] || []);
+      if (mwRecords.length === 0) {
+        mwOpts = '<li class="bp-dd-empty">No records found</li>';
+      } else {
+        mwRecords.forEach(function (rec) {
+          mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+                    '" data-label="' + escHtml(rec.name) +
+                    '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' + escHtml(rec.name) + '</li>';
+        });
+      }
+    }
+
+    /* Visibility flags */
+    var isLeaveMode = existingAttend.toLowerCase() === 'leave';
+    var isWorking   = existingAttend.toLowerCase() === 'working';
+    var tableStyle  = isWorking   ? '' : 'display:none;';
+    var leaveStyle  = isLeaveMode ? '' : 'display:none;';
+    var applyStyle  = (isLeaveMode && existingLeave && existingLeave !== '-None-') ? '' : 'display:none;';
+
+    /* Container leave colour */
+    var containerLeaveColor = '';
+    if (isLeaveMode && existingLeave && existingLeave !== '-None-') {
+      var colorFv = {};
+      colorFv[attendApi] = existingAttend;
+      colorFv[leaveApi]  = existingLeave;
+      containerLeaveColor = getLeaveTypeColor(colorFv);
+    }
+    var containerBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
+
+    /* Attend bar */
+    var attendBar = '<div class="bp-attend-bar">';
+    if (attendanceField) {
+      attendBar += '<div class="bp-attend-field">' +
+                   '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
+                   '<div class="bp-dd-wrap" data-api="' + escHtml(attendApi) + '" data-label="' + escHtml(attendanceField.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' +
+                   (existingAttend ? ' data-actual-val="' + escHtml(existingAttend) + '"' : '') + '>' +
+                   escHtml(existingAttend || 'Select\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + buildOptList(attendanceField.options) + '</ul>' +
+                   '</div></div></div>';
+    }
+    if (leaveTypeField) {
+      attendBar += '<div class="bp-attend-field bp-leave-type-field" style="' + leaveStyle + '">' +
+                   '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
+                   '<div class="bp-dd-wrap" data-api="' + escHtml(leaveApi) + '" data-label="' + escHtml(leaveTypeField.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' +
+                   (existingLeave ? ' data-actual-val="' + escHtml(existingLeave) + '"' : '') + '>' +
+                   escHtml(existingLeave || 'Select\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + buildOptList(leaveTypeField.options) + '</ul>' +
+                   '</div></div></div>';
+      attendBar += '<button class="bp-apply-leave-btn" type="button" style="' + applyStyle + '">Update Leave</button>';
+    }
+    attendBar += '</div>';
+
+    /* Table */
+    var date    = ev.date || '';
+    var startLbl = fmtTime(ev.startTime || '00:00');
+    var endLbl   = fmtTime(ev.endTime   || '00:00');
+
+    /* Avatar – use cached image if available */
+    var avatarHtml  = ev.mwAvatarImgSrc
+      ? '<img src="' + escHtml(ev.mwAvatarImgSrc) + '">'
+      : (existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '');
+    var avatarClass = existingMwName ? ' bp-rec-avatar--show' : '';
+
+    /* Row styling */
+    var editRowStyles = buildBprEventStyles(ev);
+    var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
+    var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
+    var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
+
+    /* Original field values for change detection */
+    var originalVals = {
+      mf:     existingMfVal,
+      mfApi:  existingMfApi,
+      mwId:   existingMwId,
+      attend: existingAttend,
+      leave:  existingLeave
+    };
+    tablePicklistCols.forEach(function (f) {
+      var rawVal    = bprVals[f.api_name] || '';
+      var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+      if (actualVal) { originalVals[f.api_name] = actualVal; }
+    });
+
+    /* Approval state */
+    var evApprovalVal  = bprVals['beatplanner__Managers_Approval'] || '';
+    var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+    var lockedAttr     = approvalLocked ? ' disabled' : '';
+    var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+    var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
+
+    /* data-pf-* attributes for filter matching */
+    var pfAttrs = '';
+    if (bprPicklistFields && bprPicklistFields.length) {
+      bprPicklistFields.forEach(function (pf) {
+        var v = bprVals[pf.api_name];
+        if (v) { pfAttrs += ' data-pf-' + escHtml(pf.api_name.toLowerCase()) + '="' + escHtml(v) + '"'; }
+      });
+    }
+
+    /* Build table */
+    var tableHtml = '<table class="bp-slots-table" style="' + tableStyle + '">';
+    tableHtml += '<thead><tr>';
+    tableHtml += '<th class="bp-th bp-cb-th"></th>';
+    tableHtml += '<th class="bp-th">' + escHtml(startTimeLbl) + '</th>';
+    tableHtml += '<th class="bp-th">' + escHtml(endTimeLbl) + '</th>';
+    tableHtml += '<th class="bp-th">' + escHtml(mfFieldLabel) + '</th>';
+    tableHtml += '<th class="bp-th">Meeting With</th>';
+    tablePicklistCols.forEach(function (f) {
+      tableHtml += '<th class="bp-th">' + escHtml(f.field_label) + '</th>';
+    });
+    tableHtml += '<th class="bp-th bp-action-th">Actions</th>';
+    tableHtml += '</tr></thead><tbody>';
+
+    tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
+                 ' data-date="' + escHtml(date) + '"' +
+                 ' data-edit-id="' + escHtml(ev.id) + '"' +
+                 ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+                 ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                 ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '"' +
+                 pfAttrs +
+                 (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
+
+    tableHtml += '<td class="bp-cb-cell"' +
+                 (cbCellStyle ? ' style="' + escHtml(cbCellStyle) + '"' : '') +
+                 '>' + editRowStyles.markerHtml +
+                 '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>';
+
+    tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
+                 ' data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
+    tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
+                 ' data-api="' + escHtml(endTimeApi) + '" data-label="' + escHtml(endTimeLbl) + '">' + endLbl + '</td>';
+
+    /* Meetings For */
+    tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                 '<div class="bp-dd-wrap bp-mf-wrap" data-row="edit" data-api="' + escHtml(mfFieldApi) + '" data-label="' + escHtml(mfFieldLabel) + '">' +
+                 '<div class="bp-dd-trigger" tabindex="0">' +
+                 '<span class="bp-dd-val"' + (existingMfApi ? ' data-selected-api="' + escHtml(existingMfApi) + '"' : '') + '>' +
+                 escHtml(existingMfVal || 'Select module\u2026') + '</span>' +
+                 chevSvg + '</div>' +
+                 '<div class="bp-dd-panel">' +
+                 '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                 '<ul class="bp-dd-list">' + mfOptions + '</ul>' +
+                 '</div></div></td>';
+
+    /* Meeting With */
+    tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                 '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
+                 '<div class="bp-dd-trigger" tabindex="0">' +
+                 '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
+                 ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarHtml + '</span>' +
+                 '<span class="bp-dd-val"' + (existingMwId ? ' data-selected-id="' + escHtml(existingMwId) + '"' : '') + '>' +
+                 escHtml(existingMwName || 'Select\u2026') + '</span>' +
+                 chevSvg + '</div>' +
+                 '<div class="bp-dd-panel">' +
+                 '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                 '<ul class="bp-dd-list bp-mw-list">' + mwOpts + '</ul>' +
+                 '</div></div></td>';
+
+    /* Dynamic picklist columns */
+    tablePicklistCols.forEach(function (f) {
+      var rawVal    = bprVals[f.api_name] || '';
+      var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+      var displayVal = actualVal;
+      if (actualVal && f.options) {
+        f.options.forEach(function (opt) {
+          var a    = (typeof opt === 'object') ? opt.actual  : opt;
+          var disp = (typeof opt === 'object') ? opt.display : opt;
+          if (a === actualVal || disp === actualVal) { displayVal = disp; }
+        });
+      }
+      tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                   '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' + (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
+                   escHtml(displayVal || 'Select\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + buildOptList(f.options) + '</ul>' +
+                   '</div></div></td>';
+    });
+
+    /* Actions */
+    tableHtml += '<td class="bp-action-cell"' + (actCellStyle ? ' style="' + escHtml(actCellStyle) + '"' : '') + '>' +
+                 '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
+                 '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
+                 '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
+                 '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                 '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                 '</td>';
+
+    tableHtml += '</tr></tbody></table>';
+
+    return '<div class="bp-plan-container map-event-container"' + containerBgStyle +
+           ' data-date="' + escHtml(date) + '"' +
+           ' data-edit-id="' + escHtml(ev.id) + '">' +
+           attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
+  }
+
+  /**
+   * Build the HTML for the Mass Update popup body.
+   * Renders one .bp-plan-container per event (via buildMassUpdateEventHtml),
+   * grouped by date in a collapsible accordion.
+   *
+   * @param {Array} groups – output of getVisibleEventsByDate()
+   * @returns {string} HTML string
+   */
+  function buildMassUpdateBodyHtml(groups) {
+    if (!groups.length) { return ''; }
+
+    var chevSvg = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+    var html = '';
+    groups.forEach(function (group) {
+      html += '<div class="map-day-group" data-date="' + escHtml(group.date) + '">' +
+              '  <div class="map-day-header">' +
+              '    <label class="map-cb-label">' +
+              '      <input type="checkbox" class="map-cb map-day-cb" data-date="' + escHtml(group.date) + '" />' +
+              '      <span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(group.date)) + '</span>' +
+              '    </label>' +
+              '    <button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>' +
+              '  </div>' +
+              '  <div class="map-day-events">';
+
+      group.events.forEach(function (ev) {
+        html += buildMassUpdateEventHtml(ev);
+      });
+
+      html += '  </div>' +
+              '</div>';
+    });
+    return html;
   }
 
   /**
@@ -3503,7 +3863,52 @@ $(function () {
     }
 
     var groups = getVisibleEventsByDate();
-    $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
+
+    /* For mass-update, use per-event editable containers (attend bar + full slot row).
+       For other actions (delete / approve / reject) use the existing table layout. */
+    if (action === 'mass-update') {
+      $('#massActionsBody').html(buildMassUpdateBodyHtml(groups));
+
+      /* Populate cached avatars immediately and schedule async load for the rest */
+      groups.forEach(function (group) {
+        group.events.forEach(function (ev) {
+          var $row = $('#massActionsBody .bp-slot-row[data-edit-id="' + ev.id + '"]');
+          if (!$row.length) { return; }
+          var $avatar = $row.find('.bp-rec-avatar');
+          if (!$avatar.length) { return; }
+          if (ev.mwAvatarImgSrc) {
+            /* Already rendered inline; ensure classes are set */
+            $avatar.addClass('bp-rec-avatar--show')
+                   .attr('data-img-src', ev.mwAvatarImgSrc)
+                   .attr('data-photo-id', ev.mwPhotoId || '');
+          } else if (ev.mwPhotoId && !$avatar.find('img').length) {
+            /* Load asynchronously */
+            (function (evRef, photoId) {
+              ZOHO.CRM.API.getFile({ id: photoId })
+                .then(function (resp) {
+                  if (!resp) { return; }
+                  var imgBlob = new Blob([resp], { type: 'image/jpeg' });
+                  var reader  = new FileReader();
+                  reader.onloadend = function () {
+                    var dataUrl = reader.result;
+                    evRef.mwAvatarImgSrc = dataUrl;
+                    saveEvents();
+                    $('#massActionsBody .bp-slot-row[data-edit-id="' + evRef.id + '"] .bp-rec-avatar')
+                      .html('<img src="' + escHtml(dataUrl) + '">')
+                      .attr('data-img-src', dataUrl)
+                      .attr('data-photo-id', photoId)
+                      .addClass('bp-rec-avatar--show');
+                  };
+                  reader.readAsDataURL(imgBlob);
+                })
+                .catch(function () {});
+            }(ev, ev.mwPhotoId));
+          }
+        });
+      });
+    } else {
+      $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
+    }
 
     /* Inject filter bar */
     $('#massActionsFilterBar').remove();
@@ -6230,26 +6635,134 @@ $(function () {
         }
 
       } else if (action === 'mass-update') {
-        /* For mass-update: close this popup and open the Day Events Modal in bulk-edit mode
-           for the first date that has selected events. Pre-check the selected rows there. */
-        /* Determine the first date with selected events before closing the popup */
-        var firstDate = null;
-        for (var mui = 0; mui < selIds.length && !firstDate; mui++) {
-          var muEv = findEvent(selIds[mui]);
-          if (muEv && muEv.date) { firstDate = muEv.date; }
-        }
-        var selIdsCopy = selIds.slice();
-        closeMassActionsPopup();
-        if (firstDate) {
-          setTimeout(function () {
-            showDayEventsModal(firstDate).then(function () {
-              /* Pre-check rows matching selected IDs */
-              selIdsCopy.forEach(function (id) {
-                $('#demBulkGrid .bp-slot-row[data-edit-id="' + id + '"] .bp-row-cb').prop('checked', true);
+        /* Collect field values from each checked edit row and update via mass_update API */
+        var muUpdated = 0;
+        var muFailed  = 0;
+
+        for (var muIdx = 0; muIdx < selIds.length; muIdx++) {
+          var muId  = selIds[muIdx];
+          var $muRow = $('#massActionsBody .bp-slot-row[data-edit-id="' + muId + '"]');
+          if (!$muRow.length) { continue; }
+
+          var muDate = $muRow.data('date') || '';
+          var $muContainer = $muRow.closest('.bp-plan-container');
+
+          /* Attendance + Leave Type (from attend bar above the table) */
+          var $muAttendWrap = $muContainer.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
+          var muAttendApi   = $muAttendWrap.data('api') || 'beatplanner__Attendance';
+          var muAttendVal   = $muAttendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+          var $muLeaveWrap  = $muContainer.find('.bp-leave-type-field .bp-dd-wrap');
+          var muLeaveApi    = $muLeaveWrap.data('api') || 'beatplanner__Leave_Type';
+          var muLeaveVal    = $muLeaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
+          var muIsLeave     = muAttendVal.toLowerCase() === 'leave';
+
+          var muRecordData     = {};
+          var muBprFieldValues = {};
+
+          if (muAttendVal) {
+            muRecordData[muAttendApi]     = muAttendVal;
+            muBprFieldValues[muAttendApi] = muAttendVal;
+          }
+
+          if (muIsLeave) {
+            /* Leave records: only Attendance + Leave Type */
+            if (muLeaveVal) {
+              muRecordData[muLeaveApi]     = muLeaveVal;
+              muBprFieldValues[muLeaveApi] = muLeaveVal;
+            }
+          } else {
+            /* Working records: all editable fields from the row */
+            var muStartTime = String($muRow.data('startTime') || '00:00');
+            var muEndTime   = String($muRow.data('endTime')   || '00:00');
+            var muStartIso  = muDate && muStartTime ? toIsoDt(muDate, muStartTime) : muStartTime;
+            var muEndIso    = muDate && muEndTime   ? toIsoDt(muDate, muEndTime)   : muEndTime;
+            var $muStart    = $muRow.find('.bp-time-cell').eq(0);
+            var $muEnd      = $muRow.find('.bp-time-cell').eq(1);
+            muRecordData[$muStart.data('api') || 'beatplanner__Date_Time_From'] = muStartIso;
+            muRecordData[$muEnd.data('api')   || 'beatplanner__Date_Time_To']   = muEndIso;
+            if (muDate) { muRecordData['beatplanner__Date'] = muDate; }
+
+            /* Meetings For */
+            var $muMfWrap    = $muRow.find('.bp-mf-wrap');
+            var $muMfVal     = $muMfWrap.find('.bp-dd-val');
+            var muMfDisplay  = $muMfVal.text().trim() || '';
+            var muMfFieldApi = $muMfWrap.data('api') || 'beatplanner__Meetings_For';
+            if (muMfDisplay && muMfDisplay !== 'Select module\u2026') {
+              muRecordData[muMfFieldApi]     = muMfDisplay;
+              muBprFieldValues[muMfFieldApi] = muMfDisplay;
+            }
+
+            /* Meeting With */
+            var $muMwWrap    = $muRow.find('.bp-mw-wrap');
+            var $muMwVal     = $muMwWrap.find('.bp-dd-val');
+            var muMwId       = $muMwVal.attr('data-selected-id') || '';
+            var muMwLookupApi = $muMwWrap.attr('data-api') || '';
+            var muMwName     = $muMwVal.text() || '';
+            if (muMwId && muMwLookupApi) {
+              muRecordData[muMwLookupApi] = { id: muMwId };
+              /* Null-out any other meeting-with lookup fields for this module list */
+              bpDailyAllFields.forEach(function (f) {
+                if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
+                if (f.api_name === muMwLookupApi) { return; }
+                var modApi2 = f.lookup.module.api_name || f.lookup.module.module || '';
+                if (beatPlanModulesList.some(function (mod) { return mod.api === modApi2; })) {
+                  muRecordData[f.api_name] = null;
+                }
               });
-              syncDemBulkToolbar();
-            }).catch(function () {});
-          }, 250);
+            }
+
+            /* Other picklist fields in the row (excludes attend-bar fields) */
+            $muRow.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
+              var $w    = $(this);
+              var fApi  = String($w.data('api') || '');
+              if (!fApi || fApi === muAttendApi || fApi === muLeaveApi) { return; }
+              var $v    = $w.find('.bp-dd-val');
+              var fAct  = $v.attr('data-actual-val') || $v.text() || '';
+              if (fAct && fAct !== 'Select\u2026') {
+                muRecordData[fApi]     = fAct;
+                muBprFieldValues[fApi] = fAct;
+              }
+            });
+
+            muRecordData['Name'] = 'Meeting With ' + muMwName;
+          }
+
+          if (Object.keys(muRecordData).length === 0) { continue; }
+
+          setMapProgress('Updating record ' + (muIdx + 1) + ' of ' + selIds.length + '\u2026');
+          try {
+            await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
+              data: [muRecordData],
+              over_write: true,
+              ids: [muId]
+            });
+
+            /* Update in-memory event */
+            var muEv = findEvent(muId);
+            if (muEv) {
+              if (!muEv.bprFieldValues) { muEv.bprFieldValues = {}; }
+              Object.assign(muEv.bprFieldValues, muBprFieldValues);
+            }
+            muUpdated++;
+          } catch (muErr) {
+            console.error('Mass update failed for', muId, muErr);
+            muFailed++;
+          }
+        }
+
+        setMapProgress('');
+        saveEvents();
+        render();
+        hideHoverCard();
+        if (dom.modal.hasClass('modal-open')) { closeModal(); }
+        if (demCurrentDs && dom.dayEventsModal.hasClass('dem-open')) {
+          showDayEventsModal(demCurrentDs).catch(function () {});
+        }
+        closeMassActionsPopup();
+        if (muFailed > 0) {
+          showToast(muUpdated + ' record(s) updated. ' + muFailed + ' failed.');
+        } else {
+          showToast(muUpdated + ' record(s) updated.');
         }
       }
 
@@ -6541,55 +7054,87 @@ $(function () {
       var isAttendanceDd = $wrap.closest('.bp-attend-bar').length > 0 &&
                            !$wrap.closest('.bp-leave-type-field').length;
       if (isAttendanceDd) {
-        var $grid     = $('#slotPickerGrid');
         var isWorking = (label || '').toLowerCase() === 'working';
         var isLeave   = (label || '').toLowerCase() === 'leave';
 
-        /* ── Feature 3: Leave → Working in edit mode ──
-           When editing a Leave record and the user switches Attendance to Working,
-           replace the single edit row with the full slot table (all available hours),
-           and save the original Leave record ID so it can be deleted on save. */
-        if (isWorking) {
-          var $container = $grid.find('.bp-plan-container').first();
-          var leaveEditId = String($container.data('editId') || '');
-          if (leaveEditId) {
-            /* Generate the full slot table from buildBeatPlanTable and extract its slots-wrap */
-            var $fullTable = $('<div>').html(buildBeatPlanTable($container.data('date') || ''));
-            var $newSlotsWrap = $fullTable.find('.bp-slots-wrap');
-            $container.find('.bp-slots-wrap').replaceWith($newSlotsWrap);
-            /* Mark the container: remember the leave record ID for later deletion,
-               and remove data-edit-id to switch the container back to create mode. */
-            $container.attr('data-leave-edit-id', leaveEditId);
-            $container.removeAttr('data-edit-id');
-          }
-        }
-
-        $grid.find('.bp-slots-table').toggle(isWorking);
-        $grid.find('.bp-leave-type-field').toggle(isLeave);
-        /* Always hide the Apply/Update Leave button when Attendance changes — it becomes
-           visible only after a valid Leave Type is selected (see Leave Type handler). */
-        $grid.find('.bp-apply-leave-btn').hide();
-        /* Show Filter button only when Working; hide and close panel otherwise */
-        $grid.find('.bp-filter-action').toggle(isWorking);
-        if (!isWorking) {
-          closeFilterPanel();
-        }
-        if (!isLeave) {
-          /* Reset Leave Type selection when switching away from Leave */
-          $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
+        if ($wrap.closest('#massActionsBody').length) {
+          /* ── Mass Update popup: per-event container handling ── */
+          var $mc = $wrap.closest('.bp-plan-container');
+          $mc.find('.bp-slots-table').toggle(isWorking);
+          $mc.find('.bp-leave-type-field').toggle(isLeave);
+          $mc.find('.bp-apply-leave-btn').hide();
+          if (!isLeave) {
+            /* Reset Leave Type and clear container background */
+            $mc.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
                .text('Select\u2026')
                .removeAttr('data-actual-val');
+            $mc.css('background', '');
+          }
+        } else {
+          /* ── slotPickerGrid (single-event edit modal) handling ── */
+          var $grid     = $('#slotPickerGrid');
+
+          /* ── Feature 3: Leave → Working in edit mode ──
+             When editing a Leave record and the user switches Attendance to Working,
+             replace the single edit row with the full slot table (all available hours),
+             and save the original Leave record ID so it can be deleted on save. */
+          if (isWorking) {
+            var $container = $grid.find('.bp-plan-container').first();
+            var leaveEditId = String($container.data('editId') || '');
+            if (leaveEditId) {
+              /* Generate the full slot table from buildBeatPlanTable and extract its slots-wrap */
+              var $fullTable = $('<div>').html(buildBeatPlanTable($container.data('date') || ''));
+              var $newSlotsWrap = $fullTable.find('.bp-slots-wrap');
+              $container.find('.bp-slots-wrap').replaceWith($newSlotsWrap);
+              /* Mark the container: remember the leave record ID for later deletion,
+                 and remove data-edit-id to switch the container back to create mode. */
+              $container.attr('data-leave-edit-id', leaveEditId);
+              $container.removeAttr('data-edit-id');
+            }
+          }
+
+          $grid.find('.bp-slots-table').toggle(isWorking);
+          $grid.find('.bp-leave-type-field').toggle(isLeave);
+          /* Always hide the Apply/Update Leave button when Attendance changes — it becomes
+             visible only after a valid Leave Type is selected (see Leave Type handler). */
+          $grid.find('.bp-apply-leave-btn').hide();
+          /* Show Filter button only when Working; hide and close panel otherwise */
+          $grid.find('.bp-filter-action').toggle(isWorking);
+          if (!isWorking) {
+            closeFilterPanel();
+          }
+          if (!isLeave) {
+            /* Reset Leave Type selection when switching away from Leave */
+            $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
+                 .text('Select\u2026')
+                 .removeAttr('data-actual-val');
+            /* Clear container background colour */
+            $grid.find('.bp-plan-container').css('background', '');
+          }
         }
       }
 
-      /* Leave Type controls Apply Leave button visibility: show only when a valid
-         Leave Type (non-empty, not "-None-") is selected in the attend bar. */
+      /* Leave Type controls Apply Leave button visibility and container background colour.
+         Works for both #slotPickerGrid containers and #massActionsBody event containers. */
       var isLeaveTypeDd = $wrap.closest('.bp-leave-type-field').length > 0;
       if (isLeaveTypeDd) {
-        var $grid2 = $wrap.closest('#slotPickerGrid');
-        if ($grid2.length) {
-          var validLeaveType = actual && actual !== '-None-';
-          $grid2.find('.bp-apply-leave-btn').toggle(!!validLeaveType);
+        var $container3   = $wrap.closest('.bp-plan-container');
+        if ($container3.length) {
+          var validLeaveType3 = actual && actual !== '-None-';
+          $container3.find('.bp-apply-leave-btn').toggle(!!validLeaveType3);
+
+          /* Apply Leave Type picklist colour as container background */
+          if (validLeaveType3) {
+            var $attendWrap3 = $container3.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
+            var attendVal3   = $attendWrap3.find('.bp-dd-val').attr('data-actual-val') || '';
+            var fv3          = {};
+            fv3[$attendWrap3.data('api') || 'beatplanner__Attendance'] = attendVal3;
+            fv3[$wrap.data('api')        || 'beatplanner__Leave_Type'] = actual;
+            var leaveColor3  = getLeaveTypeColor(fv3);
+            $container3.css('background', leaveColor3 || '');
+          } else {
+            $container3.css('background', '');
+          }
         }
       }
     });

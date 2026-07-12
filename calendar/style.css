@@ -5606,6 +5606,24 @@ input, select, textarea {
   top: 0;
 }
 
+/* Per-event containers inside the mass-update accordion.
+   Each .bp-plan-container represents one event. */
+.map-event-container {
+  border-bottom: 1px solid var(--border);
+}
+.map-event-container:last-child {
+  border-bottom: none;
+}
+/* Ensure the slot table's sticky header offset is 0 inside the accordion */
+.map-event-container .bp-th {
+  top: 0;
+}
+/* Constrain the slots-wrap height within each mass-update event container */
+.map-event-container .bp-slots-wrap {
+  max-height: none;
+  overflow-x: auto;
+}
+
 /* Individual event row */
 .map-event-row {
   display: flex;
