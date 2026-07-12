@@ -2448,12 +2448,23 @@ $(function () {
     var applyStyle  = (isLeaveMode && existingLeave && existingLeave !== '-None-') ? '' : 'display:none;';
     var filterStyle = isWorking   ? '' : 'display:none;';
 
+    /* ── Leave Type colour applied to the attend-bar (not the container) ── */
+    var containerLeaveColor = '';
+    if (isLeaveMode && existingLeave && existingLeave !== '-None-') {
+      var leaveBgFv = {};
+      leaveBgFv[attendApi] = existingAttend;
+      leaveBgFv[leaveApi]  = existingLeave;
+      containerLeaveColor = getLeaveTypeColor(leaveBgFv);
+    }
+    var attendBarBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
+    var labelColorStyle  = containerLeaveColor ? ' style="color:white;"' : '';
+
     /* ── Attendance bar ── */
-    var attendBar = '<div class="bp-attend-bar">';
+    var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
     if (attendanceField) {
       var attendOptList = buildOptList(attendanceField.options);
       attendBar += '<div class="bp-attend-field">' +
-                   '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
+                   '<span class="bp-attend-label"' + labelColorStyle + '>' + escHtml(attendanceField.field_label) + '</span>' +
                    '<div class="bp-dd-wrap" data-api="' + escHtml(attendApi) + '" data-label="' + escHtml(attendanceField.field_label) + '">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-dd-val"' +
@@ -2471,7 +2482,7 @@ $(function () {
     if (leaveTypeField) {
       var leaveOptList = buildOptList(leaveTypeField.options);
       attendBar += '<div class="bp-attend-field bp-leave-type-field" style="' + leaveStyle + '">' +
-                   '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
+                   '<span class="bp-attend-label"' + labelColorStyle + '>' + escHtml(leaveTypeField.field_label) + '</span>' +
                    '<div class="bp-dd-wrap" data-api="' + escHtml(leaveApi) + '" data-label="' + escHtml(leaveTypeField.field_label) + '">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-dd-val"' +
@@ -2654,17 +2665,29 @@ $(function () {
     tableHtml += '</tr>';
     tableHtml += '</tbody></table>';
 
-    /* Apply Leave Type picklist colour as container background when Attendance = Leave */
-    var containerLeaveColor = '';
-    if (isLeaveMode && existingLeave && existingLeave !== '-None-') {
-      var containerColorFv = {};
-      containerColorFv[attendApi] = existingAttend;
-      containerColorFv[leaveApi]  = existingLeave;
-      containerLeaveColor = getLeaveTypeColor(containerColorFv);
+    /* For leave mode: replace the full (hidden) table with a minimal table that shows
+       only the action cell, keeping the row in the DOM so all button handlers work. */
+    if (isLeaveMode) {
+      tableHtml = '<table class="bp-slots-table">' +
+                  '<tbody>' +
+                  '<tr class="bp-slot-row bp-edit-row"' +
+                  ' data-date="' + escHtml(date) + '"' +
+                  ' data-edit-id="' + escHtml(ev.id) + '"' +
+                  ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+                  ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                  ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '">' +
+                  '<td class="bp-action-cell">' +
+                  '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
+                  '<button class="bp-row-action bp-row-copy" type="button" title="Copy record">' + SVG.copy + '</button>' +
+                  '<button class="bp-row-action bp-row-delete" type="button" title="Delete record"' + lockedAttr + '>' + SVG.trash + '</button>' +
+                  '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                  '<button class="bp-row-action bp-row-reject' + rejectClass + '" type="button" title="Reject record"' + lockedAttr + '>' + SVG.reject + '</button>' +
+                  '</td>' +
+                  '</tr>' +
+                  '</tbody></table>';
     }
-    var containerBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
 
-    return '<div class="bp-plan-container"' + containerBgStyle + ' data-date="' + escHtml(date) + '" data-edit-id="' + escHtml(ev.id) + '">' +
+    return '<div class="bp-plan-container" data-date="' + escHtml(date) + '" data-edit-id="' + escHtml(ev.id) + '">' +
            attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
   }
 
@@ -3098,7 +3121,7 @@ $(function () {
     var leaveStyle  = isLeaveMode ? '' : 'display:none;';
     var applyStyle  = (isLeaveMode && existingLeave && existingLeave !== '-None-') ? '' : 'display:none;';
 
-    /* Container leave colour */
+    /* Leave Type colour applied to the attend-bar (not the container) */
     var containerLeaveColor = '';
     if (isLeaveMode && existingLeave && existingLeave !== '-None-') {
       var colorFv = {};
@@ -3106,13 +3129,14 @@ $(function () {
       colorFv[leaveApi]  = existingLeave;
       containerLeaveColor = getLeaveTypeColor(colorFv);
     }
-    var containerBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
+    var attendBarBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
+    var muLabelColorStyle = containerLeaveColor ? ' style="color:white;"' : '';
 
     /* Attend bar */
-    var attendBar = '<div class="bp-attend-bar">';
+    var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
     if (attendanceField) {
       attendBar += '<div class="bp-attend-field">' +
-                   '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
+                   '<span class="bp-attend-label"' + muLabelColorStyle + '>' + escHtml(attendanceField.field_label) + '</span>' +
                    '<div class="bp-dd-wrap" data-api="' + escHtml(attendApi) + '" data-label="' + escHtml(attendanceField.field_label) + '">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-dd-val"' +
@@ -3126,7 +3150,7 @@ $(function () {
     }
     if (leaveTypeField) {
       attendBar += '<div class="bp-attend-field bp-leave-type-field" style="' + leaveStyle + '">' +
-                   '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
+                   '<span class="bp-attend-label"' + muLabelColorStyle + '>' + escHtml(leaveTypeField.field_label) + '</span>' +
                    '<div class="bp-dd-wrap" data-api="' + escHtml(leaveApi) + '" data-label="' + escHtml(leaveTypeField.field_label) + '">' +
                    '<div class="bp-dd-trigger" tabindex="0">' +
                    '<span class="bp-dd-val"' +
@@ -3282,7 +3306,33 @@ $(function () {
 
     tableHtml += '</tr></tbody></table>';
 
-    return '<div class="bp-plan-container map-event-container"' + containerBgStyle +
+    /* For leave mode: replace the full (hidden) table with a minimal table showing
+       a checkbox (for mass-action selection) and the action cell only. */
+    if (isLeaveMode) {
+      tableHtml = '<table class="bp-slots-table">' +
+                  '<tbody>' +
+                  '<tr class="bp-slot-row bp-edit-row"' +
+                  pfAttrs +
+                  ' data-date="' + escHtml(date) + '"' +
+                  ' data-edit-id="' + escHtml(ev.id) + '"' +
+                  ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+                  ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                  ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '">' +
+                  '<td class="bp-cb-cell">' +
+                  editRowStyles.markerHtml +
+                  '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>' +
+                  '<td class="bp-action-cell">' +
+                  '<button class="bp-row-action bp-row-save" type="button" title="Update record">' + SVG.save + '</button>' +
+                  '<button class="bp-row-action bp-row-copy" type="button" title="Copy record">' + SVG.copy + '</button>' +
+                  '<button class="bp-row-action bp-row-delete" type="button" title="Delete record"' + lockedAttr + '>' + SVG.trash + '</button>' +
+                  '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                  '<button class="bp-row-action bp-row-reject' + rejectClass + '" type="button" title="Reject record"' + lockedAttr + '>' + SVG.reject + '</button>' +
+                  '</td>' +
+                  '</tr>' +
+                  '</tbody></table>';
+    }
+
+    return '<div class="bp-plan-container map-event-container"' +
            ' data-date="' + escHtml(date) + '"' +
            ' data-edit-id="' + escHtml(ev.id) + '">' +
            attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
@@ -3864,9 +3914,10 @@ $(function () {
 
     var groups = getVisibleEventsByDate();
 
-    /* For mass-update, use per-event editable containers (attend bar + full slot row).
-       For other actions (delete / approve / reject) use the existing table layout. */
-    if (action === 'mass-update') {
+    /* For all beat-plan actions (mass-update, mass-approve, mass-reject, mass-delete),
+       use per-event editable containers (attend bar + slot row / leave action row).
+       Leave records show only the attend bar and action buttons; working records show the full slot row. */
+    if (beatPlanHasRefs) {
       $('#massActionsBody').html(buildMassUpdateBodyHtml(groups));
 
       /* Populate cached avatars immediately and schedule async load for the rest */
@@ -6585,21 +6636,20 @@ $(function () {
         var approvalVal  = action === 'mass-approve' ? 'Approved' : 'Rejected';
         var updated      = 0;
         var arFailed     = 0;
-        var arChunks     = chunkArray(selIds, BATCH_SIZE);
+        var arChunks     = chunkArray(selIds, 100);
 
         for (var arci = 0; arci < arChunks.length; arci++) {
           setMapProgress('Processing batch ' + (arci + 1) + ' of ' + arChunks.length + '\u2026');
           try {
-            var arResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
-              data: [{ beatplanner__Managers_Approval: approvalVal }],
-              over_write: true,
-              ids: arChunks[arci]
+            var arResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', {
+              data: arChunks[arci].map(function (id) {
+                return { id: id, beatplanner__Managers_Approval: approvalVal };
+              })
             });
             var arResults = (arResp && arResp.data && arResp.data.data) ? arResp.data.data : [];
-            /* mass_update returns one result per ID in the same order */
             arChunks[arci].forEach(function (id, idx) {
               var res = arResults[idx] || {};
-              if (res.status === 'success') {
+              if (res.status !== 'error') {
                 var ev = findEvent(id);
                 if (ev) {
                   if (!ev.bprFieldValues) { ev.bprFieldValues = {}; }
@@ -6635,9 +6685,10 @@ $(function () {
         }
 
       } else if (action === 'mass-update') {
-        /* Collect field values from each checked edit row and update via mass_update API */
+        /* Collect field values from each checked edit row, then batch-update via Records Update API */
         var muUpdated = 0;
         var muFailed  = 0;
+        var muPayloads = [];
 
         for (var muIdx = 0; muIdx < selIds.length; muIdx++) {
           var muId  = selIds[muIdx];
@@ -6729,24 +6780,36 @@ $(function () {
 
           if (Object.keys(muRecordData).length === 0) { continue; }
 
-          setMapProgress('Updating record ' + (muIdx + 1) + ' of ' + selIds.length + '\u2026');
-          try {
-            await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans/actions/mass_update', {
-              data: [muRecordData],
-              over_write: true,
-              ids: [muId]
-            });
+          muPayloads.push({ id: muId, data: muRecordData, bprFieldValues: muBprFieldValues });
+        }
 
-            /* Update in-memory event */
-            var muEv = findEvent(muId);
-            if (muEv) {
-              if (!muEv.bprFieldValues) { muEv.bprFieldValues = {}; }
-              Object.assign(muEv.bprFieldValues, muBprFieldValues);
-            }
-            muUpdated++;
+        /* Send in batches of 100 using the standard Records Update API */
+        var muChunks = chunkArray(muPayloads, 100);
+        for (var muci = 0; muci < muChunks.length; muci++) {
+          setMapProgress('Updating batch ' + (muci + 1) + ' of ' + muChunks.length + '\u2026');
+          try {
+            var muBatchData = muChunks[muci].map(function (p) {
+              return Object.assign({ id: p.id }, p.data);
+            });
+            var muResp = await zrc.put('/crm/v8/beatplanner__Daily_Beat_Plans', { data: muBatchData });
+            var muResults = (muResp && muResp.data && muResp.data.data) ? muResp.data.data : [];
+            muChunks[muci].forEach(function (p, idx) {
+              var res = muResults[idx] || {};
+              if (res.status !== 'error') {
+                var muEv = findEvent(p.id);
+                if (muEv) {
+                  if (!muEv.bprFieldValues) { muEv.bprFieldValues = {}; }
+                  Object.assign(muEv.bprFieldValues, p.bprFieldValues);
+                }
+                muUpdated++;
+              } else {
+                console.error('Mass update failed for', p.id, res);
+                muFailed++;
+              }
+            });
           } catch (muErr) {
-            console.error('Mass update failed for', muId, muErr);
-            muFailed++;
+            console.error('Mass update batch ' + (muci + 1) + ' failed', muErr);
+            muFailed += muChunks[muci].length;
           }
         }
 
@@ -7064,11 +7127,12 @@ $(function () {
           $mc.find('.bp-leave-type-field').toggle(isLeave);
           $mc.find('.bp-apply-leave-btn').hide();
           if (!isLeave) {
-            /* Reset Leave Type and clear container background */
+            /* Reset Leave Type and clear attend-bar background + label colours */
             $mc.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
                .text('Select\u2026')
                .removeAttr('data-actual-val');
-            $mc.css('background', '');
+            $mc.find('.bp-attend-bar').css('background', '');
+            $mc.find('.bp-attend-label').css('color', '');
           }
         } else {
           /* ── slotPickerGrid (single-event edit modal) handling ── */
@@ -7108,8 +7172,9 @@ $(function () {
             $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
                  .text('Select\u2026')
                  .removeAttr('data-actual-val');
-            /* Clear container background colour */
-            $grid.find('.bp-plan-container').css('background', '');
+            /* Clear attend-bar background colour and label colours */
+            $grid.find('.bp-attend-bar').css('background', '');
+            $grid.find('.bp-attend-label').css('color', '');
           }
         }
       }
@@ -7123,7 +7188,7 @@ $(function () {
           var validLeaveType3 = actual && actual !== '-None-';
           $container3.find('.bp-apply-leave-btn').toggle(!!validLeaveType3);
 
-          /* Apply Leave Type picklist colour as container background */
+          /* Apply Leave Type picklist colour as attend-bar background */
           if (validLeaveType3) {
             var $attendWrap3 = $container3.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
             var attendVal3   = $attendWrap3.find('.bp-dd-val').attr('data-actual-val') || '';
@@ -7131,9 +7196,11 @@ $(function () {
             fv3[$attendWrap3.data('api') || 'beatplanner__Attendance'] = attendVal3;
             fv3[$wrap.data('api')        || 'beatplanner__Leave_Type'] = actual;
             var leaveColor3  = getLeaveTypeColor(fv3);
-            $container3.css('background', leaveColor3 || '');
+            $container3.find('.bp-attend-bar').css('background', leaveColor3 || '');
+            $container3.find('.bp-attend-label').css('color', leaveColor3 ? 'white' : '');
           } else {
-            $container3.css('background', '');
+            $container3.find('.bp-attend-bar').css('background', '');
+            $container3.find('.bp-attend-label').css('color', '');
           }
         }
       }
@@ -8068,6 +8135,23 @@ $(function () {
         }
       });
 
+      /* For leave-mode rows (action cell only), also read Attendance + Leave Type
+         from the container attend-bar since they are not in the row itself. */
+      if ($row.find('.bp-dd-wrap').length === 0) {
+        var $leaveContainer = $row.closest('.bp-plan-container');
+        $leaveContainer.find('.bp-attend-bar .bp-dd-wrap').each(function () {
+          var $wrap    = $(this);
+          var fieldApi = String($wrap.data('api') || '');
+          if (!fieldApi) { return; }
+          var $v   = $wrap.find('.bp-dd-val');
+          var actual = $v.attr('data-actual-val') || $v.text() || '';
+          if (actual && actual !== 'Select\u2026') {
+            recordData[fieldApi]     = actual;
+            bprFieldValues[fieldApi] = actual;
+          }
+        });
+      }
+
       recordData['Name'] = 'Meeting With ' + mwName;
 
       var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
@@ -8094,6 +8178,16 @@ $(function () {
         var actual = $v.attr('data-actual-val') || $v.text() || '';
         if (actual && actual !== 'Select\u2026') { currentVals[fieldApi] = actual; }
       });
+      /* Also capture attend-bar values for leave-mode rows */
+      if ($row.find('.bp-dd-wrap').length === 0) {
+        $row.closest('.bp-plan-container').find('.bp-attend-bar .bp-dd-wrap').each(function () {
+          var fieldApi = String($(this).data('api') || '');
+          if (!fieldApi) { return; }
+          var $v = $(this).find('.bp-dd-val');
+          var actual = $v.attr('data-actual-val') || $v.text() || '';
+          if (actual && actual !== 'Select\u2026') { currentVals[fieldApi] = actual; }
+        });
+      }
 
       var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
       var hasChanges = allKeys.some(function (k) {
