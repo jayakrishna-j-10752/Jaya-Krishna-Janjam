@@ -2668,6 +2668,55 @@ $(function () {
    * @param {Object} crmRecordsMap – { [ev.id]: crmRecord } fetched from CRM API
    */
   function buildDemBulkTable(date, evts, crmRecordsMap) {
+    /* ── Filter action bar (same #bpFilterBtn as in #eventModal) ── */
+    var demFilterBar =
+      '<div class="bp-attend-bar">' +
+        '<div class="bp-filter-action">' +
+          '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+            '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
+            'Filter' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+
+    /* ── Bulk-actions toolbar (hidden until at least one row is checked) ── */
+    var toolbarHtml =
+      '<div class="dem-bulk-toolbar" style="display:none;">' +
+        '<span class="dem-sel-count"></span>' +
+        '<div class="dem-actions-dropdown">' +
+          '<button class="dem-actions-btn" type="button">' +
+            'Actions' +
+            '<svg class="dem-actions-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="6"><path d="M1 1l4 4 4-4"/></svg>' +
+          '</button>' +
+          '<ul class="dem-actions-menu" role="menu">' +
+            '<li><button class="dem-mass-update-btn" type="button" role="menuitem">Mass Update</button></li>' +
+            '<li><button class="dem-mass-delete-btn" type="button" role="menuitem">Mass Delete</button></li>' +
+            '<li><button class="dem-mass-approve-btn" type="button" role="menuitem">Mass Approve</button></li>' +
+            '<li><button class="dem-mass-reject-btn" type="button" role="menuitem">Mass Reject</button></li>' +
+          '</ul>' +
+        '</div>' +
+      '</div>';
+
+    return '<div id="demBulkGrid" class="bp-plan-container" data-date="' + escHtml(date) + '">' +
+           demFilterBar +
+           toolbarHtml +
+           '<div class="bp-slots-wrap">' + buildBpEditTableHtml(date, evts, crmRecordsMap) + '</div>' +
+           '</div>';
+  }
+
+  /**
+   * Build and return the inner <table class="bp-slots-table"> HTML for a given
+   * date and set of events, using the same structure as the Day Events Modal.
+   * Each <tr> also receives data-pf-* attributes so the mass-actions popup
+   * filter can show/hide rows without extra DOM queries.
+   * Shared by buildDemBulkTable() and buildMassActionsBodyHtml().
+   *
+   * @param {string} date         – YYYY-MM-DD
+   * @param {Array}  evts         – event objects for this date
+   * @param {Object} crmRecordsMap – { [evId]: syntheticCrmRecord }
+   * @returns {string} HTML string for the complete <table>
+   */
+  function buildBpEditTableHtml(date, evts, crmRecordsMap) {
     var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
                   ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
@@ -2718,35 +2767,6 @@ $(function () {
       if (lbl === 'end time')     { endTimeApi   = f.api_name || endTimeApi;   endTimeLbl   = f.field_label || endTimeLbl; }
       if (lbl === 'meetings for') { mfFieldApi   = f.api_name || mfFieldApi;   mfFieldLabel = f.field_label || mfFieldLabel; }
     });
-
-    /* ── Filter action bar (same #bpFilterBtn as in #eventModal) ── */
-    var demFilterBar =
-      '<div class="bp-attend-bar">' +
-        '<div class="bp-filter-action">' +
-          '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
-            '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13"><path d="M2 4h12M5 8h6M7.5 12h1"/></svg>' +
-            'Filter' +
-          '</button>' +
-        '</div>' +
-      '</div>';
-
-    /* ── Bulk-actions toolbar (hidden until at least one row is checked) ── */
-    var toolbarHtml =
-      '<div class="dem-bulk-toolbar" style="display:none;">' +
-        '<span class="dem-sel-count"></span>' +
-        '<div class="dem-actions-dropdown">' +
-          '<button class="dem-actions-btn" type="button">' +
-            'Actions' +
-            '<svg class="dem-actions-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="6"><path d="M1 1l4 4 4-4"/></svg>' +
-          '</button>' +
-          '<ul class="dem-actions-menu" role="menu">' +
-            '<li><button class="dem-mass-update-btn" type="button" role="menuitem">Mass Update</button></li>' +
-            '<li><button class="dem-mass-delete-btn" type="button" role="menuitem">Mass Delete</button></li>' +
-            '<li><button class="dem-mass-approve-btn" type="button" role="menuitem">Mass Approve</button></li>' +
-            '<li><button class="dem-mass-reject-btn" type="button" role="menuitem">Mass Reject</button></li>' +
-          '</ul>' +
-        '</div>' +
-      '</div>';
 
     /* ── Table header ── */
     var tableHtml = '<table class="bp-slots-table">';
@@ -2845,12 +2865,24 @@ $(function () {
       var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
       var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
+      /* data-pf-* attributes for mass-actions popup filter matching */
+      var pfAttrs = '';
+      if (ev.bprFieldValues && bprPicklistFields && bprPicklistFields.length) {
+        bprPicklistFields.forEach(function (pf2) {
+          var v2 = ev.bprFieldValues[pf2.api_name];
+          if (v2) {
+            pfAttrs += ' data-pf-' + escHtml(pf2.api_name.toLowerCase()) + '="' + escHtml(v2) + '"';
+          }
+        });
+      }
+
       tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
                    ' data-date="' + escHtml(date) + '"' +
                    ' data-edit-id="' + escHtml(ev.id) + '"' +
                    ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
                    ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
                    ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '"' +
+                   pfAttrs +
                    (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
 
       /* Checkbox cell – ENABLED (unlike the disabled one in single-edit mode) */
@@ -2929,12 +2961,7 @@ $(function () {
     });
 
     tableHtml += '</tbody></table>';
-
-    return '<div id="demBulkGrid" class="bp-plan-container" data-date="' + escHtml(date) + '">' +
-           demFilterBar +
-           toolbarHtml +
-           '<div class="bp-slots-wrap">' + tableHtml + '</div>' +
-           '</div>';
+    return tableHtml;
   }
 
   /**
@@ -2991,7 +3018,7 @@ $(function () {
    * day-events bulk modal grid.
    */
   function closeAllBpDropdowns() {
-    $('#slotPickerGrid .bp-dd-wrap.bp-dd-open, #demBulkGrid .bp-dd-wrap.bp-dd-open').each(function () {
+    $('#slotPickerGrid .bp-dd-wrap.bp-dd-open, #demBulkGrid .bp-dd-wrap.bp-dd-open, #massActionsBody .bp-dd-wrap.bp-dd-open').each(function () {
       closeBpDropdown($(this));
     });
   }
@@ -3260,6 +3287,9 @@ $(function () {
 
   /**
    * Build and return the HTML content for the Mass Actions popup body.
+   * Renders events day-by-day in a collapsible accordion layout.
+   * Each day section contains a full bp-slots-table (same as Day Events Modal)
+   * so the event rows are visually identical to #dayEventsModal rows.
    * @param {Array} groups – output of getVisibleEventsByDate()
    */
   function buildMassActionsBodyHtml(groups) {
@@ -3270,6 +3300,19 @@ $(function () {
                   '<path d="M1 1l4 4 4-4"/></svg>';
     var html = '';
     groups.forEach(function (group) {
+      /* Build a synthetic crmRecordsMap from already-loaded event data (no API call needed) */
+      var crmRecordsMap = {};
+      group.events.forEach(function (ev) {
+        var synthetic = {};
+        if (ev.bprFieldValues) {
+          Object.keys(ev.bprFieldValues).forEach(function (key) { synthetic[key] = ev.bprFieldValues[key]; });
+        }
+        if (ev.mwLookupApi && ev.mwRecordId) {
+          synthetic[ev.mwLookupApi] = { id: ev.mwRecordId, name: ev.title || '' };
+        }
+        crmRecordsMap[ev.id] = synthetic;
+      });
+
       html += '<div class="map-day-group" data-date="' + escHtml(group.date) + '">' +
               '  <div class="map-day-header">' +
               '    <label class="map-cb-label">' +
@@ -3278,81 +3321,12 @@ $(function () {
               '    </label>' +
               '    <button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>' +
               '  </div>' +
-              '  <div class="map-day-events">';
-
-      group.events.forEach(function (ev) {
-        var timeLabel = fmtTime(ev.startTime) + ' \u2013 ' + fmtTime(ev.endTime);
-        var title     = ev.title || '(No title)';
-
-        /* Build meta items */
-        var metaHtml = '';
-        if (ev.bprFieldValues) {
-          var bprVals = ev.bprFieldValues;
-
-          /* Meetings For */
-          var mfVal = bprVals['beatplanner__Meetings_For'] || '';
-          if (!mfVal && bpDailyAllFields && bpDailyAllFields.length) {
-            bpDailyAllFields.forEach(function (f) {
-              if ((f.field_label || '').toLowerCase() === 'meetings for') {
-                mfVal = bprVals[f.api_name] || '';
-              }
-            });
-          }
-          if (mfVal) {
-            metaHtml += '<span class="map-event-meta-item"><strong>Meetings For:</strong> ' + escHtml(mfVal) + '</span>';
-          }
-
-          /* Approval status */
-          var approval = bprVals['beatplanner__Managers_Approval'] || '';
-          if (approval) {
-            metaHtml += '<span class="map-event-meta-item"><strong>Approval:</strong> ' + escHtml(approval) + '</span>';
-          }
-
-          /* Other picklist fields (up to 2 extra) */
-          var extraCount = 0;
-          if (bprPicklistFields && bprPicklistFields.length) {
-            var hiddenLabels = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for', 'attendance', 'leave type'];
-            for (var pi = 0; pi < bprPicklistFields.length && extraCount < 2; pi++) {
-              var pf  = bprPicklistFields[pi];
-              var lbl = (pf.field_label || '').toLowerCase().trim();
-              if (hiddenLabels.indexOf(lbl) !== -1) { continue; }
-              if (pf.api_name === 'beatplanner__Date_Time_From' || pf.api_name === 'beatplanner__Date_Time_To') { continue; }
-              var val = bprVals[pf.api_name];
-              if (val && val !== 'Select\u2026') {
-                metaHtml += '<span class="map-event-meta-item"><strong>' + escHtml(pf.field_label) + ':</strong> ' + escHtml(val) + '</span>';
-                extraCount++;
-              }
-            }
-          }
-        }
-
-        /* Build data-pf-* attributes for popup filter matching.
-           HTML attribute names are lowercased by browsers, so we store the
-           api_name in lowercase and look it up in lowercase as well. */
-        var pfAttrs = '';
-        if (ev.bprFieldValues && bprPicklistFields && bprPicklistFields.length) {
-          bprPicklistFields.forEach(function (pf2) {
-            var v2 = ev.bprFieldValues[pf2.api_name];
-            if (v2) {
-              pfAttrs += ' data-pf-' + escHtml(pf2.api_name.toLowerCase()) + '="' + escHtml(v2) + '"';
-            }
-          });
-        }
-
-        html += '<div class="map-event-row" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '"' + pfAttrs + '>' +
-                '  <label class="map-cb-label" style="align-self:flex-start;margin-top:1px;">' +
-                '    <input type="checkbox" class="map-cb map-event-cb" data-evid="' + escHtml(ev.id) + '" data-date="' + escHtml(group.date) + '" />' +
-                '  </label>' +
-                '  <div class="map-event-info">' +
-                '    <div class="map-event-time">' + escHtml(timeLabel) + '</div>' +
-                '    <div class="map-event-title">' + escHtml(title) + '</div>' +
-                (metaHtml ? '<div class="map-event-meta">' + metaHtml + '</div>' : '') +
-                '  </div>' +
-                '</div>';
-      });
-
-      html += '  </div>'; /* close map-day-events */
-      html += '</div>';   /* close map-day-group */
+              '  <div class="map-day-events">' +
+              '    <div class="map-day-table-wrap bp-slots-wrap">' +
+                   buildBpEditTableHtml(group.date, group.events, crmRecordsMap) +
+              '    </div>' +
+              '  </div>' +
+              '</div>';
     });
 
     return html;
@@ -3454,7 +3428,7 @@ $(function () {
   }
 
   /**
-   * Apply massActionsPopupFilters to show/hide .map-event-row elements
+   * Apply massActionsPopupFilters to show/hide .bp-slot-row elements
    * and collapse/show .map-day-group elements that become empty.
    * Also unchecks hidden rows and resyncs the Select All state.
    */
@@ -3463,7 +3437,7 @@ $(function () {
       return massActionsPopupFilters[k] && massActionsPopupFilters[k].length > 0;
     });
 
-    $('#massActionsBody .map-event-row').each(function () {
+    $('#massActionsBody .bp-slot-row').each(function () {
       var $row    = $(this);
       var visible = true;
       for (var i = 0; i < keys.length; i++) {
@@ -3474,13 +3448,13 @@ $(function () {
         if (sel.indexOf(attrVal) === -1) { visible = false; break; }
       }
       $row.toggleClass('map-filter-hidden', !visible).toggle(visible);
-      if (!visible) { $row.find('.map-event-cb').prop('checked', false); }
+      if (!visible) { $row.find('.bp-row-cb').prop('checked', false); }
     });
 
     /* Hide day groups where every event row is filtered out */
     $('#massActionsBody .map-day-group').each(function () {
       var $group = $(this);
-      var anyVisible = $group.find('.map-event-row:not(.map-filter-hidden)').length > 0;
+      var anyVisible = $group.find('.bp-slot-row:not(.map-filter-hidden)').length > 0;
       $group.toggle(anyVisible);
     });
 
@@ -3488,7 +3462,7 @@ $(function () {
   }
 
   /** Open the Mass Actions popup for a given action */
-  function openMassActionsPopup(action) {
+  async function openMassActionsPopup(action) {
     var titleMap = {
       'mass-update':  'Mass Update',
       'mass-delete':  'Mass Delete',
@@ -3505,13 +3479,31 @@ $(function () {
     massActionsCurrentAction = action;
     massActionsPopupFilters  = {};
 
-    var groups = getVisibleEventsByDate();
-
+    /* Show the overlay immediately so the user sees it opening */
     $('#massActionsTitle').text(titleMap[action] || 'Mass Action');
     $('#massActionsConfirm').text(confirmMap[action] || 'Confirm');
     $('#massActionsSelectAll').prop('checked', false).prop('indeterminate', false);
-    $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
+    $('#massActionsBody').empty();
     $('#mapSelCount').text('');
+    $('#massActionsOverlay').css('display', 'flex');
+    $('#massActionsOverlay')[0].offsetWidth; // eslint-disable-line no-unused-expressions
+    $('#massActionsOverlay').addClass('map-open');
+
+    /* Ensure picklist metadata is loaded (needed for buildBpEditTableHtml) */
+    if (beatPlanHasRefs && bprPicklistFields === null) {
+      $('#massActionsBody').html('<div class="dem-loading">Loading\u2026</div>');
+      await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+    }
+
+    /* Make the overlay box wide (like Day Events Modal) when showing editable event rows */
+    if (beatPlanHasRefs) {
+      $('.mass-actions-box').addClass('map-wide-mode');
+    } else {
+      $('.mass-actions-box').removeClass('map-wide-mode');
+    }
+
+    var groups = getVisibleEventsByDate();
+    $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
 
     /* Inject filter bar */
     $('#massActionsFilterBar').remove();
@@ -3519,11 +3511,6 @@ $(function () {
     if (filterBarHtml) {
       $('.mass-actions-select-all-row').after(filterBarHtml);
     }
-
-    $('#massActionsOverlay').css('display', 'flex');
-    /* Trigger reflow before adding open class for CSS transition */
-    $('#massActionsOverlay')[0].offsetWidth; // eslint-disable-line no-unused-expressions
-    $('#massActionsOverlay').addClass('map-open');
   }
 
   /** Close the Mass Actions popup */
@@ -3532,6 +3519,7 @@ $(function () {
     $('#massActionsOverlay').removeClass('map-open');
     setTimeout(function () {
       $('#massActionsOverlay').css('display', 'none');
+      $('.mass-actions-box').removeClass('map-wide-mode');
       $('#massActionsBody').empty();
       $('#massActionsFilterBar').remove();
     }, 220);
@@ -3539,8 +3527,8 @@ $(function () {
 
   /** Synchronize the Select All checkbox state based on visible event checkboxes */
   function syncMassActionsSelectAll() {
-    /* Only consider event checkboxes that are not filtered out */
-    var $allEvtCbs  = $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb');
+    /* Only consider row checkboxes that are not filtered out */
+    var $allEvtCbs  = $('#massActionsBody .bp-slot-row:not(.map-filter-hidden) .bp-row-cb');
     var $checked    = $allEvtCbs.filter(':checked');
     var total       = $allEvtCbs.length;
     var checkedCount = $checked.length;
@@ -3566,7 +3554,7 @@ $(function () {
   function syncMassActionsDayCb($dayCb) {
     var date     = $dayCb.data('date');
     /* Only count non-filtered event rows for this date */
-    var $evtCbs  = $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb[data-date="' + date + '"]');
+    var $evtCbs  = $('#massActionsBody .bp-slot-row[data-date="' + date + '"]:not(.map-filter-hidden) .bp-row-cb');
     var total    = $evtCbs.length;
     var checked  = $evtCbs.filter(':checked').length;
 
@@ -4765,7 +4753,7 @@ $(function () {
   var calEventFilters = {};  /* {fieldApiName: ['val1','val2',...]} – empty array / absent key = "All" */
 
   /* ── Mass Actions popup filter state (scoped to the overlay, independent of calEventFilters) ── */
-  var massActionsPopupFilters = {};  /* same shape as calEventFilters; applied to .map-event-row visibility */
+  var massActionsPopupFilters = {};  /* same shape as calEventFilters; applied to .bp-slot-row visibility */
 
   /* ── Day Events Modal (DEM) current date ── */
   var demCurrentDs = '';  /* YYYY-MM-DD of the currently open Day Events Modal, '' when closed */
@@ -6012,11 +6000,11 @@ $(function () {
     });
 
     /* Other Actions menu items – open Mass Actions popup */
-    $(document).on('click', '#calActionsMenu .cal-actions-option[data-action]', function () {
+    $(document).on('click', '#calActionsMenu .cal-actions-option[data-action]', async function () {
       var action = $(this).data('action');
       $('#calActionsMenu').hide();
       $('#calActionsBtn').attr('aria-expanded', 'false');
-      openMassActionsPopup(action);
+      await openMassActionsPopup(action);
     });
 
     /* Mass Actions popup – close */
@@ -6031,10 +6019,12 @@ $(function () {
     $(document).on('change', '#massActionsSelectAll', function () {
       var checked = $(this).prop('checked');
       /* Only operate on non-filtered-out rows (accordion-collapsed rows are included) */
-      var $visibleEvtCbs = $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb');
+      var $visibleEvtCbs = $('#massActionsBody .bp-slot-row:not(.map-filter-hidden) .bp-row-cb');
       var $visibleDayCbs = $('#massActionsBody .map-day-group:visible .map-day-cb');
       $visibleEvtCbs.prop('checked', checked);
       $visibleDayCbs.prop('checked', checked).prop('indeterminate', false);
+      /* Also sync per-day table select-all checkboxes */
+      $('#massActionsBody .bp-select-all-cb').prop('checked', checked).prop('indeterminate', false);
       var total = $visibleEvtCbs.length;
       var label = checked && total > 0
         ? total + ' event' + (total === 1 ? '' : 's') + ' selected'
@@ -6047,13 +6037,33 @@ $(function () {
       var date    = $(this).data('date');
       var checked = $(this).prop('checked');
       /* Check/uncheck non-filtered event rows for this date (includes accordion-collapsed) */
-      $('#massActionsBody .map-event-row:not(.map-filter-hidden) .map-event-cb[data-date="' + date + '"]').prop('checked', checked);
+      $('#massActionsBody .bp-slot-row[data-date="' + date + '"]:not(.map-filter-hidden) .bp-row-cb').prop('checked', checked);
+      /* Sync per-day table select-all checkbox */
+      var $dayGroup = $(this).closest('.map-day-group');
+      $dayGroup.find('.bp-select-all-cb').prop('checked', checked).prop('indeterminate', false);
       syncMassActionsSelectAll();
     });
 
-    /* Mass Actions popup – individual event checkbox */
-    $(document).on('change', '#massActionsBody .map-event-cb', function () {
-      var date = $(this).data('date');
+    /* Mass Actions popup – individual row checkbox (bp-row-cb inside #massActionsBody) */
+    $(document).on('change', '#massActionsBody .bp-row-cb', function () {
+      var date   = $(this).closest('.bp-slot-row').data('date') || '';
+      var $dayCb = $('#massActionsBody .map-day-cb[data-date="' + date + '"]');
+      syncMassActionsDayCb($dayCb);
+      /* Also sync the per-day table select-all */
+      var $dayGroup = $(this).closest('.map-day-group');
+      var $dayCbs   = $dayGroup.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb');
+      var dayCkd    = $dayCbs.filter(':checked').length;
+      $dayGroup.find('.bp-select-all-cb').prop('checked', dayCkd === $dayCbs.length && $dayCbs.length > 0)
+                                         .prop('indeterminate', dayCkd > 0 && dayCkd < $dayCbs.length);
+      syncMassActionsSelectAll();
+    });
+
+    /* Mass Actions popup – per-day table select-all checkbox inside #massActionsBody */
+    $(document).on('change', '#massActionsBody .bp-select-all-cb', function () {
+      var checked   = $(this).is(':checked');
+      var $dayGroup = $(this).closest('.map-day-group');
+      var date      = $dayGroup.data('date') || '';
+      $dayGroup.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb').prop('checked', checked);
       var $dayCb = $('#massActionsBody .map-day-cb[data-date="' + date + '"]');
       syncMassActionsDayCb($dayCb);
       syncMassActionsSelectAll();
@@ -6073,8 +6083,8 @@ $(function () {
       var $btn    = $(this);
       var action  = massActionsCurrentAction;
       var selIds  = [];
-      $('#massActionsBody .map-event-cb:checked').each(function () {
-        var evid = String($(this).data('evid') || '');
+      $('#massActionsBody .bp-row-cb:checked').each(function () {
+        var evid = String($(this).closest('.bp-slot-row').data('editId') || '');
         if (evid) { selIds.push(evid); }
       });
 
@@ -6387,7 +6397,7 @@ $(function () {
     /* These handlers cover both #slotPickerGrid and #demBulkGrid (day-events modal). */
 
     /* Toggle open / close a dropdown trigger */
-    $(document).on('click', '#slotPickerGrid .bp-dd-trigger, #demBulkGrid .bp-dd-trigger', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-trigger, #demBulkGrid .bp-dd-trigger, #massActionsBody .bp-dd-trigger', function (e) {
       e.stopPropagation();
       var $wrap  = $(this).closest('.bp-dd-wrap');
       var isOpen = $wrap.hasClass('bp-dd-open');
@@ -6403,12 +6413,12 @@ $(function () {
     });
 
     /* Prevent search input click from bubbling and closing the panel */
-    $(document).on('click', '#slotPickerGrid .bp-dd-search, #demBulkGrid .bp-dd-search', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-search, #demBulkGrid .bp-dd-search, #massActionsBody .bp-dd-search', function (e) {
       e.stopPropagation();
     });
 
     /* Live-filter dropdown options as the user types */
-    $(document).on('input', '#slotPickerGrid .bp-dd-search, #demBulkGrid .bp-dd-search', function () {
+    $(document).on('input', '#slotPickerGrid .bp-dd-search, #demBulkGrid .bp-dd-search, #massActionsBody .bp-dd-search', function () {
       var q    = $(this).val().toLowerCase();
       var $ul  = $(this).closest('.bp-dd-panel').find('.bp-dd-opt');
       $ul.each(function () {
@@ -6418,7 +6428,7 @@ $(function () {
     });
 
     /* "Meetings For" option selected → set value + populate Meeting With */
-    $(document).on('click', '#slotPickerGrid .bp-mf-wrap .bp-dd-opt, #demBulkGrid .bp-mf-wrap .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-mf-wrap .bp-dd-opt, #demBulkGrid .bp-mf-wrap .bp-dd-opt, #massActionsBody .bp-mf-wrap .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
       var $wrap  = bpWrapOf($opt);
@@ -6470,7 +6480,7 @@ $(function () {
     });
 
     /* "Meeting With" option selected → show initials avatar; try to load actual photo */
-    $(document).on('click', '#slotPickerGrid .bp-mw-wrap .bp-dd-opt, #demBulkGrid .bp-mw-wrap .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-mw-wrap .bp-dd-opt, #demBulkGrid .bp-mw-wrap .bp-dd-opt, #massActionsBody .bp-mw-wrap .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt    = $(this);
       var $wrap   = bpWrapOf($opt);
@@ -6516,7 +6526,7 @@ $(function () {
 
     /* Generic picklist option selected for all dynamic BPR columns
        (meetings-for and meeting-with have their own handlers above) */
-    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt, #demBulkGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt', function (e) {
+    $(document).on('click', '#slotPickerGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt, #demBulkGrid .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt, #massActionsBody .bp-dd-wrap:not(.bp-mf-wrap):not(.bp-mw-wrap) .bp-dd-opt', function (e) {
       e.stopPropagation();
       var $opt   = $(this);
       var $wrap  = bpWrapOf($opt);
@@ -7449,8 +7459,8 @@ $(function () {
       syncDemBulkToolbar();
     });
 
-    /* ── demBulkGrid: single-row Save (Update) ── */
-    $(document).on('click', '#demBulkGrid .bp-row-save', async function () {
+    /* ── demBulkGrid / massActionsBody: single-row Save (Update) ── */
+    $(document).on('click', '#demBulkGrid .bp-row-save, #massActionsBody .bp-row-save', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       var editId = String($row.data('editId') || '');
@@ -7594,19 +7604,24 @@ $(function () {
       }
     });
 
-    /* ── demBulkGrid: single-row Delete ── */
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-delete', async function () {
-      var $btn   = $(this);
-      var $row   = $btn.closest('.bp-slot-row');
-      var editId = String($row.data('editId') || '');
+    /* ── demBulkGrid / massActionsBody: single-row Delete ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-delete, #massActionsBody .bp-edit-row .bp-row-delete', async function () {
+      var $btn      = $(this);
+      var $row      = $btn.closest('.bp-slot-row');
+      var editId    = String($row.data('editId') || '');
       if (!editId) { return; }
       if (!window.confirm('Delete this event?')) { return; }
+
+      /* Capture context before async operation (row may be removed from DOM) */
+      var inMassOverlay = $row.closest('#massActionsBody').length > 0;
+      var $dayGroup     = inMassOverlay ? $row.closest('.map-day-group') : null;
+      var rowDate       = $row.data('date') || '';
 
       $btn.prop('disabled', true);
       try {
         await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + editId);
       } catch (delErr) {
-        console.error('demBulkGrid delete failed, removing from local state anyway', delErr);
+        console.error('delete failed, removing from local state anyway', delErr);
       }
 
       state.events = state.events.filter(function (e) { return e.id !== editId; });
@@ -7616,12 +7631,20 @@ $(function () {
       }
       saveEvents();
       $row.remove();
-      refreshCalendarCell($row.data('date') || '');
-      syncDemBulkToolbar();
+      refreshCalendarCell(rowDate);
 
-      /* If no rows remain, close the modal */
-      if ($('#demBulkGrid .bp-slot-row').length === 0) {
-        closeDayEventsModal();
+      if (inMassOverlay) {
+        /* Sync mass overlay state after row removal */
+        syncMassActionsSelectAll();
+        if ($dayGroup && $dayGroup.find('.bp-slot-row').length === 0) {
+          $dayGroup.hide();
+        }
+      } else {
+        syncDemBulkToolbar();
+        /* If no rows remain in the Day Events Modal, close it */
+        if ($('#demBulkGrid .bp-slot-row').length === 0) {
+          closeDayEventsModal();
+        }
       }
       showToast('Event deleted.');
       $btn.prop('disabled', false);
@@ -7684,7 +7707,7 @@ $(function () {
       }
     }
 
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve', async function () {
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve, #massActionsBody .bp-edit-row .bp-row-approve', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       var editId = String($row.data('editId') || '');
@@ -7712,8 +7735,8 @@ $(function () {
       }
     });
 
-    /* ── demBulkGrid: single-row Reject – stays in modal, updates row in-place ── */
-    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject', async function () {
+    /* ── demBulkGrid / massActionsBody: single-row Reject – updates row in-place ── */
+    $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject, #massActionsBody .bp-edit-row .bp-row-reject', async function () {
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       var editId = String($row.data('editId') || '');
@@ -8136,7 +8159,8 @@ $(function () {
     $(document).on('click', function (e) {
       /* Clicks inside an open trigger wrap (in either grid) must not close */
       if (!$(e.target).closest('#slotPickerGrid .bp-dd-wrap').length &&
-          !$(e.target).closest('#demBulkGrid .bp-dd-wrap').length) {
+          !$(e.target).closest('#demBulkGrid .bp-dd-wrap').length &&
+          !$(e.target).closest('#massActionsBody .bp-dd-wrap').length) {
         closeAllBpDropdowns();
       }
       /* Close open filter-panel multi-selects when clicking outside */

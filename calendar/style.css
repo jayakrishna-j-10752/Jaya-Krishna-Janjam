@@ -5439,7 +5439,12 @@ input, select, textarea {
   flex-direction: column;
   overflow: hidden;
   transform: translateY(-10px) scale(.97);
-  transition: transform .2s cubic-bezier(.4,0,.2,1);
+  transition: transform .2s cubic-bezier(.4,0,.2,1), width .2s cubic-bezier(.4,0,.2,1);
+}
+/* Wide variant for the editable event-row table (mirrors dem-box-wide) */
+.mass-actions-box.map-wide-mode {
+  width: min(92vw, 1140px);
+  max-height: min(88vh, 760px);
 }
 .mass-actions-overlay.map-open .mass-actions-box {
   transform: translateY(0) scale(1);
@@ -5474,7 +5479,12 @@ input, select, textarea {
 .mass-actions-body {
   flex: 1 1 auto;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 12px 0;
+}
+/* In wide-mode the body is scrolled; remove the side padding so tables use full width */
+.mass-actions-box.map-wide-mode .mass-actions-body {
+  padding: 0;
 }
 .mass-actions-body:empty::after {
   content: 'No pending events in the current view.';
@@ -5583,6 +5593,17 @@ input, select, textarea {
 }
 .map-day-group.map-day-collapsed .map-day-events {
   display: none;
+}
+
+/* Scrollable wrapper for the bp-slots-table inside each accordion day */
+.map-day-table-wrap.bp-slots-wrap {
+  max-height: none;
+  overflow-y: visible;
+  overflow-x: auto;
+}
+/* Remove top margin on the table's thead sticky header in the accordion context */
+.map-day-table-wrap .bp-th {
+  top: 0;
 }
 
 /* Individual event row */
