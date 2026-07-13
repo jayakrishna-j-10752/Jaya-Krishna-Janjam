@@ -4357,7 +4357,7 @@ $(function () {
     /* Build the select field list the same way as loadBeatPlanEvents */
     var probeDate  = startDt.substring(0, 10);
     var tempHtml   = buildBeatPlanTable(probeDate);
-    var $tempRoot  = $(tempHtml);
+    var $tempRoot  = $('<div>').html(tempHtml);
     var rawApiList = [];
     $tempRoot.find('[data-api]').each(function () {
       var api = $(this).attr('data-api');
