@@ -4354,15 +4354,9 @@ $(function () {
    * @returns {Promise<Array>} merged array of COQL record objects
    */
   async function fetchMassCreateRecords(startDt, endDt, ownerId) {
-    /* Build the select field list the same way as loadBeatPlanEvents */
-    var probeDate  = startDt.substring(0, 10);
-    var tempHtml   = buildBeatPlanTable(probeDate);
-    var $tempRoot  = $('<div>').html(tempHtml);
-    var rawApiList = [];
-    $tempRoot.find('[data-api]').each(function () {
-      var api = $(this).attr('data-api');
-      if (api) { rawApiList.push(api); }
-    });
+    /* Build the select field list from the already-loaded module metadata,
+       mirroring the same logic used in loadBeatPlanEvents but without parsing HTML. */
+    var rawApiList = bpDailyAllFields.map(function (f) { return f.api_name; }).filter(Boolean);
     if (bpSavedRec) {
       var mfApis = (bpSavedRec['beatplanner__Meetings_For_Apis'] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       mfApis.forEach(function (api) { rawApiList.push(api); });
