@@ -3194,6 +3194,10 @@ $(function () {
     }
     attendBar += '</div>';
 
+    /* Working records: don't show the Attendance / Leave Type bar.
+       The full Working table already contains all required fields + action buttons. */
+    if (isWorking) { attendBar = ''; }
+
     /* Table */
     var date    = ev.date || '';
     var startLbl = fmtTime(ev.startTime || '00:00');
