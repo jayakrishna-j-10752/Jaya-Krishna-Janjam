@@ -3713,9 +3713,11 @@ $(function () {
 
   /**
    * Build and return the HTML content for the Mass Actions popup body.
-   * Renders events day-by-day in a collapsible accordion layout.
-   * Each day section contains a full bp-slots-table (same as Day Events Modal)
-   * so the event rows are visually identical to #dayEventsModal rows.
+   * Renders events day-by-day in a collapsible accordion layout using
+   * buildMassUpdateEventHtml() for each event.  Working records show the
+   * full editable table; Leave records show only the attend-bar (coloured
+   * by Leave Type) with Attendance + Leave Type dropdowns and action buttons
+   * – identical to the Leave UI in #eventModal.
    * @param {Array} groups – output of getVisibleEventsByDate()
    */
   function buildMassActionsBodyHtml(groups) {
@@ -3726,19 +3728,6 @@ $(function () {
                   '<path d="M1 1l4 4 4-4"/></svg>';
     var html = '';
     groups.forEach(function (group) {
-      /* Build a synthetic crmRecordsMap from already-loaded event data (no API call needed) */
-      var crmRecordsMap = {};
-      group.events.forEach(function (ev) {
-        var synthetic = {};
-        if (ev.bprFieldValues) {
-          Object.keys(ev.bprFieldValues).forEach(function (key) { synthetic[key] = ev.bprFieldValues[key]; });
-        }
-        if (ev.mwLookupApi && ev.mwRecordId) {
-          synthetic[ev.mwLookupApi] = { id: ev.mwRecordId, name: ev.title || '' };
-        }
-        crmRecordsMap[ev.id] = synthetic;
-      });
-
       html += '<div class="map-day-group" data-date="' + escHtml(group.date) + '">' +
               '  <div class="map-day-header">' +
               '    <label class="map-cb-label">' +
@@ -3747,11 +3736,13 @@ $(function () {
               '    </label>' +
               '    <button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>' +
               '  </div>' +
-              '  <div class="map-day-events">' +
-              '    <div class="map-day-table-wrap bp-slots-wrap">' +
-                   buildBpEditTableHtml(group.date, group.events, crmRecordsMap) +
-              '    </div>' +
-              '  </div>' +
+              '  <div class="map-day-events">';
+
+      group.events.forEach(function (ev) {
+        html += buildMassUpdateEventHtml(ev);
+      });
+
+      html += '  </div>' +
               '</div>';
     });
 
