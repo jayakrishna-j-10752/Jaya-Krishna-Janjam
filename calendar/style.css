@@ -5758,12 +5758,78 @@ input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   MASS CREATE MODAL
+   MASS CREATE – accordion inside #eventModal / #slotPickerGrid
 ══════════════════════════════════════════════════════════════ */
 
-/* Override the default 560px width so the slot list has breathing room */
-.mc-modal-box {
-  width: min(520px, calc(100vw - 32px));
+/* Remove modal-body padding in mass-create mode so accordion headers extend
+   to the full width of the modal box */
+.modal-body--mc {
+  padding: 0;
+  gap: 0;
+}
+.modal-body--mc #slotPickerSection,
+.modal-body--mc #slotPickerGrid {
+  width: 100%;
+}
+
+/* Day group inside the slot picker (mass create) */
+#slotPickerGrid .mc-day-group {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+#slotPickerGrid .mc-day-group:last-child {
+  border-bottom: none;
+}
+
+/* Day header – full-width, sticky within the scrollable modal body */
+#slotPickerGrid .mc-day-group .map-day-header {
+  padding: 8px 20px 6px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface-2);
+}
+
+/* Expand/collapse body of each day section */
+#slotPickerGrid .mc-day-group .map-day-events {
+  overflow: hidden;
+}
+#slotPickerGrid .mc-day-group.map-day-collapsed .map-day-events {
+  display: none;
+}
+
+/* Hide the per-row "Mass Create" button inside the accordion tables —
+   the accordion itself is already the mass-create context */
+.modal-body--mc .bp-mass-create-btn {
+  display: none !important;
+}
+
+/* Remove excess top spacing on the beatplan table inside a day section */
+#slotPickerGrid .mc-day-group .bp-plan-container {
+  grid-column: auto;
+}
+
+/* Non-beatplan time-slot buttons inside an accordion day */
+#slotPickerGrid .mc-tsi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 40px);
+  margin: 4px 20px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background .12s, border-color .12s;
+  text-align: left;
+}
+#slotPickerGrid .mc-tsi:hover {
+  background: var(--accent-light, #e8f0fe);
+  border-color: var(--accent, #1565C0);
 }
 
 /* Loading / empty state */
@@ -5782,25 +5848,3 @@ input, select, textarea {
   font-style: italic;
 }
 
-/* Individual slot row */
-.mc-slot-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 18px 6px 36px;
-  border-bottom: 1px solid var(--border);
-  transition: background .12s;
-}
-.mc-slot-row:last-child {
-  border-bottom: none;
-}
-.mc-slot-row:hover {
-  background: var(--surface-2);
-}
-.mc-slot-label {
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-}

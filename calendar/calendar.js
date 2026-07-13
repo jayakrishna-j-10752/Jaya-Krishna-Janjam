@@ -2112,7 +2112,7 @@ $(function () {
    * picklist columns sourced from beatplanner__Beat_Plan_References metadata.
    * Attendance and Leave Type are shown at the top-left of the wrapper.
    */
-  function buildBeatPlanTable(date) {
+  function buildBeatPlanTable(date, opts) {
     var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
                   ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
@@ -2231,8 +2231,8 @@ $(function () {
     var currentHour = isToday(date) ? new Date().getHours() : 0;
 
     for (var h = currentHour; h < 24; h++) {
-      /* Skip slots that already contain an existing event */
-      if (eventAtHour(date, h)) { continue; }
+      /* Skip slots that already contain an existing event, or externally-supplied occupied hours */
+      if ((opts && opts.skipHours) ? opts.skipHours[h] : eventAtHour(date, h)) { continue; }
 
       var startLbl = fmtTime(hourToTime(h));
       var endLbl   = fmtTime(h === 23 ? '23:59' : hourToTime(h + 1));
@@ -3477,9 +3477,11 @@ $(function () {
   function closeSlotPicker() {
     closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
+    massCreateMode = false;
     /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
     setTimeout(function () {
       dom.modal.find('.modal-box').removeClass('modal-box--wide');
+      dom.modal.find('.modal-body').removeClass('modal-body--mc');
       dom.slotPickerSection.hide();
       dom.eventFormSection.show();
       dom.slotPickerFoot.hide();
@@ -4413,10 +4415,10 @@ $(function () {
   }
 
   /**
-   * Given an array of COQL records, return a map {dateStr: Set<occupiedSlotKey>}
-   * where each slot key is "HH:MM" of the 30-minute slot start that the record overlaps.
+   * Given an array of COQL records, return a map {dateStr: {h: true}}
+   * where each key h (0–23) is an occupied hour on that date.
    */
-  function buildOccupiedSlotsMap(coqlRecords) {
+  function buildOccupiedHoursMap(coqlRecords) {
     var map = {};
     coqlRecords.forEach(function (rec) {
       var fromStr = rec['beatplanner__Date_Time_From'] || '';
@@ -4425,16 +4427,14 @@ $(function () {
       var dateStr   = fromStr.substring(0, 10);
       var startMins = timeToMins(fromStr.substring(11, 16));
       var endMins   = timeToMins(toStr ? toStr.substring(11, 16) : fromStr.substring(11, 16));
-      if (endMins <= startMins) { endMins = startMins + 30; }
+      if (endMins <= startMins) { endMins = startMins + 60; }
       if (!map[dateStr]) { map[dateStr] = {}; }
-      /* Mark every 30-min slot that the record overlaps */
-      for (var s = 0; s < 48; s++) {
-        var slotStart = s * 30;
-        var slotEnd   = slotStart + 30;
+      /* Mark every 1-hour slot (0–23) that the record overlaps */
+      for (var h = 0; h < 24; h++) {
+        var slotStart = h * 60;
+        var slotEnd   = (h + 1) * 60;
         if (startMins < slotEnd && endMins > slotStart) {
-          var h = Math.floor(slotStart / 60);
-          var m = slotStart % 60;
-          map[dateStr][pad2(h) + ':' + pad2(m)] = true;
+          map[dateStr][h] = true;
         }
       }
     });
@@ -4442,160 +4442,127 @@ $(function () {
   }
 
   /**
-   * Build the HTML for the Mass Create modal body (date accordions + slot checkboxes).
-   * @param {string[]} dateList      – YYYY-MM-DD strings in the range
-   * @param {object}   occupiedMap   – {dateStr: {slotKey: true}} from buildOccupiedSlotsMap
+   * Build the HTML for the Mass Create accordion inside #slotPickerGrid.
+   * Each day is a collapsible section containing the same beatplan table
+   * rendered by buildBeatPlanTable (or time-slot buttons in non-beatplan mode).
+   *
+   * @param {string[]} dateList       – YYYY-MM-DD strings in the range
+   * @param {object}   occupiedHrsMap – {dateStr: {h: true}} from buildOccupiedHoursMap
    * @returns {string} HTML string
    */
-  function buildMassCreateBodyHtml(dateList, occupiedMap) {
+  function buildMassCreateAccordionHtml(dateList, occupiedHrsMap) {
     if (!dateList.length) { return '<div class="mc-loading">No dates in range.</div>'; }
 
-    var today       = todayStr();
-    var nowMins     = new Date().getHours() * 60 + new Date().getMinutes();
-    var chevSvg     = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
-                      'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                      '<path d="M1 1l4 4 4-4"/></svg>';
+    var chevSvg = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
     var html = '';
 
     dateList.forEach(function (ds) {
-      var occupied = occupiedMap[ds] || {};
-      var slots    = [];
-
-      for (var s = 0; s < 48; s++) {
-        var slotStartMins = s * 30;
-        var slotEndMins   = slotStartMins + 30;
-        var h  = Math.floor(slotStartMins / 60);
-        var m  = slotStartMins % 60;
-        var key = pad2(h) + ':' + pad2(m);
-
-        /* Skip occupied slots */
-        if (occupied[key]) { continue; }
-        /* Skip past slots when date is today */
-        if (ds === today && slotStartMins < nowMins) { continue; }
-
-        var startLbl = fmtTime(key);
-        var endH     = Math.floor(slotEndMins / 60);
-        var endM     = slotEndMins % 60;
-        var endKey   = slotEndMins >= 1440 ? '23:59' : pad2(endH) + ':' + pad2(endM);
-        var endLbl   = fmtTime(endKey);
-
-        slots.push({ key: key, startLbl: startLbl, endLbl: endLbl });
+      var skipHours   = occupiedHrsMap[ds] || {};
+      /* Determine the first eligible hour (skip past hours for today) */
+      var currentHour = isToday(ds) ? new Date().getHours() : 0;
+      /* Check whether there are any available slots */
+      var hasSlots    = false;
+      for (var hc = currentHour; hc < 24; hc++) {
+        if (!skipHours[hc]) { hasSlots = true; break; }
       }
 
-      html += '<div class="map-day-group" data-date="' + escHtml(ds) + '">' +
-              '  <div class="map-day-header">' +
-              '    <label class="map-cb-label">' +
-              '      <input type="checkbox" class="map-cb map-day-cb mc-day-cb" data-date="' + escHtml(ds) + '" />' +
-              '      <span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(ds)) + '</span>' +
-              '    </label>' +
-              '    <button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>' +
-              '  </div>' +
-              '  <div class="map-day-events">';
+      html += '<div class="map-day-group mc-day-group" data-date="' + escHtml(ds) + '">';
+      html += '<div class="map-day-header">';
+      html += '<span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(ds)) + '</span>';
+      html += '<button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>';
+      html += '</div>';
+      html += '<div class="map-day-events">';
 
-      if (slots.length === 0) {
+      if (!hasSlots) {
         html += '<div class="mc-no-slots">No available slots</div>';
+      } else if (beatPlanHasRefs) {
+        html += buildBeatPlanTable(ds, { skipHours: skipHours });
       } else {
-        slots.forEach(function (slot) {
-          html += '<div class="mc-slot-row" data-date="' + escHtml(ds) + '" data-slot="' + escHtml(slot.key) + '">' +
-                  '  <label class="map-cb-label">' +
-                  '    <input type="checkbox" class="map-cb mc-slot-cb" data-date="' + escHtml(ds) + '" data-slot="' + escHtml(slot.key) + '" />' +
-                  '    <span class="mc-slot-label">' + escHtml(slot.startLbl) + ' – ' + escHtml(slot.endLbl) + '</span>' +
-                  '  </label>' +
-                  '</div>';
-        });
+        /* Non-beatplan fallback: clickable time-slot buttons */
+        var nowHour = isToday(ds) ? new Date().getHours() : 0;
+        for (var hb = nowHour; hb < 24; hb++) {
+          if (skipHours[hb]) { continue; }
+          var startLbl = fmtTime(pad2(hb) + ':00');
+          var endLbl   = fmtTime(hb === 23 ? '23:59' : pad2(hb + 1) + ':00');
+          html += '<button class="time-slot-item mc-tsi" data-date="' + escHtml(ds) + '" data-hour="' + hb + '">' +
+                  '<span class="tsi-start">' + escHtml(startLbl) + '</span>' +
+                  '<span class="tsi-sep">\u2013</span>' +
+                  '<span class="tsi-end">' + escHtml(endLbl) + '</span>' +
+                  '</button>';
+        }
       }
 
-      html += '  </div>' +
-              '</div>';
+      html += '</div></div>';
     });
 
     return html || '<div class="mc-loading">No available slots in the selected range.</div>';
   }
 
   /**
-   * Open the Mass Create modal for the given action and optional date range.
-   * Fetches COQL records, computes available slots, and renders the accordion UI.
+   * Open the Mass Create flow inside the shared #eventModal.
+   * Fetches COQL records, computes available 1-hour slots, and renders
+   * a multi-day accordion with the same beatplan form in each day section.
    */
   async function openMassCreateModal(action, fromDate, toDate) {
     var range = getMassCreateDateRange(action, fromDate, toDate);
 
-    /* Show the overlay immediately with a loading indicator */
-    $('#massCreateTitle').text('Mass Create');
-    $('#massCreateSelectAll').prop('checked', false).prop('indeterminate', false);
-    $('#massCreateBody').html('<div class="mc-loading">Loading\u2026</div>');
-    $('#massCreateSelCount').text('');
-    $('#massCreateConfirm').prop('disabled', false);
-    $('#massCreateOverlay').css('display', 'flex');
-    $('#massCreateOverlay')[0].offsetWidth; // eslint-disable-line no-unused-expressions
-    $('#massCreateOverlay').addClass('map-open');
+    closeAllBpDropdowns();
+
+    /* ── Open #eventModal immediately with a loading indicator ── */
+    massCreateMode    = true;
+    monthlyBeatPlanId = null; /* monthly beat plan is per-date; skip linking for mass create */
+
+    dom.modalHeading.text('Mass Create');
+    dom.modal.addClass('modal-open');
+    dom.modal.find('.modal-box').addClass('modal-box--wide');
+    dom.modal.find('.modal-body').addClass('modal-body--mc');
+
+    var $modalBody  = dom.modal.find('.modal-body');
+    var $modalFoot  = dom.modal.find('.modal-foot');
+    var $initLoader = $('#modalInitLoader');
+    $initLoader.show();
+    $modalBody.hide();
+    $modalFoot.hide();
 
     try {
+      /* Ensure BPR picklist field metadata is available before rendering tables */
+      if (bprPicklistFields === null) {
+        await fetchBprPicklistFields().catch(function () { bprPicklistFields = []; });
+      }
+
       var ownerId = activeUserId || ($('#userProfile').attr('data-userid') || '');
-      /* Always query the full day range; past-slot filtering is done in the UI */
+      /* Query the full day range; past-slot filtering is handled in the rendering */
       var startDt = toIsoDt(range.startDate, '00:00');
       var endDt   = toIsoDt(range.endDate,   '23:59');
 
-      var records     = await fetchMassCreateRecords(startDt, endDt, ownerId);
-      var occupiedMap = buildOccupiedSlotsMap(records);
-      var dateList    = buildDateList(range.startDate, range.endDate);
-      var bodyHtml    = buildMassCreateBodyHtml(dateList, occupiedMap);
+      var records       = await fetchMassCreateRecords(startDt, endDt, ownerId);
+      var occupiedHrsMap = buildOccupiedHoursMap(records);
+      var dateList      = buildDateList(range.startDate, range.endDate);
+      var accordionHtml = buildMassCreateAccordionHtml(dateList, occupiedHrsMap);
 
-      $('#massCreateBody').html(bodyHtml);
+      dom.slotPickerGrid.html(accordionHtml);
+      updateFilterBadge();
     } catch (err) {
       console.error('Mass Create fetch error:', err);
-      $('#massCreateBody').html('<div class="mc-loading">Failed to load records. Please try again.</div>');
+      dom.slotPickerGrid.html('<div class="mc-loading">Failed to load records. Please try again.</div>');
     }
+
+    /* ── Reveal the modal ── */
+    $initLoader.hide();
+    $modalBody.show();
+    $modalFoot.show();
+
+    dom.slotPickerSection.show();
+    dom.eventFormSection.hide();
+    dom.slotPickerFoot.show();
+    dom.eventFormFoot.hide();
   }
 
-  /** Close the Mass Create modal */
+  /** Close the Mass Create modal (delegates to the shared slot-picker close path) */
   function closeMassCreateModal() {
-    $('#massCreateOverlay').removeClass('map-open');
-    setTimeout(function () {
-      $('#massCreateOverlay').css('display', 'none');
-      $('#massCreateBody').empty();
-    }, 220);
-  }
-
-  /** Sync the Mass Create master checkbox based on slot checkboxes */
-  function syncMassCreateSelectAll() {
-    var $allCbs      = $('#massCreateBody .mc-slot-cb');
-    var $checked     = $allCbs.filter(':checked');
-    var total        = $allCbs.length;
-    var checkedCount = $checked.length;
-    var $sa          = $('#massCreateSelectAll');
-
-    if (total === 0) {
-      $sa.prop('checked', false).prop('indeterminate', false);
-    } else if (checkedCount === total) {
-      $sa.prop('checked', true).prop('indeterminate', false);
-    } else if (checkedCount === 0) {
-      $sa.prop('checked', false).prop('indeterminate', false);
-    } else {
-      $sa.prop('checked', false).prop('indeterminate', true);
-    }
-
-    var label = checkedCount === 0
-      ? ''
-      : checkedCount + ' slot' + (checkedCount === 1 ? '' : 's') + ' selected';
-    $('#massCreateSelCount').text(label);
-  }
-
-  /** Sync a date-level checkbox for the Mass Create modal */
-  function syncMassCreateDayCb($dayCb) {
-    var date    = $dayCb.data('date');
-    var $slots  = $('#massCreateBody .mc-slot-cb[data-date="' + date + '"]');
-    var total   = $slots.length;
-    var checked = $slots.filter(':checked').length;
-
-    if (total === 0) {
-      $dayCb.prop('checked', false).prop('indeterminate', false);
-    } else if (checked === total) {
-      $dayCb.prop('checked', true).prop('indeterminate', false);
-    } else if (checked === 0) {
-      $dayCb.prop('checked', false).prop('indeterminate', false);
-    } else {
-      $dayCb.prop('checked', false).prop('indeterminate', true);
-    }
+    closeSlotPicker();
   }
 
   /** Synchronize the Select All checkbox state based on visible event checkboxes */
@@ -4681,8 +4648,11 @@ $(function () {
     closeAllBpDropdowns();
     dom.modal.removeClass('modal-open');
     state.editId = null;
+    massCreateMode = false;
     /* Defer DOM resets until after the fade-out transition (0.22s) to avoid a blink */
     setTimeout(function () {
+      dom.modal.find('.modal-box').removeClass('modal-box--wide');
+      dom.modal.find('.modal-body').removeClass('modal-body--mc');
       dom.slotPickerSection.hide();
       dom.eventFormSection.show();
       dom.slotPickerFoot.hide();
@@ -5816,6 +5786,7 @@ $(function () {
   var beatPlanLoadGen     = 0;      /* incremented on every loadBeatPlanEvents() call; used to discard stale responses */
   var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
   var monthlyBeatPlanId   = null;   /* ID of the beatplanner__Monthly_Beat_Plans record for the open modal's month */
+  var massCreateMode      = false;  /* true while the event modal is open for Mass Create (multi-day accordion) */
 
   /* ── Filter Panel state ── */
   var modulePicklistMeta    = {};  /* {moduleName: [{api_name, field_label, options}]} – per-module picklist fields */
@@ -7070,109 +7041,20 @@ $(function () {
       await openMassCreateModal('between', fromVal, toVal);
     });
 
-    /* ── Mass Create modal – close ── */
-    $(document).on('click', '#massCreateClose, #massCreateCancel', function () {
-      closeMassCreateModal();
-    });
-    $(document).on('click', '#massCreateOverlay', function (e) {
-      if (e.target === this) { closeMassCreateModal(); }
-    });
-
-    /* ── Mass Create modal – master Select All checkbox ── */
-    $(document).on('change', '#massCreateSelectAll', function () {
-      var checked = $(this).prop('checked');
-      $('#massCreateBody .mc-slot-cb').prop('checked', checked);
-      $('#massCreateBody .mc-day-cb').prop('checked', checked).prop('indeterminate', false);
-      var total = $('#massCreateBody .mc-slot-cb').length;
-      var label = checked && total > 0
-        ? total + ' slot' + (total === 1 ? '' : 's') + ' selected'
-        : '';
-      $('#massCreateSelCount').text(label);
-    });
-
-    /* ── Mass Create modal – date-level checkbox ── */
-    $(document).on('change', '#massCreateBody .mc-day-cb', function () {
-      var date    = $(this).data('date');
-      var checked = $(this).prop('checked');
-      $('#massCreateBody .mc-slot-cb[data-date="' + date + '"]').prop('checked', checked);
-      syncMassCreateSelectAll();
-    });
-
-    /* ── Mass Create modal – individual slot checkbox ── */
-    $(document).on('change', '#massCreateBody .mc-slot-cb', function () {
-      var date   = $(this).data('date');
-      var $dayCb = $('#massCreateBody .mc-day-cb[data-date="' + date + '"]');
-      syncMassCreateDayCb($dayCb);
-      syncMassCreateSelectAll();
-    });
-
-    /* ── Mass Create modal – accordion day header toggle ── */
-    $(document).on('click', '#massCreateBody .map-day-header', function (e) {
-      if ($(e.target).closest('.map-cb-label').length) { return; }
+    /* ── Mass Create: accordion day header toggle (inside #slotPickerGrid) ── */
+    $(document).on('click', '#slotPickerGrid .mc-day-group .map-day-header', function (e) {
       var $group    = $(this).closest('.map-day-group');
       var collapsed = $group.toggleClass('map-day-collapsed').hasClass('map-day-collapsed');
       $(this).find('.map-day-toggle').attr('aria-expanded', String(!collapsed));
     });
 
-    /* ── Mass Create modal – Confirm (Create Selected) ── */
-    $(document).on('click', '#massCreateConfirm', async function () {
-      var $btn     = $(this);
-      var selected = [];
-      $('#massCreateBody .mc-slot-cb:checked').each(function () {
-        selected.push({
-          date: String($(this).data('date') || ''),
-          slot: String($(this).data('slot') || '')
-        });
-      });
-
-      if (selected.length === 0) {
-        showToast('No slots selected.');
-        return;
-      }
-
-      $btn.prop('disabled', true);
-      $('#massCreateSelCount').text('Creating ' + selected.length + ' event' + (selected.length === 1 ? '' : 's') + '\u2026');
-
-      var ownerId  = activeUserId || ($('#userProfile').attr('data-userid') || '');
-      var batchData = [];
-      selected.forEach(function (item) {
-        var slotMins  = timeToMins(item.slot);
-        var endMins   = slotMins + 30;
-        var endH      = Math.floor(endMins / 60);
-        var endM      = endMins % 60;
-        var endKey    = endMins >= 1440 ? '23:59' : pad2(endH) + ':' + pad2(endM);
-        var recordData = {
-          'beatplanner__Date_Time_From': toIsoDt(item.date, item.slot),
-          'beatplanner__Date_Time_To':   toIsoDt(item.date, endKey),
-          'Owner': { id: ownerId }
-        };
-        batchData.push(recordData);
-      });
-
-      /* Create in batches of 100 (CRM API limit) */
-      var BATCH = 100;
-      var created = 0;
-      var errored = 0;
-      for (var bi = 0; bi < batchData.length; bi += BATCH) {
-        var chunk = batchData.slice(bi, bi + BATCH);
-        try {
-          await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: chunk });
-          created += chunk.length;
-        } catch (err) {
-          console.error('Mass Create batch error:', err);
-          errored += chunk.length;
-        }
-      }
-
-      closeMassCreateModal();
-      if (errored === 0) {
-        showToast('Mass Create: ' + created + ' event' + (created === 1 ? '' : 's') + ' created.');
-      } else {
-        showToast('Mass Create: ' + created + ' created, ' + errored + ' failed.');
-      }
-      /* Reload the calendar to reflect new events */
-      await loadBeatPlanEvents();
+    /* ── Mass Create: non-beatplan time-slot click — opens form for that slot ── */
+    $(document).on('click', '#slotPickerGrid .mc-tsi', function () {
+      var date = $(this).data('date');
+      var hour = parseInt($(this).data('hour'), 10);
+      openModal(date, hourToTime(hour), hourToTime(hour + 1));
     });
+
     $(document).on('click', '#calActionsMenu .cal-actions-option[data-action]', async function () {
       var action = $(this).data('action');
       $('#calActionsMenu').hide();
