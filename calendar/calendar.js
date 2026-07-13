@@ -4012,10 +4012,11 @@ $(function () {
                        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13">' +
                        '<path d="M2 4h12M5 8h6M7.5 12h1"/></svg>';
 
-    var html = '';
-    /* Track whether the filter button has been emitted yet; it should appear only once
-       (before the first Leave record across all day groups) to avoid duplicate IDs. */
-    var leaveFilterBtnAdded = false;
+    /* Filter button rendered once at the very top of #massActionsBody, above all records */
+    var html = '<div class="bp-filter-action">' +
+               '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+               filterBtnSvg + 'Filter</button>' +
+               '</div>';
 
     groups.forEach(function (group) {
       /* Separate events: Working records share ONE container; Leave / other records
@@ -4046,18 +4047,8 @@ $(function () {
         html += buildMassActionsWorkingSection(group.date, workingEvts);
       }
 
-      /* Leave / other records: individual containers (existing Leave layout).
-         The filter button (#bpFilterBtn) is added once, before the first Leave record. */
+      /* Leave / other records: individual containers (existing Leave layout). */
       if (leaveEvts.length) {
-        if (!leaveFilterBtnAdded) {
-          html += '<div class="bp-attend-bar">' +
-                  '<div class="bp-filter-action">' +
-                  '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
-                  filterBtnSvg + 'Filter</button>' +
-                  '</div>' +
-                  '</div>';
-          leaveFilterBtnAdded = true;
-        }
         leaveEvts.forEach(function (ev) {
           html += buildMassUpdateEventHtml(ev);
         });
@@ -4290,12 +4281,6 @@ $(function () {
       $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
     }
 
-    /* Inject filter bar */
-    $('#massActionsFilterBar').remove();
-    var filterBarHtml = buildMassActionsFilterBarHtml();
-    if (filterBarHtml) {
-      $('.mass-actions-select-all-row').after(filterBarHtml);
-    }
   }
 
   /** Close the Mass Actions popup */
@@ -10733,7 +10718,7 @@ $(function () {
       }).join('');
     }
 
-    $('#slotPickerGrid .bp-slot-row, #demBulkGrid .bp-slot-row').each(function () {
+    $('#slotPickerGrid .bp-slot-row, #demBulkGrid .bp-slot-row, #massActionsBody .bp-slot-row').each(function () {
       var $row = $(this);
       var selectedApi = $row.find('.bp-mf-wrap .bp-dd-val').attr('data-selected-api');
       if (selectedApi !== modApi) { return; }

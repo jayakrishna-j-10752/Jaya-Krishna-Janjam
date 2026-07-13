@@ -5693,6 +5693,13 @@ input, select, textarea {
   font-weight: 600;
 }
 
+/* ── Mass Actions popup: filter button at top of body ── */
+.mass-actions-body .bp-filter-action {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
 /* ── Mass Actions popup: inline filter bar ── */
 .mass-actions-filter-bar {
   display: flex;
