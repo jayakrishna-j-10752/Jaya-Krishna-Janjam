@@ -4295,6 +4295,315 @@ $(function () {
     }, 220);
   }
 
+  /* ──────────────────────────────────────────────────────────
+     MASS CREATE MODAL
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Calculate the start/end date strings (YYYY-MM-DD) for a given mass-create action.
+   * @param {string} action    – 'tomorrow' | 'next-week' | 'next-month' | 'between'
+   * @param {string} fromDate  – YYYY-MM-DD (only used for 'between')
+   * @param {string} toDate    – YYYY-MM-DD (only used for 'between')
+   * @returns {{startDate: string, endDate: string}}
+   */
+  function getMassCreateDateRange(action, fromDate, toDate) {
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (action === 'tomorrow') {
+      var t = new Date(today);
+      t.setDate(t.getDate() + 1);
+      var ts = dateToStr(t);
+      return { startDate: ts, endDate: ts };
+    }
+
+    if (action === 'next-week') {
+      /* Sun-based week: next week starts on the Sunday after today's week-end */
+      var thisSun = new Date(today);
+      thisSun.setDate(today.getDate() - today.getDay()); /* this Sunday */
+      var nextSun = new Date(thisSun);
+      nextSun.setDate(thisSun.getDate() + 7);
+      var nextSat = new Date(nextSun);
+      nextSat.setDate(nextSun.getDate() + 6);
+      return { startDate: dateToStr(nextSun), endDate: dateToStr(nextSat) };
+    }
+
+    if (action === 'next-month') {
+      var y  = today.getFullYear();
+      var m  = today.getMonth() + 1; /* next month (0-indexed + 1) */
+      if (m > 11) { y += 1; m = 0; }
+      var firstDay = new Date(y, m, 1);
+      var lastDay  = new Date(y, m + 1, 0);
+      return { startDate: dateToStr(firstDay), endDate: dateToStr(lastDay) };
+    }
+
+    if (action === 'between') {
+      return { startDate: fromDate, endDate: toDate };
+    }
+
+    return { startDate: dateToStr(today), endDate: dateToStr(today) };
+  }
+
+  /**
+   * Fetch all beatplanner__Daily_Beat_Plans records in the given date/time range
+   * for the given owner, handling COQL pagination automatically (up to 2000/page).
+   *
+   * @param {string} startDt  – ISO datetime string, e.g. "2026-07-14T00:00:00+05:30"
+   * @param {string} endDt    – ISO datetime string, e.g. "2026-07-20T23:59:59+05:30"
+   * @param {string} ownerId  – CRM user id
+   * @returns {Promise<Array>} merged array of COQL record objects
+   */
+  async function fetchMassCreateRecords(startDt, endDt, ownerId) {
+    /* Build the select field list the same way as loadBeatPlanEvents */
+    var probeDate  = startDt.substring(0, 10);
+    var tempHtml   = buildBeatPlanTable(probeDate);
+    var $tempRoot  = $(tempHtml);
+    var rawApiList = [];
+    $tempRoot.find('[data-api]').each(function () {
+      var api = $(this).attr('data-api');
+      if (api) { rawApiList.push(api); }
+    });
+    if (bpSavedRec) {
+      var mfApis = (bpSavedRec['beatplanner__Meetings_For_Apis'] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      mfApis.forEach(function (api) { rawApiList.push(api); });
+    }
+    var seenApis    = {};
+    var selectFields = ['id', 'beatplanner__Managers_Approval', 'Owner'];
+    rawApiList.forEach(function (api) {
+      if (api && !seenApis[api] && selectFields.indexOf(api) === -1) {
+        seenApis[api] = true;
+        selectFields.push(api);
+      }
+    });
+    var dynamicFieldList = selectFields.filter(function (f) { return f !== 'id' && f !== 'beatplanner__Managers_Approval'; }).join(', ');
+
+    var allRecords = [];
+    var offset     = 0;
+    var pageSize   = 2000;
+
+    do {
+      var query = {
+        select_query: (
+          'SELECT id, beatplanner__Managers_Approval, ' + dynamicFieldList +
+          ' FROM beatplanner__Daily_Beat_Plans' +
+          " WHERE (((beatplanner__Date_Time_From >= '" + startDt + "'" +
+          " AND beatplanner__Date_Time_From <= '" + endDt + "')" +
+          " AND (beatplanner__Date_Time_To >= '" + startDt + "'" +
+          " AND beatplanner__Date_Time_To <= '" + endDt + "'))" +
+          " AND Owner.id='" + ownerId + "')" +
+          ' LIMIT ' + offset + ',' + pageSize
+        ).replace(/\s+/g, ' ').trim()
+      };
+      var res     = await zrc.post('/crm/v8/coql', query);
+      var records = (res && res.data && res.data.data && Array.isArray(res.data.data)) ? res.data.data : [];
+      allRecords  = allRecords.concat(records);
+      offset     += pageSize;
+      if (records.length < pageSize) { break; }
+    } while (true);
+
+    return allRecords;
+  }
+
+  /**
+   * Build an array of YYYY-MM-DD strings from startDate to endDate (inclusive).
+   */
+  function buildDateList(startDate, endDate) {
+    var list = [];
+    var cur  = new Date(startDate + 'T00:00:00');
+    var end  = new Date(endDate   + 'T00:00:00');
+    while (cur <= end) {
+      list.push(dateToStr(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return list;
+  }
+
+  /**
+   * Given an array of COQL records, return a map {dateStr: Set<occupiedSlotKey>}
+   * where each slot key is "HH:MM" of the 30-minute slot start that the record overlaps.
+   */
+  function buildOccupiedSlotsMap(coqlRecords) {
+    var map = {};
+    coqlRecords.forEach(function (rec) {
+      var fromStr = rec['beatplanner__Date_Time_From'] || '';
+      var toStr   = rec['beatplanner__Date_Time_To']   || '';
+      if (!fromStr) { return; }
+      var dateStr   = fromStr.substring(0, 10);
+      var startMins = timeToMins(fromStr.substring(11, 16));
+      var endMins   = timeToMins(toStr ? toStr.substring(11, 16) : fromStr.substring(11, 16));
+      if (endMins <= startMins) { endMins = startMins + 30; }
+      if (!map[dateStr]) { map[dateStr] = {}; }
+      /* Mark every 30-min slot that the record overlaps */
+      for (var s = 0; s < 48; s++) {
+        var slotStart = s * 30;
+        var slotEnd   = slotStart + 30;
+        if (startMins < slotEnd && endMins > slotStart) {
+          var h = Math.floor(slotStart / 60);
+          var m = slotStart % 60;
+          map[dateStr][pad2(h) + ':' + pad2(m)] = true;
+        }
+      }
+    });
+    return map;
+  }
+
+  /**
+   * Build the HTML for the Mass Create modal body (date accordions + slot checkboxes).
+   * @param {string[]} dateList      – YYYY-MM-DD strings in the range
+   * @param {object}   occupiedMap   – {dateStr: {slotKey: true}} from buildOccupiedSlotsMap
+   * @returns {string} HTML string
+   */
+  function buildMassCreateBodyHtml(dateList, occupiedMap) {
+    if (!dateList.length) { return '<div class="mc-loading">No dates in range.</div>'; }
+
+    var today       = todayStr();
+    var nowMins     = new Date().getHours() * 60 + new Date().getMinutes();
+    var chevSvg     = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
+                      'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                      '<path d="M1 1l4 4 4-4"/></svg>';
+    var html = '';
+
+    dateList.forEach(function (ds) {
+      var occupied = occupiedMap[ds] || {};
+      var slots    = [];
+
+      for (var s = 0; s < 48; s++) {
+        var slotStartMins = s * 30;
+        var slotEndMins   = slotStartMins + 30;
+        var h  = Math.floor(slotStartMins / 60);
+        var m  = slotStartMins % 60;
+        var key = pad2(h) + ':' + pad2(m);
+
+        /* Skip occupied slots */
+        if (occupied[key]) { continue; }
+        /* Skip past slots when date is today */
+        if (ds === today && slotStartMins < nowMins) { continue; }
+
+        var startLbl = fmtTime(key);
+        var endH     = Math.floor(slotEndMins / 60);
+        var endM     = slotEndMins % 60;
+        var endKey   = slotEndMins >= 1440 ? '23:59' : pad2(endH) + ':' + pad2(endM);
+        var endLbl   = fmtTime(endKey);
+
+        slots.push({ key: key, startLbl: startLbl, endLbl: endLbl });
+      }
+
+      html += '<div class="map-day-group" data-date="' + escHtml(ds) + '">' +
+              '  <div class="map-day-header">' +
+              '    <label class="map-cb-label">' +
+              '      <input type="checkbox" class="map-cb map-day-cb mc-day-cb" data-date="' + escHtml(ds) + '" />' +
+              '      <span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(ds)) + '</span>' +
+              '    </label>' +
+              '    <button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>' +
+              '  </div>' +
+              '  <div class="map-day-events">';
+
+      if (slots.length === 0) {
+        html += '<div class="mc-no-slots">No available slots</div>';
+      } else {
+        slots.forEach(function (slot) {
+          html += '<div class="mc-slot-row" data-date="' + escHtml(ds) + '" data-slot="' + escHtml(slot.key) + '">' +
+                  '  <label class="map-cb-label">' +
+                  '    <input type="checkbox" class="map-cb mc-slot-cb" data-date="' + escHtml(ds) + '" data-slot="' + escHtml(slot.key) + '" />' +
+                  '    <span class="mc-slot-label">' + escHtml(slot.startLbl) + ' – ' + escHtml(slot.endLbl) + '</span>' +
+                  '  </label>' +
+                  '</div>';
+        });
+      }
+
+      html += '  </div>' +
+              '</div>';
+    });
+
+    return html || '<div class="mc-loading">No available slots in the selected range.</div>';
+  }
+
+  /**
+   * Open the Mass Create modal for the given action and optional date range.
+   * Fetches COQL records, computes available slots, and renders the accordion UI.
+   */
+  async function openMassCreateModal(action, fromDate, toDate) {
+    var range = getMassCreateDateRange(action, fromDate, toDate);
+
+    /* Show the overlay immediately with a loading indicator */
+    $('#massCreateTitle').text('Mass Create');
+    $('#massCreateSelectAll').prop('checked', false).prop('indeterminate', false);
+    $('#massCreateBody').html('<div class="mc-loading">Loading\u2026</div>');
+    $('#massCreateSelCount').text('');
+    $('#massCreateConfirm').prop('disabled', false);
+    $('#massCreateOverlay').css('display', 'flex');
+    $('#massCreateOverlay')[0].offsetWidth; // eslint-disable-line no-unused-expressions
+    $('#massCreateOverlay').addClass('map-open');
+
+    try {
+      var ownerId = activeUserId || ($('#userProfile').attr('data-userid') || '');
+      /* Always query the full day range; past-slot filtering is done in the UI */
+      var startDt = toIsoDt(range.startDate, '00:00');
+      var endDt   = toIsoDt(range.endDate,   '23:59');
+
+      var records     = await fetchMassCreateRecords(startDt, endDt, ownerId);
+      var occupiedMap = buildOccupiedSlotsMap(records);
+      var dateList    = buildDateList(range.startDate, range.endDate);
+      var bodyHtml    = buildMassCreateBodyHtml(dateList, occupiedMap);
+
+      $('#massCreateBody').html(bodyHtml);
+    } catch (err) {
+      console.error('Mass Create fetch error:', err);
+      $('#massCreateBody').html('<div class="mc-loading">Failed to load records. Please try again.</div>');
+    }
+  }
+
+  /** Close the Mass Create modal */
+  function closeMassCreateModal() {
+    $('#massCreateOverlay').removeClass('map-open');
+    setTimeout(function () {
+      $('#massCreateOverlay').css('display', 'none');
+      $('#massCreateBody').empty();
+    }, 220);
+  }
+
+  /** Sync the Mass Create master checkbox based on slot checkboxes */
+  function syncMassCreateSelectAll() {
+    var $allCbs      = $('#massCreateBody .mc-slot-cb');
+    var $checked     = $allCbs.filter(':checked');
+    var total        = $allCbs.length;
+    var checkedCount = $checked.length;
+    var $sa          = $('#massCreateSelectAll');
+
+    if (total === 0) {
+      $sa.prop('checked', false).prop('indeterminate', false);
+    } else if (checkedCount === total) {
+      $sa.prop('checked', true).prop('indeterminate', false);
+    } else if (checkedCount === 0) {
+      $sa.prop('checked', false).prop('indeterminate', false);
+    } else {
+      $sa.prop('checked', false).prop('indeterminate', true);
+    }
+
+    var label = checkedCount === 0
+      ? ''
+      : checkedCount + ' slot' + (checkedCount === 1 ? '' : 's') + ' selected';
+    $('#massCreateSelCount').text(label);
+  }
+
+  /** Sync a date-level checkbox for the Mass Create modal */
+  function syncMassCreateDayCb($dayCb) {
+    var date    = $dayCb.data('date');
+    var $slots  = $('#massCreateBody .mc-slot-cb[data-date="' + date + '"]');
+    var total   = $slots.length;
+    var checked = $slots.filter(':checked').length;
+
+    if (total === 0) {
+      $dayCb.prop('checked', false).prop('indeterminate', false);
+    } else if (checked === total) {
+      $dayCb.prop('checked', true).prop('indeterminate', false);
+    } else if (checked === 0) {
+      $dayCb.prop('checked', false).prop('indeterminate', false);
+    } else {
+      $dayCb.prop('checked', false).prop('indeterminate', true);
+    }
+  }
+
   /** Synchronize the Select All checkbox state based on visible event checkboxes */
   function syncMassActionsSelectAll() {
     /* Only consider row checkboxes that are not filtered out */
@@ -6672,14 +6981,13 @@ $(function () {
     });
 
     /* Mass Create submenu options */
-    $(document).on('click', '#calMassCreateSubmenu .cal-actions-option:not(.cal-between-trigger)', function () {
+    $(document).on('click', '#calMassCreateSubmenu .cal-actions-option:not(.cal-between-trigger)', async function () {
       var action = $(this).data('mass-create');
       $('#calActionsMenu').hide();
       $('#calMassCreateSubmenu').hide();
       $('#calActionsBtn').attr('aria-expanded', 'false');
       $('.cal-mass-create-btn').attr('aria-expanded', 'false');
-      /* Placeholder – wire up actual mass-create logic per action */
-      showToast('Mass Create – ' + $(this).text().trim());
+      await openMassCreateModal(action);
     });
 
     /* Between trigger – open the Between date range modal */
@@ -6748,7 +7056,7 @@ $(function () {
     });
 
     /* Between modal – submit */
-    $('#calBetweenSubmit').on('click', function () {
+    $('#calBetweenSubmit').on('click', async function () {
       var fromVal = $('#calBetweenFrom').val();
       var toVal   = $('#calBetweenTo').val();
 
@@ -6765,11 +7073,112 @@ $(function () {
       if (!validateBetweenDates()) { return; }
 
       closeBetweenModal();
-      /* Placeholder – wire up actual mass-create Between logic */
-      showToast('Mass Create Between ' + fromVal + ' and ' + toVal);
+      await openMassCreateModal('between', fromVal, toVal);
     });
 
-    /* Other Actions menu items – open Mass Actions popup */
+    /* ── Mass Create modal – close ── */
+    $(document).on('click', '#massCreateClose, #massCreateCancel', function () {
+      closeMassCreateModal();
+    });
+    $(document).on('click', '#massCreateOverlay', function (e) {
+      if (e.target === this) { closeMassCreateModal(); }
+    });
+
+    /* ── Mass Create modal – master Select All checkbox ── */
+    $(document).on('change', '#massCreateSelectAll', function () {
+      var checked = $(this).prop('checked');
+      $('#massCreateBody .mc-slot-cb').prop('checked', checked);
+      $('#massCreateBody .mc-day-cb').prop('checked', checked).prop('indeterminate', false);
+      var total = $('#massCreateBody .mc-slot-cb').length;
+      var label = checked && total > 0
+        ? total + ' slot' + (total === 1 ? '' : 's') + ' selected'
+        : '';
+      $('#massCreateSelCount').text(label);
+    });
+
+    /* ── Mass Create modal – date-level checkbox ── */
+    $(document).on('change', '#massCreateBody .mc-day-cb', function () {
+      var date    = $(this).data('date');
+      var checked = $(this).prop('checked');
+      $('#massCreateBody .mc-slot-cb[data-date="' + date + '"]').prop('checked', checked);
+      syncMassCreateSelectAll();
+    });
+
+    /* ── Mass Create modal – individual slot checkbox ── */
+    $(document).on('change', '#massCreateBody .mc-slot-cb', function () {
+      var date   = $(this).data('date');
+      var $dayCb = $('#massCreateBody .mc-day-cb[data-date="' + date + '"]');
+      syncMassCreateDayCb($dayCb);
+      syncMassCreateSelectAll();
+    });
+
+    /* ── Mass Create modal – accordion day header toggle ── */
+    $(document).on('click', '#massCreateBody .map-day-header', function (e) {
+      if ($(e.target).closest('.map-cb-label').length) { return; }
+      var $group    = $(this).closest('.map-day-group');
+      var collapsed = $group.toggleClass('map-day-collapsed').hasClass('map-day-collapsed');
+      $(this).find('.map-day-toggle').attr('aria-expanded', String(!collapsed));
+    });
+
+    /* ── Mass Create modal – Confirm (Create Selected) ── */
+    $(document).on('click', '#massCreateConfirm', async function () {
+      var $btn     = $(this);
+      var selected = [];
+      $('#massCreateBody .mc-slot-cb:checked').each(function () {
+        selected.push({
+          date: String($(this).data('date') || ''),
+          slot: String($(this).data('slot') || '')
+        });
+      });
+
+      if (selected.length === 0) {
+        showToast('No slots selected.');
+        return;
+      }
+
+      $btn.prop('disabled', true);
+      $('#massCreateSelCount').text('Creating ' + selected.length + ' event' + (selected.length === 1 ? '' : 's') + '\u2026');
+
+      var ownerId  = activeUserId || ($('#userProfile').attr('data-userid') || '');
+      var batchData = [];
+      selected.forEach(function (item) {
+        var slotMins  = timeToMins(item.slot);
+        var endMins   = slotMins + 30;
+        var endH      = Math.floor(endMins / 60);
+        var endM      = endMins % 60;
+        var endKey    = endMins >= 1440 ? '23:59' : pad2(endH) + ':' + pad2(endM);
+        var recordData = {
+          'beatplanner__Date_Time_From': toIsoDt(item.date, item.slot),
+          'beatplanner__Date_Time_To':   toIsoDt(item.date, endKey),
+          'Owner': { id: ownerId }
+        };
+        batchData.push(recordData);
+      });
+
+      /* Create in batches of 100 (CRM API limit) */
+      var BATCH = 100;
+      var created = 0;
+      var errored = 0;
+      for (var bi = 0; bi < batchData.length; bi += BATCH) {
+        var chunk = batchData.slice(bi, bi + BATCH);
+        try {
+          await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', { data: chunk });
+          created += chunk.length;
+        } catch (err) {
+          console.error('Mass Create batch error:', err);
+          errored += chunk.length;
+        }
+      }
+
+      closeMassCreateModal();
+      if (errored === 0) {
+        showToast('Mass Create: ' + created + ' event' + (created === 1 ? '' : 's') + ' created.');
+      } else {
+        showToast('Mass Create: ' + created + ' created, ' + errored + ' failed.');
+      }
+      /* Reload the calendar to reflect new events */
+      await loadBeatPlanEvents();
+    });
     $(document).on('click', '#calActionsMenu .cal-actions-option[data-action]', async function () {
       var action = $(this).data('action');
       $('#calActionsMenu').hide();

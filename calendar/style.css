@@ -5756,3 +5756,51 @@ input, select, textarea {
   color: var(--text-secondary);
   font-style: italic;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MASS CREATE MODAL
+══════════════════════════════════════════════════════════════ */
+
+/* Override the default 560px width so the slot list has breathing room */
+.mc-modal-box {
+  width: min(520px, calc(100vw - 32px));
+}
+
+/* Loading / empty state */
+.mc-loading {
+  padding: 28px 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* No-slots message inside a day group */
+.mc-no-slots {
+  padding: 8px 18px 10px 42px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Individual slot row */
+.mc-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px 6px 36px;
+  border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+.mc-slot-row:last-child {
+  border-bottom: none;
+}
+.mc-slot-row:hover {
+  background: var(--surface-2);
+}
+.mc-slot-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
