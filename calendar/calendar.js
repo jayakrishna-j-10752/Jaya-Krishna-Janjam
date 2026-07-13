@@ -3129,6 +3129,12 @@ $(function () {
     var tableStyle  = isWorking   ? '' : 'display:none;';
     var leaveStyle  = isLeaveMode ? '' : 'display:none;';
 
+    /* Row styling – computed early so borderLeftStr is available for the attend-bar */
+    var editRowStyles = buildBprEventStyles(ev);
+    var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
+    var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
+    var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
+
     /* Leave Type colour applied to the attend-bar (not the container) */
     var containerLeaveColor = '';
     if (isLeaveMode && existingLeave && existingLeave !== '-None-') {
@@ -3137,7 +3143,12 @@ $(function () {
       colorFv[leaveApi]  = existingLeave;
       containerLeaveColor = getLeaveTypeColor(colorFv);
     }
-    var attendBarBgStyle = containerLeaveColor ? ' style="background:' + containerLeaveColor + ';"' : '';
+    /* For Leave records: combine Leave Type background with Manager Approval left-border
+       on the attend-bar so the status indicator is visible (the table row is hidden). */
+    var attendBarStyleStr = '';
+    if (containerLeaveColor) { attendBarStyleStr += 'background:' + containerLeaveColor + ';'; }
+    if (isLeaveMode && editRowStyles.borderLeftStr) { attendBarStyleStr += editRowStyles.borderLeftStr; }
+    var attendBarBgStyle  = attendBarStyleStr ? ' style="' + attendBarStyleStr + '"' : '';
     var muLabelColorStyle = containerLeaveColor ? ' style="color:white;"' : '';
 
     /* Approval state (needed early for Leave-mode attend-bar action buttons) */
@@ -3149,6 +3160,12 @@ $(function () {
 
     /* Attend bar */
     var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
+    /* For Leave records: show the selection checkbox on the left side of the attend-bar
+       so it is always visible and participates in mass-action selection. */
+    if (isLeaveMode) {
+      attendBar += editRowStyles.markerHtml +
+                   '<input type="checkbox" class="bp-row-cb" aria-label="Select row">';
+    }
     if (attendanceField) {
       attendBar += '<div class="bp-attend-field">' +
                    '<span class="bp-attend-label"' + muLabelColorStyle + '>' + escHtml(attendanceField.field_label) + '</span>' +
@@ -3208,12 +3225,6 @@ $(function () {
       ? '<img src="' + escHtml(ev.mwAvatarImgSrc) + '">'
       : (existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '');
     var avatarClass = existingMwName ? ' bp-rec-avatar--show' : '';
-
-    /* Row styling */
-    var editRowStyles = buildBprEventStyles(ev);
-    var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
-    var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
-    var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
 
     /* Original field values for change detection */
     var originalVals = {
@@ -3332,24 +3343,21 @@ $(function () {
 
     tableHtml += '</tr></tbody></table>';
 
-    /* For leave mode: replace the full (hidden) table with a checkbox-only row.
-       Action buttons are in the attend-bar. The checkbox is kept visible so the
-       user can select this Leave record for mass operations. */
+    /* For leave mode: the checkbox has moved to the attend-bar (left side); the hidden
+       table is kept so that toggling Attendance back to Working can still show a table.
+       The .bp-slot-row / .bp-edit-row class and all data attributes are promoted to the
+       outer container so that the mass-actions selection logic finds them correctly. */
     if (isLeaveMode) {
-      tableHtml = '<table class="bp-slots-table">' +
-                  '<tbody>' +
-                  '<tr class="bp-slot-row bp-edit-row"' +
-                  pfAttrs +
-                  ' data-date="' + escHtml(date) + '"' +
-                  ' data-edit-id="' + escHtml(ev.id) + '"' +
-                  ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
-                  ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
-                  ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '">' +
-                  '<td class="bp-cb-cell">' +
-                  editRowStyles.markerHtml +
-                  '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>' +
-                  '</tr>' +
-                  '</tbody></table>';
+      tableHtml = '<table class="bp-slots-table" style="display:none;"><tbody></tbody></table>';
+
+      return '<div class="bp-plan-container map-event-container bp-slot-row bp-edit-row"' +
+             pfAttrs +
+             ' data-date="' + escHtml(date) + '"' +
+             ' data-edit-id="' + escHtml(ev.id) + '"' +
+             ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+             ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+             ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '">' +
+             attendBar + '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
     }
 
     return '<div class="bp-plan-container map-event-container"' +
@@ -3716,6 +3724,266 @@ $(function () {
   }
 
   /**
+   * Build the HTML for ONE shared .bp-plan-container that holds all Working-mode events
+   * for a single date group inside the Mass Actions popup.
+   * Creates exactly one container, one .bp-slots-wrap, one .bp-slots-table, one <thead>,
+   * and one <tbody> whose rows correspond to the supplied working events.
+   *
+   * @param {string} date        – YYYY-MM-DD date string
+   * @param {Array}  workingEvts – calendar events (Attendance = Working) for this date
+   * @returns {string} HTML string
+   */
+  function buildMassActionsWorkingSection(date, workingEvts) {
+    if (!workingEvts.length) { return ''; }
+
+    var chevSvg = '<svg class="bp-dd-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor"' +
+                  ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M1 1l4 4 4-4"/></svg>';
+
+    /* Meetings For options (shared across all rows) */
+    var mfOptions = '';
+    beatPlanModulesList.forEach(function (mod) {
+      mfOptions += '<li class="bp-dd-opt" data-api="' + escHtml(mod.api) +
+                   '" data-label="' + escHtml(mod.label) + '">' + escHtml(mod.label) + '</li>';
+    });
+
+    /* Separate BPR picklist fields (same set as buildMassUpdateEventHtml) */
+    var HIDDEN_BPR_LABELS_WS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for'];
+    var tablePicklistCols = [];
+    var attendanceField   = null;
+    var leaveTypeField    = null;
+    if (bprPicklistFields && bprPicklistFields.length) {
+      bprPicklistFields.forEach(function (f) {
+        var lbl = (f.field_label || '').toLowerCase().trim();
+        if (HIDDEN_BPR_LABELS_WS.indexOf(lbl) !== -1) { return; }
+        if (lbl === 'attendance') { attendanceField = f; return; }
+        if (lbl === 'leave type') { leaveTypeField  = f; return; }
+        tablePicklistCols.push(f);
+      });
+    }
+
+    function buildOptList(opts) {
+      if (!opts || !opts.length) {
+        return '<li class="bp-dd-empty">No options available</li>';
+      }
+      return opts.map(function (v) {
+        var display = (typeof v === 'object') ? v.display : v;
+        var actual  = (typeof v === 'object') ? v.actual  : v;
+        return '<li class="bp-dd-opt" data-label="' + escHtml(display) +
+               '" data-actual="' + escHtml(actual) + '">' + escHtml(display) + '</li>';
+      }).join('');
+    }
+
+    /* Resolve time / meetings-for field metadata */
+    var startTimeApi = 'beatplanner__Date_Time_From', startTimeLbl = 'Date Time From';
+    var endTimeApi   = 'beatplanner__Date_Time_To',   endTimeLbl   = 'Date Time To';
+    var mfFieldApi   = 'beatplanner__Meetings_For',   mfFieldLabel = 'Meetings For';
+    bpDailyAllFields.forEach(function (f) {
+      var lbl = (f.field_label || '').toLowerCase();
+      if (lbl === 'start time')   { startTimeApi = f.api_name || startTimeApi; startTimeLbl = f.field_label || startTimeLbl; }
+      if (lbl === 'end time')     { endTimeApi   = f.api_name || endTimeApi;   endTimeLbl   = f.field_label || endTimeLbl; }
+      if (lbl === 'meetings for') { mfFieldApi   = f.api_name || mfFieldApi;   mfFieldLabel = f.field_label || mfFieldLabel; }
+    });
+
+    var attendApi = (attendanceField && attendanceField.api_name) || 'beatplanner__Attendance';
+    var leaveApi  = (leaveTypeField  && leaveTypeField.api_name)  || 'beatplanner__Leave_Type';
+
+    /* Build shared table header – ONE thead for all working rows */
+    var tableHtml = '<table class="bp-slots-table">';
+    tableHtml += '<thead><tr>';
+    tableHtml += '<th class="bp-th bp-cb-th"></th>';
+    tableHtml += '<th class="bp-th">' + escHtml(startTimeLbl) + '</th>';
+    tableHtml += '<th class="bp-th">' + escHtml(endTimeLbl)   + '</th>';
+    tableHtml += '<th class="bp-th">' + escHtml(mfFieldLabel) + '</th>';
+    tableHtml += '<th class="bp-th">Meeting With</th>';
+    tablePicklistCols.forEach(function (f) {
+      tableHtml += '<th class="bp-th">' + escHtml(f.field_label) + '</th>';
+    });
+    tableHtml += '<th class="bp-th bp-action-th">Actions</th>';
+    tableHtml += '</tr></thead><tbody>';
+
+    /* ONE row per working event, all in the same <tbody> */
+    workingEvts.forEach(function (ev) {
+      var bprVals = ev.bprFieldValues || {};
+
+      var existingAttend = String(bprVals[attendApi] || '');
+      var existingLeave  = String(bprVals[leaveApi]  || '');
+
+      /* Meetings For */
+      var existingMfVal = String(bprVals[mfFieldApi] || '');
+      var existingMfApi = '';
+      beatPlanModulesList.forEach(function (mod) {
+        if (mod.label === existingMfVal) { existingMfApi = mod.api; }
+      });
+
+      /* Meeting With lookup field */
+      var mwLookupApiName = '';
+      var existingMwId    = ev.mwRecordId || '';
+      var existingMwName  = ev.title || '';
+      if (existingMfApi) {
+        for (var fi = 0; fi < bpDailyAllFields.length; fi++) {
+          var fld = bpDailyAllFields[fi];
+          if (fld.data_type === 'lookup' && fld.lookup && fld.lookup.module) {
+            var modApiName = fld.lookup.module.api_name || fld.lookup.module.module || '';
+            var fldLbl     = (fld.field_label || '').toLowerCase();
+            if (modApiName === existingMfApi || fldLbl === existingMfVal.toLowerCase()) {
+              mwLookupApiName = fld.api_name;
+              break;
+            }
+          }
+        }
+      }
+
+      /* Meeting With option list */
+      var mwOpts = '';
+      if (existingMfApi) {
+        var mwRecords = filteredModuleRecords.hasOwnProperty(existingMfApi)
+          ? filteredModuleRecords[existingMfApi]
+          : (moduleRecordsMap[existingMfApi] || []);
+        if (mwRecords.length === 0) {
+          mwOpts = '<li class="bp-dd-empty">No records found</li>';
+        } else {
+          mwRecords.forEach(function (rec) {
+            mwOpts += '<li class="bp-dd-opt" data-id="' + escHtml(rec.id) +
+                      '" data-label="' + escHtml(rec.name) +
+                      '" data-photo-id="' + escHtml(rec.photo_id || '') + '">' + escHtml(rec.name) + '</li>';
+          });
+        }
+      }
+
+      /* Avatar */
+      var avatarHtml  = ev.mwAvatarImgSrc
+        ? '<img src="' + escHtml(ev.mwAvatarImgSrc) + '">'
+        : (existingMwName ? escHtml(buildRecordInitials(existingMwName)) : '');
+      var avatarClass = existingMwName ? ' bp-rec-avatar--show' : '';
+
+      /* Row styling */
+      var editRowStyles = buildBprEventStyles(ev);
+      var cellBorderTB  = editRowStyles.borderTopStr + editRowStyles.borderBottomStr;
+      var cbCellStyle   = editRowStyles.borderLeftStr + cellBorderTB;
+      var actCellStyle  = cellBorderTB + editRowStyles.borderRightStr;
+
+      /* Original field values for change detection */
+      var originalVals = {
+        mf:     existingMfVal,
+        mfApi:  existingMfApi,
+        mwId:   existingMwId,
+        attend: existingAttend,
+        leave:  existingLeave
+      };
+      tablePicklistCols.forEach(function (f) {
+        var rawVal    = bprVals[f.api_name] || '';
+        var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+        if (actualVal) { originalVals[f.api_name] = actualVal; }
+      });
+
+      /* Approval state */
+      var evApprovalVal  = bprVals['beatplanner__Managers_Approval'] || '';
+      var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+      var lockedAttr     = approvalLocked ? ' disabled' : '';
+      var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+      var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
+
+      /* data-pf-* attributes for filter matching */
+      var pfAttrs = '';
+      if (bprPicklistFields && bprPicklistFields.length) {
+        bprPicklistFields.forEach(function (pf) {
+          var v = bprVals[pf.api_name];
+          if (v) { pfAttrs += ' data-pf-' + escHtml(pf.api_name.toLowerCase()) + '="' + escHtml(v) + '"'; }
+        });
+      }
+
+      var startLbl = fmtTime(ev.startTime || '00:00');
+      var endLbl   = fmtTime(ev.endTime   || '00:00');
+
+      tableHtml += '<tr class="bp-slot-row bp-edit-row"' +
+                   ' data-date="' + escHtml(date) + '"' +
+                   ' data-edit-id="' + escHtml(ev.id) + '"' +
+                   ' data-start-time="' + escHtml(ev.startTime || '') + '"' +
+                   ' data-end-time="' + escHtml(ev.endTime || '') + '"' +
+                   ' data-original-vals="' + escHtml(JSON.stringify(originalVals)) + '"' +
+                   pfAttrs +
+                   (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
+
+      tableHtml += '<td class="bp-cb-cell"' +
+                   (cbCellStyle ? ' style="' + escHtml(cbCellStyle) + '"' : '') +
+                   '>' + editRowStyles.markerHtml +
+                   '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>';
+
+      tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
+                   ' data-api="' + escHtml(startTimeApi) + '" data-label="' + escHtml(startTimeLbl) + '">' + startLbl + '</td>';
+      tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
+                   ' data-api="' + escHtml(endTimeApi)   + '" data-label="' + escHtml(endTimeLbl)   + '">' + endLbl   + '</td>';
+
+      /* Meetings For */
+      tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                   '<div class="bp-dd-wrap bp-mf-wrap" data-row="edit" data-api="' + escHtml(mfFieldApi) + '" data-label="' + escHtml(mfFieldLabel) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-dd-val"' + (existingMfApi ? ' data-selected-api="' + escHtml(existingMfApi) + '"' : '') + '>' +
+                   escHtml(existingMfVal || 'Select module\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list">' + mfOptions + '</ul>' +
+                   '</div></div></td>';
+
+      /* Meeting With */
+      tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                   '<div class="bp-dd-wrap bp-mw-wrap" data-row="edit" data-api="' + escHtml(mwLookupApiName) + '" data-label="Meeting With">' +
+                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<span class="bp-rec-avatar' + avatarClass + '" aria-hidden="true"' +
+                   ' data-photo-id="' + escHtml(ev.mwPhotoId || '') + '">' + avatarHtml + '</span>' +
+                   '<span class="bp-dd-val"' + (existingMwId ? ' data-selected-id="' + escHtml(existingMwId) + '"' : '') + '>' +
+                   escHtml(existingMwName || 'Select\u2026') + '</span>' +
+                   chevSvg + '</div>' +
+                   '<div class="bp-dd-panel">' +
+                   '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                   '<ul class="bp-dd-list bp-mw-list">' + mwOpts + '</ul>' +
+                   '</div></div></td>';
+
+      /* Dynamic picklist columns */
+      tablePicklistCols.forEach(function (f) {
+        var rawVal    = bprVals[f.api_name] || '';
+        var actualVal = (rawVal && typeof rawVal === 'object') ? (rawVal.name || rawVal.actual_value || '') : String(rawVal);
+        var displayVal = actualVal;
+        if (actualVal && f.options) {
+          f.options.forEach(function (opt) {
+            var a    = (typeof opt === 'object') ? opt.actual  : opt;
+            var disp = (typeof opt === 'object') ? opt.display : opt;
+            if (a === actualVal || disp === actualVal) { displayVal = disp; }
+          });
+        }
+        tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
+                     '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                     '<div class="bp-dd-trigger" tabindex="0">' +
+                     '<span class="bp-dd-val"' + (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
+                     escHtml(displayVal || 'Select\u2026') + '</span>' +
+                     chevSvg + '</div>' +
+                     '<div class="bp-dd-panel">' +
+                     '<input class="bp-dd-search" type="text" placeholder="Search\u2026" autocomplete="off" />' +
+                     '<ul class="bp-dd-list">' + buildOptList(f.options) + '</ul>' +
+                     '</div></div></td>';
+      });
+
+      /* Actions */
+      tableHtml += '<td class="bp-action-cell"' + (actCellStyle ? ' style="' + escHtml(actCellStyle) + '"' : '') + '>' +
+                   '<button class="bp-row-action bp-row-save"    type="button" title="Update record">'  + SVG.save    + '</button>' +
+                   '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'    + SVG.copy    + '</button>' +
+                   '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'   + lockedAttr + '>' + SVG.trash   + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '</td>';
+
+      tableHtml += '</tr>';
+    });
+
+    tableHtml += '</tbody></table>';
+
+    return '<div class="bp-plan-container map-event-container" data-date="' + escHtml(date) + '">' +
+           '<div class="bp-slots-wrap">' + tableHtml + '</div></div>';
+  }
+
+  /**
    * Build and return the HTML content for the Mass Actions popup body.
    * Renders events day-by-day in a collapsible accordion layout using
    * buildMassUpdateEventHtml() for each event.  Working records show the
@@ -3727,11 +3995,42 @@ $(function () {
   function buildMassActionsBodyHtml(groups) {
     if (!groups.length) { return ''; }
 
+    /* Resolve the Attendance API name once – same for all events */
+    var attendApi = 'beatplanner__Attendance';
+    if (bprPicklistFields) {
+      bprPicklistFields.forEach(function (f) {
+        if ((f.field_label || '').toLowerCase().trim() === 'attendance') { attendApi = f.api_name; }
+      });
+    }
+
     var chevSvg = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
                   'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
+
+    /* SVG for the filter button – same icon used in demBulkGrid */
+    var filterBtnSvg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+                       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13">' +
+                       '<path d="M2 4h12M5 8h6M7.5 12h1"/></svg>';
+
     var html = '';
+    /* Track whether the filter button has been emitted yet; it should appear only once
+       (before the first Leave record across all day groups) to avoid duplicate IDs. */
+    var leaveFilterBtnAdded = false;
+
     groups.forEach(function (group) {
+      /* Separate events: Working records share ONE container; Leave / other records
+         each keep their own individual container (existing Leave layout). */
+      var workingEvts = [];
+      var leaveEvts   = [];
+      group.events.forEach(function (ev) {
+        var val = String(((ev.bprFieldValues || {})[attendApi]) || '').toLowerCase();
+        if (val === 'working') {
+          workingEvts.push(ev);
+        } else {
+          leaveEvts.push(ev);
+        }
+      });
+
       html += '<div class="map-day-group" data-date="' + escHtml(group.date) + '">' +
               '  <div class="map-day-header">' +
               '    <label class="map-cb-label">' +
@@ -3742,9 +4041,27 @@ $(function () {
               '  </div>' +
               '  <div class="map-day-events">';
 
-      group.events.forEach(function (ev) {
-        html += buildMassUpdateEventHtml(ev);
-      });
+      /* Working records: ONE shared container with ONE table for the whole day */
+      if (workingEvts.length) {
+        html += buildMassActionsWorkingSection(group.date, workingEvts);
+      }
+
+      /* Leave / other records: individual containers (existing Leave layout).
+         The filter button (#bpFilterBtn) is added once, before the first Leave record. */
+      if (leaveEvts.length) {
+        if (!leaveFilterBtnAdded) {
+          html += '<div class="bp-attend-bar">' +
+                  '<div class="bp-filter-action">' +
+                  '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+                  filterBtnSvg + 'Filter</button>' +
+                  '</div>' +
+                  '</div>';
+          leaveFilterBtnAdded = true;
+        }
+        leaveEvts.forEach(function (ev) {
+          html += buildMassUpdateEventHtml(ev);
+        });
+      }
 
       html += '  </div>' +
               '</div>';
