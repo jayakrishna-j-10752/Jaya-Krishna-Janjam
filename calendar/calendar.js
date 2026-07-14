@@ -1884,6 +1884,26 @@ $(function () {
   }
 
   /**
+   * Programmatically pre-select a Leave Type value in a slot-picker grid or day group.
+   * @param {jQuery} $grid     – the container to search within
+   * @param {string} leaveType – the leave type value to select (case-insensitive)
+   */
+  function preselectLeaveType($grid, leaveType) {
+    if (!leaveType) { return; }
+    var $leaveWrap = $grid.find('.bp-leave-type-field .bp-dd-wrap').first();
+    if (!$leaveWrap.length) { return; }
+    $leaveWrap.find('.bp-dd-opt').each(function () {
+      var label  = $(this).data('label')  || '';
+      var actual = $(this).data('actual') || label;
+      if (actual.toLowerCase() === leaveType.toLowerCase() ||
+          label.toLowerCase()  === leaveType.toLowerCase()) {
+        $leaveWrap.find('.bp-dd-val').text(label).attr('data-actual-val', actual);
+        return false; /* break each() */
+      }
+    });
+  }
+
+  /**
    * Returns the attendance value (lowercase) for the given date from state.events,
    * or null if no event with attendance data exists.
    * Returns 'leave' or 'working' (or null).
@@ -4442,15 +4462,45 @@ $(function () {
   }
 
   /**
+   * Given an array of COQL records, return a map:
+   *   { dateStr: { attendance: string, leaveType: string } }
+   * "Leave" takes priority over "Working" for any given day.
+   *
+   * @param {Array} coqlRecords
+   * @returns {Object}
+   */
+  function buildAttendanceMap(coqlRecords) {
+    var attendApi = getAttendanceApiName();
+    var leaveApi  = 'beatplanner__Leave_Type';
+    var map = {};
+    coqlRecords.forEach(function (rec) {
+      var fromStr = rec['beatplanner__Date_Time_From'] || '';
+      if (!fromStr) { return; }
+      var dateStr   = fromStr.substring(0, 10);
+      var attend    = rec[attendApi] || '';
+      var leaveType = rec[leaveApi]  || '';
+      if (!map[dateStr]) { map[dateStr] = { attendance: '', leaveType: '' }; }
+      if (attend.toLowerCase() === 'leave') {
+        map[dateStr].attendance = attend;
+        if (leaveType) { map[dateStr].leaveType = leaveType; }
+      } else if (attend && !map[dateStr].attendance) {
+        map[dateStr].attendance = attend;
+      }
+    });
+    return map;
+  }
+
+  /**
    * Build the HTML for the Mass Create accordion inside #slotPickerGrid.
    * Each day is a collapsible section containing the same beatplan table
    * rendered by buildBeatPlanTable (or time-slot buttons in non-beatplan mode).
    *
    * @param {string[]} dateList       – YYYY-MM-DD strings in the range
    * @param {object}   occupiedHrsMap – {dateStr: {h: true}} from buildOccupiedHoursMap
+   * @param {object}   [attendanceMap] – {dateStr: {attendance, leaveType}} from buildAttendanceMap
    * @returns {string} HTML string
    */
-  function buildMassCreateAccordionHtml(dateList, occupiedHrsMap) {
+  function buildMassCreateAccordionHtml(dateList, occupiedHrsMap, attendanceMap) {
     if (!dateList.length) { return '<div class="mc-loading">No dates in range.</div>'; }
 
     var chevSvg = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
@@ -4458,25 +4508,58 @@ $(function () {
                   '<path d="M1 1l4 4 4-4"/></svg>';
     var html = '';
 
+    /* Sentinel used to suppress all rows inside a beatplan table for leave/no-slot days */
+    var allHoursOccupied = {};
+    for (var ah = 0; ah < 24; ah++) { allHoursOccupied[ah] = true; }
+
     dateList.forEach(function (ds) {
-      var skipHours   = occupiedHrsMap[ds] || {};
+      var skipHours    = occupiedHrsMap[ds] || {};
+      var dayAttendInfo = attendanceMap ? (attendanceMap[ds] || null) : null;
+      var isLeave      = dayAttendInfo && dayAttendInfo.attendance.toLowerCase() === 'leave';
+      var isWorking    = dayAttendInfo && dayAttendInfo.attendance.toLowerCase() !== 'leave' && !!dayAttendInfo.attendance;
+      var leaveType    = (dayAttendInfo && dayAttendInfo.leaveType) || '';
+
       /* Determine the first eligible hour (skip past hours for today) */
       var currentHour = isToday(ds) ? new Date().getHours() : 0;
-      /* Check whether there are any available slots */
+      /* Check whether there are any available working-hour slots */
       var hasSlots    = false;
-      for (var hc = currentHour; hc < 24; hc++) {
-        if (!skipHours[hc]) { hasSlots = true; break; }
+      if (!isLeave) {
+        for (var hc = currentHour; hc < 24; hc++) {
+          if (!skipHours[hc]) { hasSlots = true; break; }
+        }
       }
 
-      html += '<div class="map-day-group mc-day-group" data-date="' + escHtml(ds) + '">';
+      /* Build data attributes for post-DOM attendance pre-selection */
+      var dayDataAttrs = ' data-date="' + escHtml(ds) + '"';
+      if (dayAttendInfo && dayAttendInfo.attendance) {
+        dayDataAttrs += ' data-mc-attendance="' + escHtml(dayAttendInfo.attendance) + '"';
+      }
+      if (leaveType) {
+        dayDataAttrs += ' data-mc-leave-type="' + escHtml(leaveType) + '"';
+      }
+
+      html += '<div class="map-day-group mc-day-group"' + dayDataAttrs + '>';
       html += '<div class="map-day-header">';
       html += '<span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(ds)) + '</span>';
       html += '<button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>';
       html += '</div>';
       html += '<div class="map-day-events">';
 
-      if (!hasSlots) {
-        html += '<div class="mc-no-slots">No available slots</div>';
+      if (isLeave) {
+        /* Leave day: render attend bar for pre-selection (table suppressed), show leave message */
+        if (beatPlanHasRefs) {
+          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied });
+        }
+        var leaveMsg = leaveType
+          ? 'No available slots.<br>User is on ' + escHtml(leaveType) + '.'
+          : 'No available slots.<br>User is on Leave.';
+        html += '<div class="mc-no-slots">' + leaveMsg + '</div>';
+      } else if (!hasSlots) {
+        /* Working or unknown – all slots occupied */
+        if (beatPlanHasRefs && isWorking) {
+          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied });
+        }
+        html += '<div class="mc-no-slots">No available slots.</div>';
       } else if (beatPlanHasRefs) {
         html += buildBeatPlanTable(ds, { skipHours: skipHours });
       } else {
@@ -4508,6 +4591,7 @@ $(function () {
   async function openMassCreateModal(action, fromDate, toDate) {
     var range = getMassCreateDateRange(action, fromDate, toDate);
 
+
     closeAllBpDropdowns();
 
     /* ── Open #eventModal immediately with a loading indicator ── */
@@ -4537,12 +4621,27 @@ $(function () {
       var startDt = toIsoDt(range.startDate, '00:00');
       var endDt   = toIsoDt(range.endDate,   '23:59');
 
-      var records       = await fetchMassCreateRecords(startDt, endDt, ownerId);
+      var records        = await fetchMassCreateRecords(startDt, endDt, ownerId);
       var occupiedHrsMap = buildOccupiedHoursMap(records);
-      var dateList      = buildDateList(range.startDate, range.endDate);
-      var accordionHtml = buildMassCreateAccordionHtml(dateList, occupiedHrsMap);
+      var attendanceMap  = buildAttendanceMap(records);
+      var dateList       = buildDateList(range.startDate, range.endDate);
+      var accordionHtml  = buildMassCreateAccordionHtml(dateList, occupiedHrsMap, attendanceMap);
 
       dom.slotPickerGrid.html(accordionHtml);
+
+      /* ── Post-DOM: pre-select Attendance (and Leave Type) for each day ── */
+      dom.slotPickerGrid.find('.mc-day-group[data-mc-attendance]').each(function () {
+        var $dayGroup = $(this);
+        var attend    = $dayGroup.data('mc-attendance') || '';
+        var lType     = $dayGroup.data('mc-leave-type') || '';
+        if (attend) {
+          preselectAttendance($dayGroup, attend);
+        }
+        if (attend.toLowerCase() === 'leave' && lType) {
+          preselectLeaveType($dayGroup, lType);
+        }
+      });
+
       updateFilterBadge();
     } catch (err) {
       console.error('Mass Create fetch error:', err);
