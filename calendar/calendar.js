@@ -4506,7 +4506,19 @@ $(function () {
     var chevSvg = '<svg class="map-day-toggle-chev" viewBox="0 0 10 6" fill="none" stroke="currentColor" ' +
                   'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
-    var html = '';
+
+    /* ── Single global action bar: Filter button + Mass Update button ── */
+    var filterSvg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+                    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13">' +
+                    '<path d="M2 4h12M5 8h6M7.5 12h1"/></svg>';
+    var html = '<div class="mc-action-bar">' +
+               '<div class="bp-filter-action">' +
+               '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+               filterSvg + 'Filter' +
+               '</button>' +
+               '</div>' +
+               '<button class="mc-mass-update-btn" type="button" style="display:none;">Mass Update</button>' +
+               '</div>';
 
     /* Sentinel used to suppress all rows inside a beatplan table for leave/no-slot days */
     var allHoursOccupied = {};
@@ -4640,6 +4652,10 @@ $(function () {
         if (attend.toLowerCase() === 'leave' && lType) {
           preselectLeaveType($dayGroup, lType);
         }
+        /* Records already exist for this day – hide the Attendance and Leave Type
+           fields so they cannot be accidentally changed. The values are already
+           known from the fetched records. */
+        $dayGroup.find('.bp-attend-field').hide();
       });
 
       updateFilterBadge();
@@ -7919,6 +7935,7 @@ $(function () {
       var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
       var anyChecked = checkedCnt > 0;
       $grid.find('.bp-mass-create-btn').toggle(anyChecked);
+      $grid.find('.mc-mass-update-btn').toggle(anyChecked);
       var $selectAll = $grid.find('.bp-select-all-cb');
       if ($selectAll.length) {
         $selectAll.prop('indeterminate', anyChecked && checkedCnt < $allCbs.length);
@@ -7932,6 +7949,7 @@ $(function () {
       var checked  = $(this).is(':checked');
       $grid.find('.bp-row-cb:not(:disabled)').prop('checked', checked);
       $grid.find('.bp-mass-create-btn').toggle(checked);
+      $grid.find('.mc-mass-update-btn').toggle(checked);
     });
 
     /* ── Bulk Create Daily Beat Plans ── */
