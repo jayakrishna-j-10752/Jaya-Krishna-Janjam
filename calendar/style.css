@@ -4856,6 +4856,22 @@ input, select, textarea {
   box-shadow: 0 2px 8px rgba(0,0,0,.4);
 }
 
+/* ── Mass Create: leave-day checkbox (left of Attendance dropdown) ── */
+.bp-mc-leave-cb-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  align-self: flex-end;
+  padding-bottom: 6px;
+}
+.bp-mc-leave-cb-label .bp-mc-leave-cb {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #1565C0);
+  cursor: pointer;
+}
+
 /* ── Leave-mode action buttons inside .bp-attend-bar ── */
 .bp-attend-leave-actions {
   display: flex;

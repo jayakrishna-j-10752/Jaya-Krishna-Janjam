@@ -1872,6 +1872,7 @@ $(function () {
         $grid.find('.bp-slots-table').toggle(isWorking);
         $grid.find('.bp-leave-type-field').toggle(isLeave);
         $grid.find('.bp-apply-leave-btn').hide();
+        $grid.find('.bp-mc-leave-cb-label').toggle(isLeave);
         $grid.find('.bp-filter-action').toggle(isWorking);
         if (!isLeave) {
           $grid.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
@@ -2210,6 +2211,13 @@ $(function () {
 
     /* ── Attendance + Leave Type bar (top-left of .bp-slots-wrap) ── */
     var attendBar = '<div class="bp-attend-bar">';
+    /* Mass Create mode: leave-day checkbox sits to the left of the Attendance dropdown.
+       Hidden by default; revealed by the Attendance change handler when Leave is selected. */
+    if (opts && opts.massCreate) {
+      attendBar += '<label class="bp-mc-leave-cb-label" style="display:none;" title="Mark as leave day">' +
+                   '<input type="checkbox" class="bp-mc-leave-cb" aria-label="Mark as leave day">' +
+                   '</label>';
+    }
     if (attendanceField) {
       attendBar += '<div class="bp-attend-field">' +
                    '<span class="bp-attend-label">' + escHtml(attendanceField.field_label) + '</span>' +
@@ -2221,8 +2229,10 @@ $(function () {
                    '<span class="bp-attend-label">' + escHtml(leaveTypeField.field_label) + '</span>' +
                    buildDdWrap(leaveTypeField.api_name, leaveTypeField.field_label, 'Select\u2026', buildOptList(leaveTypeField.options)) +
                    '</div>';
-      /* "Apply Leave" button – shown alongside the Leave Type dropdown */
-      attendBar += '<button class="bp-apply-leave-btn" type="button" style="display:none;">Apply Leave</button>';
+      /* "Apply Leave" button – shown in normal (single-event) mode only; omitted in Mass Create */
+      if (!(opts && opts.massCreate)) {
+        attendBar += '<button class="bp-apply-leave-btn" type="button" style="display:none;">Apply Leave</button>';
+      }
     }
     attendBar += '<div class="bp-filter-action" style="display:none;">' +
                  '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
@@ -4507,7 +4517,7 @@ $(function () {
                   'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
 
-    /* ── Single global action bar: Filter button + Mass Update button ── */
+    /* ── Single global action bar: Filter button + Mass Create button ── */
     var filterSvg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
                     'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13">' +
                     '<path d="M2 4h12M5 8h6M7.5 12h1"/></svg>';
@@ -4517,7 +4527,7 @@ $(function () {
                filterSvg + 'Filter' +
                '</button>' +
                '</div>' +
-               '<button class="mc-mass-update-btn" type="button" style="display:none;">Mass Update</button>' +
+               '<button class="bp-mass-create-btn mc-global-mass-create-btn" type="button" style="display:none;">Mass Create</button>' +
                '</div>';
 
     /* Sentinel used to suppress all rows inside a beatplan table for leave/no-slot days */
@@ -4560,7 +4570,7 @@ $(function () {
       if (isLeave) {
         /* Leave day: render attend bar for pre-selection (table suppressed), show leave message */
         if (beatPlanHasRefs) {
-          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied });
+          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied, massCreate: true });
         }
         var leaveMsg = leaveType
           ? 'No available slots.<br>User is on ' + escHtml(leaveType) + '.'
@@ -4569,11 +4579,11 @@ $(function () {
       } else if (!hasSlots) {
         /* Working or unknown – all slots occupied */
         if (beatPlanHasRefs && isWorking) {
-          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied });
+          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied, massCreate: true });
         }
         html += '<div class="mc-no-slots">No available slots.</div>';
       } else if (beatPlanHasRefs) {
-        html += buildBeatPlanTable(ds, { skipHours: skipHours });
+        html += buildBeatPlanTable(ds, { skipHours: skipHours, massCreate: true });
       } else {
         /* Non-beatplan fallback: clickable time-slot buttons */
         var nowHour = isToday(ds) ? new Date().getHours() : 0;
@@ -7852,6 +7862,25 @@ $(function () {
             $mc.find('.bp-attend-leave-actions').css('color', '');
           }
         } else {
+          /* ── Check if inside a Mass Create accordion day group ── */
+          var $dayGroup = $wrap.closest('.mc-day-group');
+
+          if ($dayGroup.length) {
+            /* ── Mass Create accordion: scope all changes to this day group only ── */
+            $dayGroup.find('.bp-slots-table').toggle(isWorking);
+            $dayGroup.find('.bp-leave-type-field').toggle(isLeave);
+            /* Show/hide leave-day checkbox (Mass Create mode only) */
+            $dayGroup.find('.bp-mc-leave-cb-label').toggle(isLeave);
+            if (!isLeave) {
+              /* Uncheck leave checkbox and reset Leave Type when switching away from Leave */
+              $dayGroup.find('.bp-mc-leave-cb').prop('checked', false);
+              $dayGroup.find('.bp-leave-type-field .bp-dd-wrap .bp-dd-val')
+                       .text('Select\u2026')
+                       .removeAttr('data-actual-val');
+              $dayGroup.find('.bp-attend-bar').css('background', '');
+              $dayGroup.find('.bp-attend-label').css('color', '');
+            }
+          } else {
           /* ── slotPickerGrid (single-event edit modal) handling ── */
           var $grid     = $('#slotPickerGrid');
 
@@ -7896,6 +7925,7 @@ $(function () {
             $grid.find('.bp-attend-label').css('color', '');
             $grid.find('.bp-attend-leave-actions').css('color', '');
           }
+          } /* end single-event else */
         }
       }
 
@@ -7935,7 +7965,6 @@ $(function () {
       var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
       var anyChecked = checkedCnt > 0;
       $grid.find('.bp-mass-create-btn').toggle(anyChecked);
-      $grid.find('.mc-mass-update-btn').toggle(anyChecked);
       var $selectAll = $grid.find('.bp-select-all-cb');
       if ($selectAll.length) {
         $selectAll.prop('indeterminate', anyChecked && checkedCnt < $allCbs.length);
@@ -7949,7 +7978,6 @@ $(function () {
       var checked  = $(this).is(':checked');
       $grid.find('.bp-row-cb:not(:disabled)').prop('checked', checked);
       $grid.find('.bp-mass-create-btn').toggle(checked);
-      $grid.find('.mc-mass-update-btn').toggle(checked);
     });
 
     /* ── Bulk Create Daily Beat Plans ── */
@@ -7957,55 +7985,83 @@ $(function () {
       var $btn  = $(this);
       var $grid = $('#slotPickerGrid');
 
-      /* Collect only rows where the checkbox is checked */
+      /* ── Determine mode: multi-day Mass Create accordion vs single-event edit modal ── */
+      var isMcAccordion = $grid.find('.mc-day-group').length > 0;
+
+      /* Collect checked working rows */
       var $checkedRows = $grid.find('.bp-slot-row').filter(function () {
         return $(this).find('.bp-row-cb').is(':checked');
       });
 
-      if ($checkedRows.length === 0) { return; }
+      /* In accordion mode, also collect leave-day groups whose checkbox is checked */
+      var $leaveGroups = isMcAccordion
+        ? $grid.find('.mc-day-group').filter(function () {
+            return $(this).find('.bp-mc-leave-cb').is(':checked');
+          })
+        : $();
+
+      if ($checkedRows.length === 0 && $leaveGroups.length === 0) { return; }
 
       $btn.prop('disabled', true);
-
-      /* Read shared attendance/leave-type from the plan container (one container per date) */
-      var $container  = $grid.find('.bp-plan-container').first();
-      var $attendWrap = $container.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
-      var attendApi   = $attendWrap.data('api') || 'beatplanner__Attendance';
-      var attendVal   = $attendWrap.find('.bp-dd-val').attr('data-actual-val') || '';
-      var $leaveWrap  = $container.find('.bp-leave-type-field .bp-dd-wrap');
-      var leaveApi    = $leaveWrap.data('api') || 'beatplanner__Leave_Type';
-      var leaveVal    = $leaveWrap.find('.bp-dd-val').attr('data-actual-val') || '';
 
       var created = 0;
       var failed  = 0;
 
-      /* ── Feature 4: If this session began as a Leave edit, delete the Leave record first ── */
-      var leaveEditId = String($container.data('leaveEditId') || '');
-      if (leaveEditId) {
-        try {
-          await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + leaveEditId);
-          state.events = state.events.filter(function (e) { return e.id !== leaveEditId; });
-          $container.removeAttr('data-leave-edit-id');
-          console.log('Deleted leave record before mass-creating working records', leaveEditId);
-        } catch (err) {
-          console.error('Failed to delete leave record', err);
-          showToast('Failed to remove existing Leave record. Aborting.');
-          $btn.prop('disabled', false);
-          return;
+      /* ── Feature 4 (single-event mode): delete previous Leave record before creating ── */
+      if (!isMcAccordion) {
+        var $singleContainer = $grid.find('.bp-plan-container').first();
+        var singleLeaveEditId = String($singleContainer.data('leaveEditId') || '');
+        if (singleLeaveEditId) {
+          try {
+            await zrc.delete('/crm/v8/beatplanner__Daily_Beat_Plans?ids=' + singleLeaveEditId);
+            state.events = state.events.filter(function (e) { return e.id !== singleLeaveEditId; });
+            $singleContainer.removeAttr('data-leave-edit-id');
+            console.log('Deleted leave record before mass-creating working records', singleLeaveEditId);
+          } catch (err) {
+            console.error('Failed to delete leave record', err);
+            showToast('Failed to remove existing Leave record. Aborting.');
+            $btn.prop('disabled', false);
+            return;
+          }
         }
       }
 
-      /* ── Build all record payloads and event metadata; send in a single batch request ── */
+      /* ── Build all record payloads ── */
       var massPayloads = []; /* [{ recordData, massEv }] */
 
+      /* Helper: resolve attendance/leave-type from the container enclosing $row or from the
+         provided explicit container (used for leave-day groups). */
+      function resolveAttendFromContainer($container) {
+        var $aw = $container.find('.bp-attend-field:not(.bp-leave-type-field) .bp-dd-wrap');
+        var $lw = $container.find('.bp-leave-type-field .bp-dd-wrap');
+        return {
+          attendApi: $aw.data('api') || 'beatplanner__Attendance',
+          attendVal: $aw.find('.bp-dd-val').attr('data-actual-val') || '',
+          leaveApi:  $lw.data('api') || 'beatplanner__Leave_Type',
+          leaveVal:  $lw.find('.bp-dd-val').attr('data-actual-val') || ''
+        };
+      }
+
+      /* ── Working-day rows ── */
       for (var ri = 0; ri < $checkedRows.length; ri++) {
         var $row = $($checkedRows[ri]);
         var date = $row.data('date') || '';
         var hour = $row.data('hour');
 
+        /* In accordion mode, read attendance from THIS row's day group;
+           in single-event mode, read from the (only) plan container. */
+        var rowContainer = isMcAccordion
+          ? $row.closest('.mc-day-group').find('.bp-plan-container')
+          : $grid.find('.bp-plan-container').first();
+        var ra = resolveAttendFromContainer(rowContainer);
+        var attendApi = ra.attendApi;
+        var attendVal = ra.attendVal;
+        var leaveApi  = ra.leaveApi;
+        var leaveVal  = ra.leaveVal;
+
         var recordData = {};
 
-        /* Start / End time fields – build ISO-8601 datetimes from the row date + hour.
-           For Leave records, override with the full-day range (00:00:00 … 23:59:59). */
+        /* Start / End time fields */
         var isLeaveRecord = (attendVal && attendVal !== 'Select\u2026' &&
                              attendVal.toLowerCase() === 'leave');
         var startIso, endIso;
@@ -8023,7 +8079,7 @@ $(function () {
 
         if (date) { recordData['beatplanner__Date'] = date; }
 
-        /* Meetings For – save the user-visible display text, not the module API name */
+        /* Meetings For */
         var $mfWrap      = $row.find('.bp-mf-wrap');
         var $mfVal       = $mfWrap.find('.bp-dd-val');
         var mfDisplayVal = $mfVal.text().trim() || '';
@@ -8041,7 +8097,6 @@ $(function () {
         if (mwId && mwLookupApi) {
           recordData[mwLookupApi] = { id: mwId };
         }
-        /* Include all other module lookup fields as null to clear them */
         bpDailyAllFields.forEach(function (f) {
           if (f.data_type !== 'lookup' || !f.lookup || !f.lookup.module) { return; }
           if (f.api_name === mwLookupApi) { return; }
@@ -8053,11 +8108,10 @@ $(function () {
 
         /* Dynamic picklist columns */
         $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
-          var $wrap    = $(this);
-          var fieldApi = String($wrap.data('api') || '');
+          var $wrapCell = $(this);
+          var fieldApi  = String($wrapCell.data('api') || '');
           if (!fieldApi) { return; }
-          var $val   = $wrap.find('.bp-dd-val');
-          var actual = $val.attr('data-actual-val') || '';
+          var actual = $wrapCell.find('.bp-dd-val').attr('data-actual-val') || '';
           if (actual && actual !== 'Select\u2026') {
             recordData[fieldApi] = actual;
           }
@@ -8071,77 +8125,120 @@ $(function () {
           recordData[leaveApi] = leaveVal;
         }
 
-        /* Link to the Monthly Beat Plan record */
         if (monthlyBeatPlanId) {
           recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
         }
-
-        /* Mandatory Name field */
         recordData['Name'] = 'Meeting With ' + mwName;
-
-        /* Always default Managers Approval to "Pending" on creation */
         recordData['beatplanner__Managers_Approval'] = 'Pending';
-
-        /* Assign the record to the currently selected user */
         var massOwnerId = $('#userProfile').attr('data-userid');
-        if (massOwnerId) {
-          recordData['Owner'] = { id: massOwnerId };
-        }
+        if (massOwnerId) { recordData['Owner'] = { id: massOwnerId }; }
 
-        /* Build bprFieldValues for this row so the chip gets metadata-driven styling */
-        var massBprFieldValues = {};
+        /* bprFieldValues for in-memory event */
+        var massBprFv = {};
         if (mfDisplayVal && mfDisplayVal !== 'Select module\u2026') {
-          massBprFieldValues[mfFieldApi] = mfDisplayVal;
+          massBprFv[mfFieldApi] = mfDisplayVal;
         }
         $row.find('.bp-dd-wrap').not('.bp-mf-wrap').not('.bp-mw-wrap').each(function () {
-          var $wrap    = $(this);
-          var fieldApi = String($wrap.data('api') || '');
+          var $wrapCell = $(this);
+          var fieldApi  = String($wrapCell.data('api') || '');
           if (!fieldApi) { return; }
-          var $val   = $wrap.find('.bp-dd-val');
-          var actual = $val.attr('data-actual-val') || '';
-          if (actual && actual !== 'Select\u2026') {
-            massBprFieldValues[fieldApi] = actual;
-          }
+          var actual = $wrapCell.find('.bp-dd-val').attr('data-actual-val') || '';
+          if (actual && actual !== 'Select\u2026') { massBprFv[fieldApi] = actual; }
         });
-        if (attendVal && attendVal !== 'Select\u2026') {
-          massBprFieldValues[attendApi] = attendVal;
-        }
-        if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') {
-          massBprFieldValues[leaveApi] = leaveVal;
-        }
-        massBprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
+        if (attendVal && attendVal !== 'Select\u2026') { massBprFv[attendApi] = attendVal; }
+        if (isLeaveRecord && leaveVal && leaveVal !== 'Select\u2026') { massBprFv[leaveApi] = leaveVal; }
+        massBprFv['beatplanner__Managers_Approval'] = 'Pending';
 
         var $massMwAvatar = $mwWrap.find('.bp-rec-avatar');
         var massStartTime = isLeaveRecord ? '00:00' : hourToTime(hour);
         var massEndTime   = isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1));
 
-        var massEv = {
-          id:             uid(),
-          title:          mwName || (mfDisplayVal || 'Beat Plan'),
-          date:           date,
-          startTime:      massStartTime,
-          endTime:        massEndTime,
-          color:          '#1565C0',
-          description:    '',
-          bprFieldValues: massBprFieldValues,
-          mwAvatarImgSrc: $massMwAvatar.find('img').attr('src') || $massMwAvatar.attr('data-img-src') || '',
-          mwAvatarText:   $massMwAvatar.text() || '',
-          mwPhotoId:      $massMwAvatar.attr('data-photo-id') || '',
-          mwRecordId:     mwId,
-          mwLookupApi:    mwLookupApi
-        };
-
-        massPayloads.push({ recordData: recordData, massEv: massEv });
+        massPayloads.push({
+          recordData: recordData,
+          massEv: {
+            id:             uid(),
+            title:          mwName || (mfDisplayVal || 'Beat Plan'),
+            date:           date,
+            startTime:      massStartTime,
+            endTime:        massEndTime,
+            color:          '#1565C0',
+            description:    '',
+            bprFieldValues: massBprFv,
+            mwAvatarImgSrc: $massMwAvatar.find('img').attr('src') || $massMwAvatar.attr('data-img-src') || '',
+            mwAvatarText:   $massMwAvatar.text() || '',
+            mwPhotoId:      $massMwAvatar.attr('data-photo-id') || '',
+            mwRecordId:     mwId,
+            mwLookupApi:    mwLookupApi
+          }
+        });
       }
 
-      /* Single batch request for all checked Beat Plan rows */
-      if (massPayloads.length > 0) {
+      /* ── Leave-day groups (accordion mode only) ── */
+      $leaveGroups.each(function () {
+        var $dg         = $(this);
+        var $lc         = $dg.find('.bp-plan-container');
+        var leaveDate   = $lc.data('date') || '';
+        if (!leaveDate) { return; }
+        var la          = resolveAttendFromContainer($lc);
+        var lAttendVal  = la.attendVal;
+        var lLeaveVal   = la.leaveVal;
+        var lAttendApi  = la.attendApi;
+        var lLeaveApi   = la.leaveApi;
+
+        /* Resolve time-field API names */
+        var lStartApi = 'beatplanner__Date_Time_From';
+        var lEndApi   = 'beatplanner__Date_Time_To';
+        bpDailyAllFields.forEach(function (f) {
+          var lbl = (f.field_label || '').toLowerCase();
+          if (lbl === 'start time') { lStartApi = f.api_name || lStartApi; }
+          if (lbl === 'end time')   { lEndApi   = f.api_name || lEndApi; }
+        });
+
+        var lStartIso = toIsoDt(leaveDate, '00:00');
+        var lEndIso   = toIsoDt(leaveDate, '23:59').replace('T23:59:00', 'T23:59:59');
+
+        var lBprFv = {};
+        lBprFv[lAttendApi] = lAttendVal;
+        if (lLeaveVal && lLeaveVal !== 'Select\u2026') { lBprFv[lLeaveApi] = lLeaveVal; }
+        lBprFv['beatplanner__Managers_Approval'] = 'Pending';
+
+        var lRecordData = {};
+        lRecordData[lStartApi]                        = lStartIso;
+        lRecordData[lEndApi]                          = lEndIso;
+        lRecordData['beatplanner__Date']              = leaveDate;
+        lRecordData[lAttendApi]                       = lAttendVal;
+        if (lLeaveVal && lLeaveVal !== 'Select\u2026') { lRecordData[lLeaveApi] = lLeaveVal; }
+        lRecordData['beatplanner__Managers_Approval'] = 'Pending';
+        lRecordData['Name'] = 'Leave \u2013 ' + (lLeaveVal || lAttendVal || 'Leave');
+        if (monthlyBeatPlanId) { lRecordData['beatplanner__Month'] = { id: monthlyBeatPlanId }; }
+        var lOwner = $('#userProfile').attr('data-userid');
+        if (lOwner) { lRecordData['Owner'] = { id: lOwner }; }
+
+        massPayloads.push({
+          recordData: lRecordData,
+          massEv: {
+            id:             uid(),
+            title:          lLeaveVal || 'Leave',
+            date:           leaveDate,
+            startTime:      '00:00',
+            endTime:        '23:59',
+            color:          '#1565C0',
+            description:    '',
+            bprFieldValues: lBprFv
+          }
+        });
+      });
+
+      /* ── Send payloads in sequential batches of 100 ── */
+      var BATCH_SIZE = 100;
+      for (var bi = 0; bi < massPayloads.length; bi += BATCH_SIZE) {
+        var batch = massPayloads.slice(bi, bi + BATCH_SIZE);
         try {
           var massResp = await zrc.post('/crm/v8/beatplanner__Daily_Beat_Plans', {
-            data: massPayloads.map(function (p) { return p.recordData; })
+            data: batch.map(function (p) { return p.recordData; })
           });
           var massRespItems = (massResp && massResp.data && massResp.data.data) || [];
-          massPayloads.forEach(function (p, idx) {
+          batch.forEach(function (p, idx) {
             var item      = massRespItems[idx];
             var massCrmId = item && item.details && item.details.id;
             if (massCrmId) { p.massEv.id = massCrmId; }
@@ -8149,14 +8246,15 @@ $(function () {
             created++;
           });
         } catch (err) {
-          console.error('Bulk create failed', err);
-          failed += massPayloads.length;
+          console.error('Bulk create batch failed (offset ' + bi + ')', err);
+          failed += batch.length;
         }
       }
 
-      /* Uncheck all processed rows, reset Select-All header checkbox, and hide the Mass Create button */
+      /* Uncheck all rows and leave checkboxes; hide the Mass Create button */
       $grid.find('.bp-row-cb').prop('checked', false);
       $grid.find('.bp-select-all-cb').prop('checked', false).prop('indeterminate', false);
+      $grid.find('.bp-mc-leave-cb').prop('checked', false);
       $btn.hide();
 
       saveEvents();
