@@ -5827,9 +5827,11 @@ input, select, textarea {
   background: var(--surface);
 }
 
-/* Hide the per-row "Mass Create" button inside the accordion tables —
-   the accordion itself is already the mass-create context */
-.modal-body--mc .bp-mass-create-btn {
+/* Hide the per-row "Mass Create" button inside each accordion beat-plan table —
+   the accordion itself is already the mass-create context.
+   Only targets buttons inside .bp-plan-container so the global .mc-global-mass-create-btn
+   in the .mc-action-bar remains visible and togglable. */
+.modal-body--mc .bp-plan-container .bp-mass-create-btn {
   display: none !important;
 }
 

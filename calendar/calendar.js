@@ -1919,6 +1919,52 @@ $(function () {
     return null;
   }
 
+  /**
+   * Compute the "Month Year" string (e.g. "July 2026") for a YYYY-MM-DD date string.
+   * Mirrors the same logic used in openSlotPicker and the Monthly Beat Plan COQL queries.
+   */
+  function getMonthYearFromDate(dateStr) {
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  /**
+   * Ensure a beatplanner__Monthly_Beat_Plans record exists for the given "Month Year"
+   * (e.g. "July 2026").  Reuses the same COQL lookup and ZOHO.CRM.API.insertRecord
+   * logic as the .cell-add-btn / openSlotPicker workflow.
+   *
+   * @param {string} monthYear – e.g. "July 2026"
+   * @returns {Promise<string|null>} the record ID, or null on error
+   */
+  async function ensureMonthlyBeatPlan(monthYear) {
+    try {
+      var coqlConfig = {
+        select_query: "SELECT id FROM beatplanner__Monthly_Beat_Plans WHERE Name = '" + monthYear + "' LIMIT 1"
+      };
+      var coqlResp = await ZOHO.CRM.API.coql(coqlConfig);
+      var existingData = coqlResp && coqlResp.data && Array.isArray(coqlResp.data) && coqlResp.data.length > 0
+                           ? coqlResp.data
+                           : null;
+      if (existingData) {
+        return existingData[0].id;
+      }
+      /* Record not found – create a new one */
+      var insertResp = await ZOHO.CRM.API.insertRecord({
+        Entity:  'beatplanner__Monthly_Beat_Plans',
+        APIData: { Name: monthYear },
+        Trigger: ['workflow']
+      });
+      if (insertResp && insertResp.data && insertResp.data[0] && insertResp.data[0].details) {
+        return insertResp.data[0].details.id;
+      }
+      return null;
+    } catch (err) {
+      console.error('ensureMonthlyBeatPlan error for', monthYear, err);
+      return null;
+    }
+  }
+
   async function openSlotPicker(date, presetAttend, targetHour) {
     /* Ensure no stale open beat-plan dropdown leaks into the new view */
     closeAllBpDropdowns();
@@ -1944,38 +1990,9 @@ $(function () {
     /* ── Reset Monthly Beat Plan ID for this session ── */
     monthlyBeatPlanId = null;
 
-    try {
-      /* ── COQL query: check if a Monthly Beat Plan record exists for this month ── */
-      var coqlConfig = {
-        select_query: "SELECT id FROM beatplanner__Monthly_Beat_Plans WHERE Name = '" + monthYear + "' LIMIT 1"
-      };
-      var coqlResp = await ZOHO.CRM.API.coql(coqlConfig);
-      console.log('Monthly Beat Plans COQL response', coqlResp);
-
-      var existingData = coqlResp && coqlResp.data && Array.isArray(coqlResp.data) && coqlResp.data.length > 0
-                           ? coqlResp.data
-                           : null;
-
-      if (existingData) {
-        /* Record already exists – reuse its ID */
-        monthlyBeatPlanId = existingData[0].id;
-        console.log('Reusing existing Monthly Beat Plan ID:', monthlyBeatPlanId);
-      } else {
-        /* No record found – create a new one */
-        var insertResp = await ZOHO.CRM.API.insertRecord({
-          Entity:   'beatplanner__Monthly_Beat_Plans',
-          APIData:  { Name: monthYear },
-          Trigger:  ['workflow']
-        });
-        console.log('Created Monthly Beat Plan', insertResp);
-        if (insertResp && insertResp.data && insertResp.data[0] && insertResp.data[0].details) {
-          monthlyBeatPlanId = insertResp.data[0].details.id;
-        }
-        console.log('New Monthly Beat Plan ID:', monthlyBeatPlanId);
-      }
-    } catch (err) {
-      console.error('Monthly Beat Plan init error:', err);
-    }
+    /* Reuse ensureMonthlyBeatPlan (same logic as the .cell-add-btn workflow) */
+    monthlyBeatPlanId = await ensureMonthlyBeatPlan(monthYear);
+    console.log('Monthly Beat Plan ID for', monthYear, ':', monthlyBeatPlanId);
 
     /* ── Build the picker content now that init is done ── */
     if (beatPlanHasRefs) {
@@ -2212,8 +2229,9 @@ $(function () {
     /* ── Attendance + Leave Type bar (top-left of .bp-slots-wrap) ── */
     var attendBar = '<div class="bp-attend-bar">';
     /* Mass Create mode: leave-day checkbox sits to the left of the Attendance dropdown.
-       Hidden by default; revealed by the Attendance change handler when Leave is selected. */
-    if (opts && opts.massCreate) {
+       Hidden by default; revealed by the Attendance change handler when Leave is selected.
+       Not rendered when an existing Leave record already exists for this day (opts.existingLeave). */
+    if (opts && opts.massCreate && !opts.existingLeave) {
       attendBar += '<label class="bp-mc-leave-cb-label" style="display:none;" title="Mark as leave day">' +
                    '<input type="checkbox" class="bp-mc-leave-cb" aria-label="Mark as leave day">' +
                    '</label>';
@@ -4562,15 +4580,19 @@ $(function () {
 
       html += '<div class="map-day-group mc-day-group"' + dayDataAttrs + '>';
       html += '<div class="map-day-header">';
-      html += '<span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(ds)) + '</span>';
+      html += '<label class="map-cb-label">' +
+              '<input type="checkbox" class="map-cb map-day-cb" data-date="' + escHtml(ds) + '">' +
+              '<span class="map-cb-text map-day-label">' + escHtml(fmtDateLabel(ds)) + '</span>' +
+              '</label>';
       html += '<button type="button" class="map-day-toggle" aria-label="Toggle day" aria-expanded="true">' + chevSvg + '</button>';
       html += '</div>';
       html += '<div class="map-day-events">';
 
       if (isLeave) {
-        /* Leave day: render attend bar for pre-selection (table suppressed), show leave message */
+        /* Leave day: render attend bar for pre-selection (table suppressed), show leave message.
+           Pass existingLeave:true so the bp-mc-leave-cb is NOT rendered for already-leave days. */
         if (beatPlanHasRefs) {
-          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied, massCreate: true });
+          html += buildBeatPlanTable(ds, { skipHours: allHoursOccupied, massCreate: true, existingLeave: true });
         }
         var leaveMsg = leaveType
           ? 'No available slots.<br>User is on ' + escHtml(leaveType) + '.'
@@ -4617,8 +4639,9 @@ $(function () {
     closeAllBpDropdowns();
 
     /* ── Open #eventModal immediately with a loading indicator ── */
-    massCreateMode    = true;
-    monthlyBeatPlanId = null; /* monthly beat plan is per-date; skip linking for mass create */
+    massCreateMode         = true;
+    monthlyBeatPlanId      = null;
+    massCreateMonthPlanMap = {};
 
     dom.modalHeading.text('Mass Create');
     dom.modal.addClass('modal-open');
@@ -4647,6 +4670,20 @@ $(function () {
       var occupiedHrsMap = buildOccupiedHoursMap(records);
       var attendanceMap  = buildAttendanceMap(records);
       var dateList       = buildDateList(range.startDate, range.endDate);
+
+      /* ── Ensure a Monthly Beat Plan record exists for every unique month in the range ── */
+      var uniqueMonths = [];
+      dateList.forEach(function (ds) {
+        var my = getMonthYearFromDate(ds);
+        if (uniqueMonths.indexOf(my) === -1) { uniqueMonths.push(my); }
+      });
+      for (var mi = 0; mi < uniqueMonths.length; mi++) {
+        var my = uniqueMonths[mi];
+        var mbpId = await ensureMonthlyBeatPlan(my);
+        if (mbpId) { massCreateMonthPlanMap[my] = mbpId; }
+        console.log('Monthly Beat Plan for', my, ':', mbpId);
+      }
+
       var accordionHtml  = buildMassCreateAccordionHtml(dateList, occupiedHrsMap, attendanceMap);
 
       dom.slotPickerGrid.html(accordionHtml);
@@ -5911,6 +5948,7 @@ $(function () {
   var beatPlanLoadGen     = 0;      /* incremented on every loadBeatPlanEvents() call; used to discard stale responses */
   var copiedRowData       = null;   /* temporarily stored row data for Copy & Paste */
   var monthlyBeatPlanId   = null;   /* ID of the beatplanner__Monthly_Beat_Plans record for the open modal's month */
+  var massCreateMonthPlanMap = {};  /* { 'July 2026': 'id', ... } – per-month IDs for the mass create accordion */
   var massCreateMode      = false;  /* true while the event modal is open for Mass Create (multi-day accordion) */
 
   /* ── Filter Panel state ── */
@@ -7168,6 +7206,8 @@ $(function () {
 
     /* ── Mass Create: accordion day header toggle (inside #slotPickerGrid) ── */
     $(document).on('click', '#slotPickerGrid .mc-day-group .map-day-header', function (e) {
+      /* Ignore clicks on the checkbox label so the day-level checkbox can be toggled independently */
+      if ($(e.target).closest('.map-cb-label').length) { return; }
       var $group    = $(this).closest('.map-day-group');
       var collapsed = $group.toggleClass('map-day-collapsed').hasClass('map-day-collapsed');
       $(this).find('.map-day-toggle').attr('aria-expanded', String(!collapsed));
@@ -7958,7 +7998,7 @@ $(function () {
       }
     });
 
-    /* Row checkbox → show/hide Mass Create button + sync Select-All header checkbox */
+    /* Row checkbox → show/hide Mass Create button + sync Select-All header checkbox + sync day checkbox */
     $(document).on('change', '#slotPickerGrid .bp-row-cb', function () {
       var $grid      = $('#slotPickerGrid');
       var $allCbs    = $grid.find('.bp-row-cb:not(:disabled)');
@@ -7970,6 +8010,33 @@ $(function () {
         $selectAll.prop('indeterminate', anyChecked && checkedCnt < $allCbs.length);
         $selectAll.prop('checked', checkedCnt === $allCbs.length && $allCbs.length > 0);
       }
+      /* Sync the day-level checkbox for the day group containing this row */
+      var $dayGroup = $(this).closest('.mc-day-group');
+      if ($dayGroup.length) {
+        var $dayRows  = $dayGroup.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb:not(:disabled)');
+        var dayTotal  = $dayRows.length;
+        var dayChecked = $dayRows.filter(':checked').length;
+        var $dayCb    = $dayGroup.find('.map-day-cb');
+        $dayCb.prop('checked', dayTotal > 0 && dayChecked === dayTotal)
+              .prop('indeterminate', dayChecked > 0 && dayChecked < dayTotal);
+      }
+    });
+
+    /* Day-level checkbox in Mass Create accordion → check/uncheck all rows for that day */
+    $(document).on('change', '#slotPickerGrid .map-day-cb', function () {
+      var checked   = $(this).prop('checked');
+      var $dayGroup = $(this).closest('.mc-day-group');
+      $dayGroup.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb:not(:disabled)').prop('checked', checked);
+      /* Sync the global Mass Create button and select-all */
+      var $grid      = $('#slotPickerGrid');
+      var $allCbs    = $grid.find('.bp-row-cb:not(:disabled)');
+      var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
+      $grid.find('.bp-mass-create-btn').toggle(checkedCnt > 0);
+      var $selectAll = $grid.find('.bp-select-all-cb');
+      if ($selectAll.length) {
+        $selectAll.prop('indeterminate', checkedCnt > 0 && checkedCnt < $allCbs.length);
+        $selectAll.prop('checked', checkedCnt === $allCbs.length && $allCbs.length > 0);
+      }
     });
 
     /* Select-All header checkbox → check/uncheck all row checkboxes */
@@ -7978,6 +8045,13 @@ $(function () {
       var checked  = $(this).is(':checked');
       $grid.find('.bp-row-cb:not(:disabled)').prop('checked', checked);
       $grid.find('.bp-mass-create-btn').toggle(checked);
+      /* Sync all day checkboxes */
+      $grid.find('.mc-day-group').each(function () {
+        var $dg       = $(this);
+        var $dayRows  = $dg.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb:not(:disabled)');
+        var dayTotal  = $dayRows.length;
+        $dg.find('.map-day-cb').prop('checked', checked && dayTotal > 0).prop('indeterminate', false);
+      });
     });
 
     /* ── Bulk Create Daily Beat Plans ── */
@@ -8125,8 +8199,15 @@ $(function () {
           recordData[leaveApi] = leaveVal;
         }
 
-        if (monthlyBeatPlanId) {
-          recordData['beatplanner__Month'] = { id: monthlyBeatPlanId };
+        /* Look up the Monthly Beat Plan ID for this record's month.
+           In accordion mode use massCreateMonthPlanMap (which covers multi-month ranges);
+           in single-event mode fall back to the global monthlyBeatPlanId. */
+        var rowMonthYear  = date ? getMonthYearFromDate(date) : '';
+        var rowMonthPlanId = (isMcAccordion && rowMonthYear)
+          ? (massCreateMonthPlanMap[rowMonthYear] || null)
+          : monthlyBeatPlanId;
+        if (rowMonthPlanId) {
+          recordData['beatplanner__Month'] = { id: rowMonthPlanId };
         }
         recordData['Name'] = 'Meeting With ' + mwName;
         recordData['beatplanner__Managers_Approval'] = 'Pending';
@@ -8210,7 +8291,11 @@ $(function () {
         if (lLeaveVal && lLeaveVal !== 'Select\u2026') { lRecordData[lLeaveApi] = lLeaveVal; }
         lRecordData['beatplanner__Managers_Approval'] = 'Pending';
         lRecordData['Name'] = 'Leave \u2013 ' + (lLeaveVal || lAttendVal || 'Leave');
-        if (monthlyBeatPlanId) { lRecordData['beatplanner__Month'] = { id: monthlyBeatPlanId }; }
+        var lMonthYear    = leaveDate ? getMonthYearFromDate(leaveDate) : '';
+        var lMonthPlanId  = (isMcAccordion && lMonthYear)
+          ? (massCreateMonthPlanMap[lMonthYear] || null)
+          : monthlyBeatPlanId;
+        if (lMonthPlanId) { lRecordData['beatplanner__Month'] = { id: lMonthPlanId }; }
         var lOwner = $('#userProfile').attr('data-userid');
         if (lOwner) { lRecordData['Owner'] = { id: lOwner }; }
 
