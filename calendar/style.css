@@ -5070,6 +5070,17 @@ input, select, textarea {
    .bp-row-action including those inside edit rows.  When no mapping is
    configured the theme defaults apply (black in light theme). ── */
 
+/* ── Event creation rows inside #eventModal (#slotPickerGrid) must always follow
+   the current theme and must never be affected by the bg-colour mapping.
+   At creation time no record exists and no background colour has been assigned.
+   Light theme: force dark text on time cells and row action buttons regardless
+   of whether a Background Colour field has been configured. Dark/night themes
+   inherit their default (white) without any override needed here. ── */
+.theme-light.cal-bg-colour-mapped #slotPickerGrid .bp-time-cell,
+.theme-light.cal-bg-colour-mapped #slotPickerGrid .bp-row-action {
+  color: #1A1A2E !important;
+}
+
 /* ══════════════════════════════════════════════════════════
    LEGENDS DISPLAY STRIP
    Dynamic colour-coded legend bar rendered below the header.

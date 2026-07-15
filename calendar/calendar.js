@@ -1814,6 +1814,11 @@ $(function () {
       $card.find('.hc-act-approve, .hc-act-reject, .hc-act-delete').prop('disabled', true);
     }
 
+    /* ── Disable approve/reject for own records when the logged-in user is not Admin ── */
+    if (isSelfApprovalBlocked()) {
+      $card.find('.hc-act-approve, .hc-act-reject').prop('disabled', true);
+    }
+
     /* ── Disable all editing actions for past events ── */
     if (!isEventEditable(ev)) {
       $card.find('.hc-act-edit, .hc-act-approve, .hc-act-reject, .hc-act-delete').prop('disabled', true);
@@ -2547,11 +2552,12 @@ $(function () {
     var labelColorStyle  = containerLeaveColor ? ' style="color:white;"' : '';
 
     /* ── Approval state (needed early for Leave-mode attend-bar action buttons) ── */
-    var evApprovalVal   = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
-    var approvalLocked  = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
-    var lockedAttr      = approvalLocked ? ' disabled' : '';
-    var approveClass    = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
-    var rejectClass     = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
+    var evApprovalVal       = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+    var approvalLocked      = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+    var lockedAttr          = approvalLocked ? ' disabled' : '';
+    var approveRejectAttr   = (approvalLocked || isSelfApprovalBlocked()) ? ' disabled' : '';
+    var approveClass        = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+    var rejectClass         = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     /* ── Attendance bar ── */
     var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
@@ -2609,8 +2615,8 @@ $(function () {
                    '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
                    '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                    '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + approveRejectAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + approveRejectAttr + '>' + SVG.reject  + '</button>' +
                    '</div>';
     }
     /* No Mass Create button in edit mode */
@@ -2761,8 +2767,8 @@ $(function () {
                  '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
                  '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                  '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                 '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                 '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                 '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + approveRejectAttr + '>' + SVG.approve + '</button>' +
+                 '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + approveRejectAttr + '>' + SVG.reject  + '</button>' +
                  '</td>';
 
     tableHtml += '</tr>';
@@ -2994,11 +3000,11 @@ $(function () {
       });
 
       /* Disable approve/reject/delete when already Approved or Rejected */
-      var evApprovalVal  = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
-      var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
-      var lockedAttr     = approvalLocked ? ' disabled' : '';
-      var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
-      var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
+      var evApprovalVal    = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
+      var approvalLocked   = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+      var lockedAttr       = approvalLocked ? ' disabled' : '';
+      var approveClass     = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+      var rejectClass      = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
       /* data-pf-* attributes for mass-actions popup filter matching */
       var pfAttrs = '';
@@ -3091,8 +3097,8 @@ $(function () {
                    '<button class="bp-row-action bp-row-save"    type="button" title="Update record"'  + pastAttr   + '>' + SVG.save    + '</button>' +
                    '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                    '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + (approvalLocked || pastLocked ? ' disabled' : '') + '>' + SVG.trash   + '</button>' +
-                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + (approvalLocked || pastLocked ? ' disabled' : '') + '>' + SVG.approve + '</button>' +
-                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + (approvalLocked || pastLocked ? ' disabled' : '') + '>' + SVG.reject  + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + (approvalLocked || pastLocked || isSelfApprovalBlocked() ? ' disabled' : '') + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + (approvalLocked || pastLocked || isSelfApprovalBlocked() ? ' disabled' : '') + '>' + SVG.reject  + '</button>' +
                    '</td>';
 
       tableHtml += '</tr>';
@@ -3243,11 +3249,12 @@ $(function () {
     var muLabelColorStyle = containerLeaveColor ? ' style="color:white;"' : '';
 
     /* Approval state (needed early for Leave-mode attend-bar action buttons) */
-    var evApprovalVal  = bprVals['beatplanner__Managers_Approval'] || '';
-    var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
-    var lockedAttr     = approvalLocked ? ' disabled' : '';
-    var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
-    var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
+    var evApprovalVal     = bprVals['beatplanner__Managers_Approval'] || '';
+    var approvalLocked    = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+    var lockedAttr        = approvalLocked ? ' disabled' : '';
+    var approveRejectAttr = (approvalLocked || isSelfApprovalBlocked()) ? ' disabled' : '';
+    var approveClass      = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+    var rejectClass       = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
     /* Attend bar */
     var attendBar = '<div class="bp-attend-bar"' + attendBarBgStyle + '>';
@@ -3296,8 +3303,8 @@ $(function () {
                    '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
                    '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                    '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + approveRejectAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + approveRejectAttr + '>' + SVG.reject  + '</button>' +
                    '</div>';
     }
     attendBar += '</div>';
@@ -3428,8 +3435,8 @@ $(function () {
                  '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
                  '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
                  '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                 '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                 '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                 '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + approveRejectAttr + '>' + SVG.approve + '</button>' +
+                 '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + approveRejectAttr + '>' + SVG.reject  + '</button>' +
                  '</td>';
 
     tableHtml += '</tr></tbody></table>';
@@ -3749,6 +3756,10 @@ $(function () {
     dom.demList.find('.dem-card[data-past-locked="1"]')
                .find('.hc-act-edit, .hc-act-approve, .hc-act-reject, .hc-act-delete')
                .prop('disabled', true);
+    /* Disable approve/reject for own records when the logged-in user is not Admin */
+    if (isSelfApprovalBlocked()) {
+      dom.demList.find('.hc-act-approve, .hc-act-reject').prop('disabled', true);
+    }
   }
 
   function closeDayEventsModal() {
@@ -3978,11 +3989,12 @@ $(function () {
       });
 
       /* Approval state */
-      var evApprovalVal  = bprVals['beatplanner__Managers_Approval'] || '';
-      var approvalLocked = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
-      var lockedAttr     = approvalLocked ? ' disabled' : '';
-      var approveClass   = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
-      var rejectClass    = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
+      var evApprovalVal     = bprVals['beatplanner__Managers_Approval'] || '';
+      var approvalLocked    = (evApprovalVal === 'Approved' || evApprovalVal === 'Rejected');
+      var lockedAttr        = approvalLocked ? ' disabled' : '';
+      var approveRejectAttr = (approvalLocked || isSelfApprovalBlocked()) ? ' disabled' : '';
+      var approveClass      = evApprovalVal === 'Approved' ? ' is-approved' : (evApprovalVal === 'Rejected' ? ' is-rejected' : '');
+      var rejectClass       = evApprovalVal === 'Rejected' ? ' is-rejected' : (evApprovalVal === 'Approved' ? ' is-approved' : '');
 
       /* data-pf-* attributes for filter matching */
       var pfAttrs = '';
@@ -4070,8 +4082,8 @@ $(function () {
                    '<button class="bp-row-action bp-row-save"    type="button" title="Update record">'  + SVG.save    + '</button>' +
                    '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'    + SVG.copy    + '</button>' +
                    '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'   + lockedAttr + '>' + SVG.trash   + '</button>' +
-                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + approveRejectAttr + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + approveRejectAttr + '>' + SVG.reject  + '</button>' +
                    '</td>';
 
       tableHtml += '</tr>';
@@ -5659,12 +5671,13 @@ $(function () {
      USER PROFILE DROPDOWN  (hierarchy-based)
   ────────────────────────────────────────────────────────── */
 
-  var allUsers       = [];   /* fetched from /crm/v8/users?type=ActiveConfirmedUsers */
-  var userMap        = {};   /* id → user object */
-  var childrenMap    = {};   /* id → [childId, …] */
-  var loggedInUserId = null; /* id of the logged-in user (root of hierarchy) */
-  var expandedNodes  = {};   /* id → boolean (true = expanded) */
-  var activeUserId   = null; /* currently selected user id */
+  var allUsers        = [];   /* fetched from /crm/v8/users?type=ActiveConfirmedUsers */
+  var userMap         = {};   /* id → user object */
+  var childrenMap     = {};   /* id → [childId, …] */
+  var loggedInUserId  = null; /* id of the logged-in user (root of hierarchy) */
+  var expandedNodes   = {};   /* id → boolean (true = expanded) */
+  var activeUserId    = null; /* currently selected user id */
+  var loggedInIsAdmin = false; /* true when logged-in user's profile is Administrator */
 
   /**
    * Normalize a user object so that full_name and profile_pic are always set,
@@ -5714,6 +5727,17 @@ $(function () {
       (childrenMap[cur] || []).forEach(function (c) { queue.push(c); });
     }
     return ids;
+  }
+
+  /**
+   * Returns true when the logged-in user is NOT an Administrator AND is currently
+   * viewing their own records (activeUserId === loggedInUserId).
+   * In this case, approve/reject actions must be disabled on all rows.
+   * Administrators can always approve/reject any record (own or subordinate).
+   * Non-administrators can approve/reject subordinate records only.
+   */
+  function isSelfApprovalBlocked() {
+    return !loggedInIsAdmin && (activeUserId === loggedInUserId);
   }
 
   /** Return the inner HTML for an avatar: profile image if available, else initials */
@@ -7730,12 +7754,14 @@ $(function () {
     });
     dom.hoverCard.on('click', '.hc-act-approve', function (e) {
       e.stopPropagation();
+      if (isSelfApprovalBlocked()) { return; }
       var evid = $(this).data('evid');
       hideHoverCard();
       doApprove(evid);
     });
     dom.hoverCard.on('click', '.hc-act-reject', function (e) {
       e.stopPropagation();
+      if (isSelfApprovalBlocked()) { return; }
       var evid = $(this).data('evid');
       hideHoverCard();
       doReject(evid);
@@ -7775,10 +7801,12 @@ $(function () {
     });
     dom.dayEventsModal.on('click', '.hc-act-approve', function (e) {
       e.stopPropagation();
+      if (isSelfApprovalBlocked()) { return; }
       doApprove($(this).data('evid'));
     });
     dom.dayEventsModal.on('click', '.hc-act-reject', function (e) {
       e.stopPropagation();
+      if (isSelfApprovalBlocked()) { return; }
       doReject($(this).data('evid'));
     });
     dom.dayEventsModal.on('click', '.hc-act-copy', function (e) {
@@ -9043,6 +9071,7 @@ $(function () {
 
     /* ── Beat plan edit row: Approve ── */
     $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-approve, #slotPickerGrid .bp-attend-bar .bp-row-approve', function () {
+      if (isSelfApprovalBlocked()) { return; }
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       if (!$row.length) { $row = $btn.closest('.bp-plan-container').find('.bp-slot-row').first(); }
@@ -9052,6 +9081,7 @@ $(function () {
 
     /* ── Beat plan edit row: Reject ── */
     $(document).on('click', '#slotPickerGrid .bp-edit-row .bp-row-reject, #slotPickerGrid .bp-attend-bar .bp-row-reject', function () {
+      if (isSelfApprovalBlocked()) { return; }
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       if (!$row.length) { $row = $btn.closest('.bp-plan-container').find('.bp-slot-row').first(); }
@@ -9399,6 +9429,7 @@ $(function () {
     }
 
     $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-approve, #massActionsBody .bp-edit-row .bp-row-approve, #massActionsBody .bp-attend-bar .bp-row-approve', async function () {
+      if (isSelfApprovalBlocked()) { return; }
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       /* For Leave mode the Approve button may be in the attend-bar. */
@@ -9434,6 +9465,7 @@ $(function () {
 
     /* ── demBulkGrid / massActionsBody: single-row Reject – updates row in-place ── */
     $(document).on('click', '#demBulkGrid .bp-edit-row .bp-row-reject, #massActionsBody .bp-edit-row .bp-row-reject, #massActionsBody .bp-attend-bar .bp-row-reject', async function () {
+      if (isSelfApprovalBlocked()) { return; }
       var $btn   = $(this);
       var $row   = $btn.closest('.bp-slot-row');
       /* For Leave mode the Reject button may be in the attend-bar. */
@@ -10417,6 +10449,9 @@ $(function () {
   var $settingsBackBtn = $('#settingsBackBtn');
 
   function showMeetingsBarOnly() {
+    /* Non-administrators never see the settings/meetings-bar UI.
+       Redirect them to the main calendar content instead. */
+    if (!loggedInIsAdmin) { showMainContent(); return; }
     $meetingsBar.show();
     $otherContent.hide();
     $('#legendsDisplay').hide();
@@ -10428,6 +10463,8 @@ $(function () {
     $legendBar.hide();
     $settingsBackBtn.hide();
     $otherContent.show();
+    /* Admin-only toolbar controls must stay hidden for non-administrators */
+    if (!loggedInIsAdmin) { $('.toolbar-right').hide(); }
     /* Show the legends display strip only if it has been populated */
     if ($('#legendsDisplay').children().length > 0) {
       $('#legendsDisplay').show();
@@ -10436,6 +10473,8 @@ $(function () {
 
   /* Settings icon → show meetings-bar + styleBar + back button, hide rest */
   $('#settingsIconBtn').on('click', function () {
+    /* Non-administrators cannot access the settings view */
+    if (!loggedInIsAdmin) { return; }
     showMeetingsBarOnly();
     $settingsBackBtn.show();
   });
@@ -11983,6 +12022,8 @@ $(function () {
       loggedInUserId = cuNorm.id || null;
       activeUserId   = loggedInUserId;
       userMap[cuNorm.id] = cuNorm;
+      /* Determine if the logged-in user is an Administrator (profile.name check) */
+      loggedInIsAdmin = !!(cuData.profile && cuData.profile.name === 'Administrator');
       $('.user-name').text(cuNorm.full_name || cuNorm.email || '');
       $('.user-avatar').html(buildAvatarInnerHtml(cuNorm));
     }
