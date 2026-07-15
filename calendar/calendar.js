@@ -9243,6 +9243,8 @@ $(function () {
 
         saveEvents();
         refreshCalendarCell(date);
+        /* Refresh row border/background in the open Day Events Modal immediately */
+        if (evIdx !== -1) { refreshDemRowStyles($row, state.events[evIdx]); }
         showToast('Beat plan record updated.');
       } catch (err) {
         console.error('Failed to update Daily Beat Plan (bulk modal)', err);
