@@ -5127,7 +5127,7 @@ $(function () {
       var dynamicFieldList = selectFields.filter(function (f) { return f !== 'id' && f !== 'beatplanner__Managers_Approval'; }).join(', ');
       var currentViewStart = bounds.startDt;
       var currentViewEnd   = bounds.endDt;
-      var ownerId = activeUserId;
+      var ownerId = $('#userProfile').attr('data-userid') || '';
       var query = {
         select_query: `
           SELECT
@@ -5153,7 +5153,7 @@ $(function () {
          (e.g. the user switched to a different owner while this request was in flight).
          Also verify the owner this response was fetched for still matches the active user,
          providing an extra guard against out-of-order responses. */
-      if (myGen !== beatPlanLoadGen || String(ownerId) !== String(activeUserId)) { return; }
+      if (myGen !== beatPlanLoadGen || String(ownerId) !== String($('#userProfile').attr('data-userid'))) { return; }
 
       console.log(coqlRes && coqlRes.data && coqlRes.data.data);
       var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
@@ -5252,6 +5252,9 @@ $(function () {
               var imgBlob = new Blob([resp], { type: 'image/jpeg' });
               var reader  = new FileReader();
               reader.onloadend = function () {
+                /* Discard avatar update if a newer loadBeatPlanEvents() call has
+                   since started – the new call manages its own DOM state. */
+                if (myGen !== beatPlanLoadGen) { resolve(); return; }
                 var dataUrl = reader.result;
                 evObj.mwAvatarImgSrc = dataUrl;
                 dom.canvas.find('[data-evid="' + evObj.id + '"] .bp-rec-avatar')
