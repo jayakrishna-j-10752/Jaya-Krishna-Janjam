@@ -5709,21 +5709,23 @@ input, select, textarea {
   font-weight: 600;
 }
 
+/* ── Mass Actions popup: shared base for non-scrolling rows above the body ── */
+.mass-actions-fixed-row {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── Mass Actions popup: filter button row (above body, always visible) ── */
 .mass-actions-filter-btn-row {
   padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
   background: var(--surface);
-  flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
 /* ── Mass Actions popup: filter bar row (above body, always visible / "sticky") ── */
 .mass-actions-filter-bar-row {
-  border-bottom: 1px solid var(--border);
   background: var(--surface-2);
-  flex-shrink: 0;
   /* overflow:visible allows dropdown panels to escape the clipped box */
   overflow: visible;
 }
