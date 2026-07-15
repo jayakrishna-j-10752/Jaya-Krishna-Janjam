@@ -4107,8 +4107,7 @@ $(function () {
                   'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
 
-    /* Inline filter bar (same filters as #bpCalFilterBar, scoped to the overlay) */
-    var html = '<div class="bp-filter-action">' + buildMassActionsFilterBarHtml() + '</div>';
+    var html = '';
 
     groups.forEach(function (group) {
       /* Separate events: Working records share ONE container; Leave / other records
@@ -4330,6 +4329,23 @@ $(function () {
        This is the same event view that was originally used by mass-delete, mass-approve
        and mass-reject; mass-update now adopts this layout for a consistent UI. */
     if (beatPlanHasRefs) {
+      /* Populate the filter button row (#bpFilterBtn) and filter bar row (.bp-filter-action)
+         above the scrollable body so they are always visible ("sticky"). */
+      var mapFilterSvg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+                         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13">' +
+                         '<path d="M2 4h12M5 8h6M7.5 12h1"/></svg>';
+      $('#massActionsFilterBtnRow')
+        .html('<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
+              mapFilterSvg + 'Filter</button>')
+        .show();
+
+      var mapFilterBarHtml = buildMassActionsFilterBarHtml();
+      if (mapFilterBarHtml) {
+        $('#massActionsFilterBarRow')
+          .html('<div class="bp-filter-action">' + mapFilterBarHtml + '</div>')
+          .show();
+      }
+
       $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
 
       /* Populate cached avatars immediately and schedule async load for the rest */
@@ -4373,17 +4389,31 @@ $(function () {
       $('#massActionsBody').html(buildMassActionsBodyHtml(groups));
     }
 
+    /* After the open animation (200 ms), clear the CSS transform on the box so that
+       position:fixed dropdown panels inside the overlay are not clipped by
+       overflow:hidden on the CSS-transformed ancestor. */
+    setTimeout(function () {
+      if ($('#massActionsOverlay').hasClass('map-open')) {
+        $('.mass-actions-box').css('transform', 'none');
+      }
+    }, 220);
+
   }
 
   /** Close the Mass Actions popup */
   function closeMassActionsPopup() {
     massActionsPopupFilters = {};
+    /* Restore the CSS-controlled transform before starting the close animation
+       so the outward transition plays correctly. */
+    $('.mass-actions-box').css('transform', '');
     $('#massActionsOverlay').removeClass('map-open');
     setTimeout(function () {
       $('#massActionsOverlay').css('display', 'none');
       $('.mass-actions-box').removeClass('map-wide-mode');
       $('#massActionsBody').empty();
       $('#massActionsFilterBar').remove();
+      $('#massActionsFilterBtnRow').hide().empty();
+      $('#massActionsFilterBarRow').hide().empty();
     }, 220);
   }
 

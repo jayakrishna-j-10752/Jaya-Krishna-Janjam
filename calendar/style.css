@@ -5709,7 +5709,34 @@ input, select, textarea {
   font-weight: 600;
 }
 
-/* ── Mass Actions popup: filter button at top of body ── */
+/* ── Mass Actions popup: filter button row (above body, always visible) ── */
+.mass-actions-filter-btn-row {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Mass Actions popup: filter bar row (above body, always visible / "sticky") ── */
+.mass-actions-filter-bar-row {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+  /* overflow:visible allows dropdown panels to escape the clipped box */
+  overflow: visible;
+}
+.mass-actions-filter-bar-row .bp-filter-action {
+  padding: 0;
+  display: block;
+  min-width: 0;
+}
+.mass-actions-filter-bar-row .mass-actions-filter-bar {
+  border-bottom: none;
+}
+
+/* ── Mass Actions popup: filter button at top of body (legacy fallback) ── */
 .mass-actions-body .bp-filter-action {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
