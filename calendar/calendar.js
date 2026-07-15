@@ -1466,7 +1466,10 @@ $(function () {
           if (crmId) {
             var oldId = p.ev.id;
             var evIdx = state.events.indexOf(p.ev);
-            if (evIdx !== -1) { state.events[evIdx].id = crmId; }
+            if (evIdx !== -1) {
+              state.events[evIdx].id       = crmId;
+              state.events[evIdx].fromCoql = true;
+            }
             p.ev.id = crmId;
             /* Sync all rendered DOM elements that still carry the temporary ID.
                Also update jQuery's internal data cache so subsequent .data('evid')
@@ -8494,6 +8497,7 @@ $(function () {
             var item      = massRespItems[idx];
             var massCrmId = item && item.details && item.details.id;
             if (massCrmId) { p.massEv.id = massCrmId; }
+            p.massEv.fromCoql = true;
             state.events.push(p.massEv);
             created++;
           });
@@ -8620,7 +8624,8 @@ $(function () {
             endTime:        '23:59',
             color:          '#1565C0',
             description:    '',
-            bprFieldValues: bprFieldValues
+            bprFieldValues: bprFieldValues,
+            fromCoql:       true
           };
 
           /* Update event ID with the CRM record ID */
@@ -8920,7 +8925,8 @@ $(function () {
             mwAvatarText:   mwAvatarText,
             mwPhotoId:      mwPhotoId,
             mwRecordId:     mwId,
-            mwLookupApi:    mwLookupApi
+            mwLookupApi:    mwLookupApi,
+            fromCoql:       true
           };
 
           /* Update event ID with the CRM record ID returned in the response */
