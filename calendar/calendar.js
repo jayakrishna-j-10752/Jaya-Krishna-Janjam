@@ -90,6 +90,12 @@ $(function () {
     return h12 + ':' + m + ' ' + ampm;
   }
 
+  /** Format "YYYY-MM-DD" → "DD-MM-YYYY" */
+  function fmtDateDMY(ds) {
+    var p = ds ? ds.split('-') : [];
+    return (p.length === 3) ? p[2] + '-' + p[1] + '-' + p[0] : (ds || '');
+  }
+
   /** Format an hour integer (0-23) to a 12-hour AM/PM time label, e.g. 13 → "1:00 PM" */
   function fmtHourLabel(h) {
     if (h === 0) return '';
@@ -1432,7 +1438,9 @@ $(function () {
       }
 
       /* Mandatory Name field */
-      recordData['Name'] = 'Meeting With ' + (ev.title || '');
+      recordData['Name'] = 'Meeting With ' + (ev.title || '') +
+        ' on ' + fmtDateDMY(ds) +
+        ' for the Time Slot ' + fmtTime(ev.startTime || '00:00') + ' - ' + fmtTime(ev.endTime || '00:00');
 
       /* New record always starts as Pending */
       recordData['beatplanner__Managers_Approval'] = 'Pending';
@@ -4099,16 +4107,8 @@ $(function () {
                   'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                   '<path d="M1 1l4 4 4-4"/></svg>';
 
-    /* SVG for the filter button – same icon used in demBulkGrid */
-    var filterBtnSvg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" ' +
-                       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="13" height="13">' +
-                       '<path d="M2 4h12M5 8h6M7.5 12h1"/></svg>';
-
-    /* Filter button rendered once at the very top of #massActionsBody, above all records */
-    var html = '<div class="bp-filter-action">' +
-               '<button class="bp-filter-btn" id="bpFilterBtn" type="button" aria-label="Open filter panel">' +
-               filterBtnSvg + 'Filter</button>' +
-               '</div>';
+    /* Inline filter bar (same filters as #bpCalFilterBar, scoped to the overlay) */
+    var html = '<div class="bp-filter-action">' + buildMassActionsFilterBarHtml() + '</div>';
 
     groups.forEach(function (group) {
       /* Separate events: Working records share ONE container; Leave / other records
@@ -4161,7 +4161,7 @@ $(function () {
   function buildMassActionsFilterBarHtml() {
     if (!beatPlanHasRefs || !bprPicklistFields || !bprPicklistFields.length) { return ''; }
 
-    var EXCLUDED = ['record status', 'currency', 'unsubscribed mode', 'managers approval'];
+    var EXCLUDED = ['record status', 'currency', 'unsubscribed mode'];
     var html = '';
     bprPicklistFields.forEach(function (f) {
       var lbl = (f.field_label || '').toLowerCase().trim();
@@ -7589,7 +7589,9 @@ $(function () {
               }
             });
 
-            muRecordData['Name'] = 'Meeting With ' + muMwName;
+            muRecordData['Name'] = 'Meeting With ' + muMwName +
+              ' on ' + fmtDateDMY(muDate) +
+              ' for the Time Slot ' + fmtTime(muStartTime) + ' - ' + fmtTime(muEndTime);
           }
 
           if (Object.keys(muRecordData).length === 0) { continue; }
@@ -8290,7 +8292,11 @@ $(function () {
         if (rowMonthPlanId) {
           recordData['beatplanner__Month'] = { id: rowMonthPlanId };
         }
-        recordData['Name'] = 'Meeting With ' + mwName;
+        recordData['Name'] = 'Meeting With ' + mwName +
+          ' on ' + fmtDateDMY(date) +
+          ' for the Time Slot ' +
+          fmtTime(isLeaveRecord ? '00:00' : hourToTime(hour)) + ' - ' +
+          fmtTime(isLeaveRecord ? '23:59' : (hour === 23 ? '23:59' : hourToTime(hour + 1)));
         recordData['beatplanner__Managers_Approval'] = 'Pending';
         var massOwnerId = $('#userProfile').attr('data-userid');
         if (massOwnerId) { recordData['Owner'] = { id: massOwnerId }; }
@@ -8680,9 +8686,9 @@ $(function () {
       }
 
       /* Mandatory Name field */
-      recordData['Name'] = 'Meeting With ' + mwName;
-
-      /* Collect avatar data from the Meeting With dropdown */
+      recordData['Name'] = 'Meeting With ' + mwName +
+        ' on ' + fmtDateDMY(date) +
+        ' for the Time Slot ' + fmtTime(startTime) + ' - ' + fmtTime(endTime);
       var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
       var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '';
       var mwAvatarText   = $mwAvatar.text() || '';
@@ -9161,8 +9167,9 @@ $(function () {
         });
       }
 
-      recordData['Name'] = 'Meeting With ' + mwName;
-
+      recordData['Name'] = 'Meeting With ' + mwName +
+        ' on ' + fmtDateDMY(date) +
+        ' for the Time Slot ' + fmtTime(startTime) + ' - ' + fmtTime(endTime);
       var $mwAvatar      = $mwWrap.find('.bp-rec-avatar');
       var mwAvatarImgSrc = $mwAvatar.find('img').attr('src') || $mwAvatar.attr('data-img-src') || '';
       var mwAvatarText   = $mwAvatar.text() || '';
@@ -9508,9 +9515,9 @@ $(function () {
           }
         });
 
-        recordData['Name'] = 'Meeting With ' + mwName;
-
-        /* Compare against original values; reset Approval to Pending if anything changed */
+        recordData['Name'] = 'Meeting With ' + mwName +
+          ' on ' + fmtDateDMY(date) +
+          ' for the Time Slot ' + fmtTime(startTime) + ' - ' + fmtTime(endTime);
         var origValsStr = $row.attr('data-original-vals') || '{}';
         var origVals;
         try { origVals = JSON.parse(origValsStr); } catch (e) { origVals = {}; }
