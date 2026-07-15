@@ -5150,8 +5150,10 @@ $(function () {
       var coqlRes     = await zrc.post('/crm/v8/coql', query);
 
       /* Discard this response if a newer loadBeatPlanEvents() call has since started
-         (e.g. the user switched to a different owner while this request was in flight). */
-      if (myGen !== beatPlanLoadGen) { return; }
+         (e.g. the user switched to a different owner while this request was in flight).
+         Also verify the owner this response was fetched for still matches the active user,
+         providing an extra guard against out-of-order responses. */
+      if (myGen !== beatPlanLoadGen || String(ownerId) !== String(activeUserId)) { return; }
 
       console.log(coqlRes && coqlRes.data && coqlRes.data.data);
       var coqlRecords = (coqlRes && coqlRes.data && coqlRes.data.data && Array.isArray(coqlRes.data.data) ? coqlRes.data.data : []);
@@ -5265,7 +5267,9 @@ $(function () {
       });
 
       await Promise.all(avatarLoadPromises);
-      saveEvents();
+      /* Only persist avatar data if this is still the most-recent call; a newer
+         call's own saveEvents() will handle the final state. */
+      if (myGen === beatPlanLoadGen) { saveEvents(); }
 
     } catch (err) {
       console.error('Failed to load Daily Beat Plans:', err);
@@ -5597,6 +5601,9 @@ $(function () {
           /* Navigate the calendar to the chosen month */
           state.cursor = new Date(y, m, 1);
           closePicker();
+          /* Discard stale COQL events so the render does not show events from
+             the previous period while the new fetch is in progress. */
+          state.events = state.events.filter(function (e) { return !e.fromCoql; });
           render();
           if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
         } else {
@@ -5624,6 +5631,9 @@ $(function () {
         state.cursor = d;
       }
       closePicker();
+      /* Discard stale COQL events so the render does not show events from
+         the previous period while the new fetch is in progress. */
+      state.events = state.events.filter(function (e) { return !e.fromCoql; });
       render();
       if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
@@ -5640,6 +5650,9 @@ $(function () {
       var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
       state.cursor = (state.view === 'week') ? weekStart(d) : d;
       closePicker();
+      /* Discard stale COQL events so the render does not show events from
+         the previous period while the new fetch is in progress. */
+      state.events = state.events.filter(function (e) { return !e.fromCoql; });
       render();
       if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
@@ -5649,6 +5662,9 @@ $(function () {
       e.stopPropagation();
       state.cursor = new Date();
       closePicker();
+      /* Discard stale COQL events so the render does not show events from
+         the previous period while the new fetch is in progress. */
+      state.events = state.events.filter(function (e) { return !e.fromCoql; });
       render();
       if (beatPlanHasRefs && bpSavedRec) { loadBeatPlanEvents(); }
     });
@@ -5973,8 +5989,11 @@ $(function () {
 
       /* Step 1: Immediately clear all COQL-loaded events and every piece of
          owner-specific state so the calendar appears clean before the new
-         user's events are fetched. */
-      if (beatPlanHasRefs && bpSavedRec) {
+         user's events are fetched.
+         The filter runs whenever beatPlanHasRefs is true (independent of bpSavedRec)
+         so that even edge-cases where bpSavedRec is temporarily null still produce a
+         clean slate – loadBeatPlanEvents itself guards against a missing bpSavedRec. */
+      if (beatPlanHasRefs) {
         state.events = state.events.filter(function (ev) { return !ev.fromCoql; });
         saveEvents();
         render();
@@ -10433,7 +10452,10 @@ $(function () {
       }
     }, 60000);
 
-    /* Initial render */
+    /* Initial render – discard any stale COQL events that may have been loaded
+       from localStorage in a previous session so the calendar starts clean.
+       The PageLoad callback will fetch fresh events for the active user. */
+    state.events = state.events.filter(function (e) { return !e.fromCoql; });
     render();
   }
 
