@@ -45,6 +45,28 @@ $(function () {
   /** Is date valid for creating / pasting events? (today or future) */
   function isValid(ds) { return !isPast(ds); }
 
+  /**
+   * Returns true when the given event can still be edited.
+   * An event is NOT editable when it belongs to a past date, or when it falls on
+   * today but its start time has already elapsed.
+   * @param {Object} ev – calendar event object (needs ev.date and ev.startTime)
+   */
+  function isEventEditable(ev) {
+    if (!ev || !ev.date) { return true; }
+    var todStr = todayStr();
+    if (ev.date < todStr) { return false; }
+    if (ev.date === todStr && ev.startTime) {
+      var parts = ev.startTime.split(':');
+      var evH   = parseInt(parts[0], 10) || 0;
+      var evM   = parseInt(parts[1], 10) || 0;
+      var now   = new Date();
+      if (evH < now.getHours() || (evH === now.getHours() && evM < now.getMinutes())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** Generate a short unique id */
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1784,6 +1806,11 @@ $(function () {
       $card.find('.hc-act-approve, .hc-act-reject, .hc-act-delete').prop('disabled', true);
     }
 
+    /* ── Disable all editing actions for past events ── */
+    if (!isEventEditable(ev)) {
+      $card.find('.hc-act-edit, .hc-act-approve, .hc-act-reject, .hc-act-delete').prop('disabled', true);
+    }
+
     /* ── Resolve mwPhotoId from cached module records if not already set ──
        Handles COQL-loaded events where photo_id was not available at init time. */
     if (!ev.mwPhotoId && ev.mwLookupApi && ev.mwRecordId) {
@@ -2275,8 +2302,13 @@ $(function () {
     tableHtml += '<th class="bp-th bp-action-th">Actions</th>';
     tableHtml += '</tr></thead><tbody>';
 
-    /* Determine the earliest hour to show: for today, skip hours that have already passed */
-    var currentHour = isToday(date) ? new Date().getHours() : 0;
+    /* Determine the earliest hour to show: for today, skip hours whose start time has passed.
+       If there are any elapsed minutes in the current hour the whole slot is already started,
+       so advance to the next full hour. */
+    var _nowBpt = new Date();
+    var currentHour = isToday(date)
+      ? (_nowBpt.getMinutes() > 0 ? _nowBpt.getHours() + 1 : _nowBpt.getHours())
+      : 0;
 
     for (var h = currentHour; h < 24; h++) {
       /* Skip slots that already contain an existing event, or externally-supplied occupied hours */
@@ -2980,11 +3012,11 @@ $(function () {
                    pfAttrs +
                    (editRowStyles.bgStr ? ' style="' + escHtml(editRowStyles.bgStr) + '"' : '') + '>';
 
-      /* Checkbox cell – ENABLED (unlike the disabled one in single-edit mode) */
+      /* Checkbox cell – disabled for Approved/Rejected rows (those cannot be bulk-selected) */
       tableHtml += '<td class="bp-cb-cell"' +
                    (cbCellStyle ? ' style="' + escHtml(cbCellStyle) + '"' : '') +
                    '>' + editRowStyles.markerHtml +
-                   '<input type="checkbox" class="bp-row-cb" aria-label="Select row"></td>';
+                   '<input type="checkbox" class="bp-row-cb" aria-label="Select row"' + (approvalLocked ? ' disabled' : '') + '></td>';
 
       /* Time cells */
       tableHtml += '<td class="bp-time-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') +
@@ -3043,13 +3075,16 @@ $(function () {
                      '</div></div></td>';
       });
 
-      /* Actions column: Save, Copy, Delete, Approve, Reject */
+      /* Actions column: Save, Copy, Delete, Approve, Reject.
+         Disable modifying actions when the event is in the past (past date or elapsed time today). */
+      var pastLocked   = !isEventEditable(ev);
+      var pastAttr     = pastLocked ? ' disabled' : '';
       tableHtml += '<td class="bp-action-cell"' + (actCellStyle ? ' style="' + escHtml(actCellStyle) + '"' : '') + '>' +
-                   '<button class="bp-row-action bp-row-save"    type="button" title="Update record">' + SVG.save    + '</button>' +
+                   '<button class="bp-row-action bp-row-save"    type="button" title="Update record"'  + pastAttr   + '>' + SVG.save    + '</button>' +
                    '<button class="bp-row-action bp-row-copy"    type="button" title="Copy record">'   + SVG.copy    + '</button>' +
-                   '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + lockedAttr + '>' + SVG.trash   + '</button>' +
-                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + lockedAttr + '>' + SVG.approve + '</button>' +
-                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + lockedAttr + '>' + SVG.reject  + '</button>' +
+                   '<button class="bp-row-action bp-row-delete"  type="button" title="Delete record"'  + (approvalLocked || pastLocked ? ' disabled' : '') + '>' + SVG.trash   + '</button>' +
+                   '<button class="bp-row-action bp-row-approve' + approveClass + '" type="button" title="Approve record"' + (approvalLocked || pastLocked ? ' disabled' : '') + '>' + SVG.approve + '</button>' +
+                   '<button class="bp-row-action bp-row-reject'  + rejectClass  + '" type="button" title="Reject record"'  + (approvalLocked || pastLocked ? ' disabled' : '') + '>' + SVG.reject  + '</button>' +
                    '</td>';
 
       tableHtml += '</tr>';
@@ -3682,8 +3717,11 @@ $(function () {
         ? ' data-approval-locked="1"'
         : '';
 
+      /* Mark past events so editing is disabled after render */
+      var pastLockedAttr = !isEventEditable(ev) ? ' data-past-locked="1"' : '';
+
       listHtml +=
-        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '"' + disableActionsAttr + '>' +
+        '<div class="dem-card" data-evid="' + escHtml(ev.id) + '"' + disableActionsAttr + pastLockedAttr + '>' +
         '  <div class="hc-head" style="' + escHtml(style.cardStyle) + '">' +
         '    <div class="hc-head-top">' + markerHtml +
         '      <span class="hc-head-title">' + escHtml(getEventDisplayTitle(ev)) + '</span>' +
@@ -3698,6 +3736,10 @@ $(function () {
     /* Apply disabled state to action buttons for locked events */
     dom.demList.find('.dem-card[data-approval-locked="1"]')
                .find('.hc-act-approve, .hc-act-reject, .hc-act-delete')
+               .prop('disabled', true);
+    /* Disable all editing actions for past events */
+    dom.demList.find('.dem-card[data-past-locked="1"]')
+               .find('.hc-act-edit, .hc-act-approve, .hc-act-reject, .hc-act-delete')
                .prop('disabled', true);
   }
 
@@ -4559,8 +4601,13 @@ $(function () {
       var isWorking    = dayAttendInfo && dayAttendInfo.attendance.toLowerCase() !== 'leave' && !!dayAttendInfo.attendance;
       var leaveType    = (dayAttendInfo && dayAttendInfo.leaveType) || '';
 
-      /* Determine the first eligible hour (skip past hours for today) */
-      var currentHour = isToday(ds) ? new Date().getHours() : 0;
+      /* Determine the first eligible hour (skip slots whose start time has already passed).
+         When there are elapsed minutes in the current hour the slot has already started,
+         so advance to the next full hour. */
+      var _nowMc = new Date();
+      var currentHour = isToday(ds)
+        ? (_nowMc.getMinutes() > 0 ? _nowMc.getHours() + 1 : _nowMc.getHours())
+        : 0;
       /* Check whether there are any available working-hour slots */
       var hasSlots    = false;
       if (!isLeave) {
@@ -4608,7 +4655,10 @@ $(function () {
         html += buildBeatPlanTable(ds, { skipHours: skipHours, massCreate: true });
       } else {
         /* Non-beatplan fallback: clickable time-slot buttons */
-        var nowHour = isToday(ds) ? new Date().getHours() : 0;
+        var _nowFb = new Date();
+        var nowHour = isToday(ds)
+          ? (_nowFb.getMinutes() > 0 ? _nowFb.getHours() + 1 : _nowFb.getHours())
+          : 0;
         for (var hb = nowHour; hb < 24; hb++) {
           if (skipHours[hb]) { continue; }
           var startLbl = fmtTime(pad2(hb) + ':00');
@@ -8003,11 +8053,11 @@ $(function () {
       var $grid      = $('#slotPickerGrid');
       var $allCbs    = $grid.find('.bp-row-cb:not(:disabled)');
       var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
-      var anyChecked = checkedCnt > 0;
-      $grid.find('.bp-mass-create-btn').toggle(anyChecked);
+      var hasCheckedLeave = $grid.find('.mc-day-group .bp-mc-leave-cb:checked').length > 0;
+      $grid.find('.bp-mass-create-btn').toggle(checkedCnt > 0 || hasCheckedLeave);
       var $selectAll = $grid.find('.bp-select-all-cb');
       if ($selectAll.length) {
-        $selectAll.prop('indeterminate', anyChecked && checkedCnt < $allCbs.length);
+        $selectAll.prop('indeterminate', checkedCnt > 0 && checkedCnt < $allCbs.length);
         $selectAll.prop('checked', checkedCnt === $allCbs.length && $allCbs.length > 0);
       }
       /* Sync the day-level checkbox for the day group containing this row */
@@ -8022,16 +8072,24 @@ $(function () {
       }
     });
 
-    /* Day-level checkbox in Mass Create accordion → check/uncheck all rows for that day */
+    /* Day-level checkbox in Mass Create accordion → check/uncheck all rows for that day.
+       For leave days, also keep the bp-mc-leave-cb in sync (Issue 1). */
     $(document).on('change', '#slotPickerGrid .map-day-cb', function () {
       var checked   = $(this).prop('checked');
       var $dayGroup = $(this).closest('.mc-day-group');
       $dayGroup.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb:not(:disabled)').prop('checked', checked);
+      /* Sync leave checkbox for this day when it is a leave day.
+         prop() is used intentionally – it does not fire a 'change' event, preventing recursion. */
+      var $leaveCb = $dayGroup.find('.bp-mc-leave-cb');
+      if ($leaveCb.length && $leaveCb.closest('.bp-mc-leave-cb-label').is(':visible')) {
+        $leaveCb.prop('checked', checked);
+      }
       /* Sync the global Mass Create button and select-all */
       var $grid      = $('#slotPickerGrid');
       var $allCbs    = $grid.find('.bp-row-cb:not(:disabled)');
       var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
-      $grid.find('.bp-mass-create-btn').toggle(checkedCnt > 0);
+      var hasCheckedLeave = $grid.find('.mc-day-group .bp-mc-leave-cb:checked').length > 0;
+      $grid.find('.bp-mass-create-btn').toggle(checkedCnt > 0 || hasCheckedLeave);
       var $selectAll = $grid.find('.bp-select-all-cb');
       if ($selectAll.length) {
         $selectAll.prop('indeterminate', checkedCnt > 0 && checkedCnt < $allCbs.length);
@@ -8039,19 +8097,42 @@ $(function () {
       }
     });
 
+    /* Leave-day checkbox in Mass Create accordion → keep the day-level checkbox in sync (Issue 1).
+       prop() is used in both directions so neither handler triggers the other. */
+    $(document).on('change', '#slotPickerGrid .bp-mc-leave-cb', function () {
+      var checked   = $(this).prop('checked');
+      var $dayGroup = $(this).closest('.mc-day-group');
+      /* Sync the day-level checkbox without triggering its own change handler */
+      $dayGroup.find('.map-day-cb').prop('checked', checked);
+      /* Update the global Mass Create button visibility */
+      var $grid = $('#slotPickerGrid');
+      var hasCheckedRows  = $grid.find('.bp-row-cb:not(:disabled):checked').length > 0;
+      var hasCheckedLeave = $grid.find('.mc-day-group .bp-mc-leave-cb:checked').length > 0;
+      $grid.find('.bp-mass-create-btn').toggle(hasCheckedRows || hasCheckedLeave);
+    });
+
     /* Select-All header checkbox → check/uncheck all row checkboxes */
     $(document).on('change', '#slotPickerGrid .bp-select-all-cb', function () {
       var $grid    = $('#slotPickerGrid');
       var checked  = $(this).is(':checked');
       $grid.find('.bp-row-cb:not(:disabled)').prop('checked', checked);
-      $grid.find('.bp-mass-create-btn').toggle(checked);
-      /* Sync all day checkboxes */
+      /* Sync all day checkboxes and leave checkboxes for leave days */
       $grid.find('.mc-day-group').each(function () {
         var $dg       = $(this);
         var $dayRows  = $dg.find('.bp-slot-row:not(.map-filter-hidden) .bp-row-cb:not(:disabled)');
         var dayTotal  = $dayRows.length;
-        $dg.find('.map-day-cb').prop('checked', checked && dayTotal > 0).prop('indeterminate', false);
+        var dayCbVal  = checked && dayTotal > 0;
+        $dg.find('.map-day-cb').prop('checked', dayCbVal).prop('indeterminate', false);
+        /* For leave days: also sync the leave checkbox */
+        var $leaveCb = $dg.find('.bp-mc-leave-cb');
+        if ($leaveCb.length && $leaveCb.closest('.bp-mc-leave-cb-label').is(':visible')) {
+          $leaveCb.prop('checked', checked);
+          /* Ensure the day checkbox matches the leave checkbox state for leave days */
+          $dg.find('.map-day-cb').prop('checked', checked).prop('indeterminate', false);
+        }
       });
+      var hasCheckedLeave = $grid.find('.mc-day-group .bp-mc-leave-cb:checked').length > 0;
+      $grid.find('.bp-mass-create-btn').toggle(checked || hasCheckedLeave);
     });
 
     /* ── Bulk Create Daily Beat Plans ── */
@@ -8949,8 +9030,8 @@ $(function () {
     /* Helper: sync bulk toolbar and Select-All header state in the modal */
     function syncDemBulkToolbar() {
       var $grid      = $('#demBulkGrid');
-      var $allCbs    = $grid.find('.bp-row-cb');
-      var checkedCnt = $grid.find('.bp-row-cb:checked').length;
+      var $allCbs    = $grid.find('.bp-row-cb:not(:disabled)');
+      var checkedCnt = $grid.find('.bp-row-cb:not(:disabled):checked').length;
       var $toolbar   = $grid.find('.dem-bulk-toolbar');
       $toolbar.toggle(checkedCnt > 0);
       $toolbar.find('.dem-sel-count').text(checkedCnt + ' row' + (checkedCnt === 1 ? '' : 's') + ' selected');
@@ -8988,10 +9069,10 @@ $(function () {
       }
     });
 
-    /* Select-All header checkbox → check/uncheck all rows */
+    /* Select-All header checkbox → check/uncheck all non-disabled rows */
     $(document).on('change', '#demBulkGrid .bp-select-all-cb', function () {
       var checked = $(this).is(':checked');
-      $('#demBulkGrid .bp-row-cb').prop('checked', checked);
+      $('#demBulkGrid .bp-row-cb:not(:disabled)').prop('checked', checked);
       syncDemBulkToolbar();
     });
 
