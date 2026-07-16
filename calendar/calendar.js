@@ -1293,21 +1293,36 @@ $(function () {
     if (!state.clipboard) { showToast('Nothing in clipboard.'); return; }
     if (!isValid(ds))     { showToast('Cannot paste on a past date.'); return; }
 
-    /* Conflict check – prevent paste if any event already occupies the same slot */
-    var conflicting = state.clipboard.some(function (clipEv) {
-      return hasConflict(ds, clipEv, hour);
-    });
-    if (conflicting) {
-      var parts = ds.split('-');
-      var dObj  = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      var label = MONTHS[dObj.getMonth()] + ' ' + dObj.getDate() + ', ' + dObj.getFullYear();
-      showToast('An event already exists in the selected time slot on ' + label + '.', 3500);
-      return;
+    var clipCopy = state.clipboard.slice(); /* snapshot before any async mutation */
+
+    if (hour !== undefined) {
+      /* Slot paste (time-grid): all-or-nothing – block if the target slot is occupied */
+      var conflicting = clipCopy.some(function (clipEv) {
+        return hasConflict(ds, clipEv, hour);
+      });
+      if (conflicting) {
+        var parts = ds.split('-');
+        var dObj  = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        var label = MONTHS[dObj.getMonth()] + ' ' + dObj.getDate() + ', ' + dObj.getFullYear();
+        showToast('An event already exists in the selected time slot on ' + label + '.', 3500);
+        return;
+      }
+    } else {
+      /* Day paste: skip individual conflicting events, paste only non-conflicting ones */
+      clipCopy = clipCopy.filter(function (clipEv) {
+        return !hasConflict(ds, clipEv, undefined);
+      });
+      if (clipCopy.length === 0) {
+        var parts = ds.split('-');
+        var dObj  = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        var label = MONTHS[dObj.getMonth()] + ' ' + dObj.getDate() + ', ' + dObj.getFullYear();
+        showToast('All copied events already exist on ' + label + '.', 3500);
+        return;
+      }
     }
 
-    var count       = state.clipboard.length;
-    var clipCopy    = state.clipboard.slice(); /* snapshot before any async mutation */
-    var newEvs      = [];
+    var count  = clipCopy.length;
+    var newEvs = [];
 
     clipCopy.forEach(function (clipEv) {
       var ev = Object.assign({}, clipEv, { id: uid(), date: ds });
