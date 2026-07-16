@@ -3620,6 +3620,17 @@ $(function () {
       }
 
     } else if (state.view === 'week') {
+      /* Mobile week view: the selected day uses .day-col inside .mobile-day-body */
+      if (isMobile()) {
+        if (ds !== state.mobileDaySelected) { return; }
+        var $dayCol = dom.canvas.find('.day-col[data-date="' + ds + '"]');
+        if (!$dayCol.length) { return; }
+        $dayCol.find('.time-event').remove();
+        eventsOn(ds).forEach(function (ev) {
+          $dayCol.append(renderTimeEvent(ev, ds));
+        });
+        return;
+      }
       var $col = dom.canvas.find('.week-day-col[data-date="' + ds + '"]');
       if (!$col.length) { return; }
       $col.find('.time-event').remove();
@@ -10097,6 +10108,17 @@ $(function () {
       render();
     });
 
+    /* Calendar event filter bar: accordion toggle (mobile only – hidden via CSS on desktop) */
+    $(document).on('click', '#bpCalFilterToggle', function (e) {
+      e.stopPropagation();
+      var $btn      = $(this);
+      var $body     = $('#bpCalFilterBody');
+      var expanded  = $btn.attr('aria-expanded') === 'true';
+      $btn.attr('aria-expanded', String(!expanded));
+      $btn.toggleClass('bp-cal-filter-toggle--collapsed', expanded);
+      $body.toggleClass('bp-cal-filter-body--collapsed', expanded);
+    });
+
     /* ── Mass Actions popup filter bar event handlers ── */
 
     /* Popup filter: multi-select trigger toggle */
@@ -11169,7 +11191,31 @@ $(function () {
     html += '<button class="bp-cal-filter-clear-btn" id="bpCalFilterClear" type="button"' +
             (hasActive ? '' : ' style="display:none;"') + '>Clear filters</button>';
 
-    $bar.html(html).show();
+    /* Preserve the current expanded/collapsed state across rebuilds (e.g. filter change) */
+    var wasCollapsed = $bar.find('#bpCalFilterBody').hasClass('bp-cal-filter-body--collapsed');
+
+    /* Accordion toggle (only visible on mobile via CSS) + collapsible body */
+    var chevSvg = '<svg class="bp-cal-filter-chev" viewBox="0 0 10 6" fill="none" ' +
+                  'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" ' +
+                  'stroke-linejoin="round" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>';
+    var activeBadge = hasActive
+      ? '<span class="bp-cal-filter-toggle-badge" aria-label="Filters active"></span>'
+      : '';
+    var expandedAttr = wasCollapsed ? 'false' : 'true';
+    var bodyCollCls  = wasCollapsed ? ' bp-cal-filter-body--collapsed' : '';
+    var togCollCls   = wasCollapsed ? ' bp-cal-filter-toggle--collapsed' : '';
+
+    var barHtml =
+      '<button class="bp-cal-filter-toggle' + togCollCls + '" id="bpCalFilterToggle" ' +
+      'type="button" aria-expanded="' + expandedAttr + '" aria-controls="bpCalFilterBody">' +
+      '<span class="bp-cal-filter-toggle-lbl">Filters</span>' +
+      activeBadge + chevSvg +
+      '</button>' +
+      '<div class="bp-cal-filter-body' + bodyCollCls + '" id="bpCalFilterBody">' +
+      html +
+      '</div>';
+
+    $bar.html(barHtml).show();
   }
 
   /**

@@ -594,6 +594,34 @@ input, select, textarea {
   min-width: 160px;
 }
 
+/* ── Calendar filter bar: accordion toggle ── */
+.bp-cal-filter-toggle {
+  display: none; /* hidden on desktop; shown on mobile via @media */
+}
+.bp-cal-filter-body {
+  flex: 1;         /* fill remaining bar width on desktop */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.bp-cal-filter-toggle-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #1565C0);
+  flex-shrink: 0;
+}
+.bp-cal-filter-chev {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  transition: transform .2s ease;
+}
+.bp-cal-filter-toggle--collapsed .bp-cal-filter-chev {
+  transform: rotate(-90deg);
+}
+
 /* ══════════════════════════════════════════════════════════
    MONTH VIEW
 ══════════════════════════════════════════════════════════ */
@@ -2958,6 +2986,91 @@ input, select, textarea {
   .slot-add-btn,
   .slot-paste-btn,
   .slot-copy-btn { opacity: 1; }
+
+  /* Time-event copy button: always visible on touch (Issue 4) */
+  .te-copy-btn { opacity: 1; }
+  .te-copy-btn {
+    width: 24px;
+    height: 24px;
+  }
+  .te-copy-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  /* ── Calendar filter bar: accordion toggle – shown on mobile ── (Issue 2) */
+  .bp-cal-filter-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bp-cal-filter-toggle-lbl {
+    flex: 1;
+    text-align: left;
+  }
+  .bp-cal-filter-body {
+    overflow: hidden;
+    max-height: 600px;
+    transition: max-height .25s ease, padding .25s ease;
+    padding: 6px 14px 8px;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .bp-cal-filter-body--collapsed {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /* ── Filter items: improved mobile layout ── (Issue 3) */
+  .bp-cal-filter-bar {
+    padding: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bp-cal-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 calc(50% - 6px);
+    min-width: 140px;
+  }
+  .bp-cal-filter-lbl {
+    flex-shrink: 0;
+    min-width: 72px;
+    font-size: 12px;
+  }
+  #bpCalFilterBar .cal-filter-ms-wrap {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+  #bpCalFilterBar .bpf-ms-trigger {
+    min-height: 32px;
+    padding: 4px 30px 4px 9px;
+    font-size: 13px;
+  }
+  #bpCalFilterBar .bpf-ms-chip {
+    font-size: 11px;
+    padding: 2px 6px;
+    max-width: 100%;
+  }
+  .bp-cal-filter-clear-btn {
+    margin: 0 0 4px;
+    align-self: flex-end;
+    height: 28px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
 
   /* Week-day-head action buttons: wrap into 2×2 grid so paste/delete are reachable */
   .week-day-head .cell-acts {
