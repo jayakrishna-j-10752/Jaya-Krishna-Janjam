@@ -1348,6 +1348,7 @@ input, select, textarea {
 }
 
 /* ── Meetings For processing horizontal loader (shown beneath .meetings-bar during #mfDone async ops) ── */
+/* Uses the `modal-loader-slide` keyframes defined above */
 .mf-proc-loader {
   height: 3px;
   overflow: hidden;
