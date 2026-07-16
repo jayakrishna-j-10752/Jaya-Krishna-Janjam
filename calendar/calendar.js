@@ -3784,11 +3784,10 @@ $(function () {
   var massActionsCurrentAction = '';
 
   /**
-   * Return all currently visible *Pending* events grouped by date string.
-   * Only events whose beatplanner__Managers_Approval equals "Pending" are
-   * included – Approved and Rejected events are excluded from the Mass Actions
-   * overlay.  Active calendar filters (calEventFilters) are also respected via
-   * eventsOn().
+   * Return all currently visible events grouped by date string.
+   * Events with any Manager Approval status (Pending, Approved, Rejected) are
+   * included – no approval-status filtering is applied.
+   * Active calendar filters (calEventFilters) are also respected via eventsOn().
    * @returns {Array<{date: string, events: Array}>} sorted ascending by date
    */
   function getVisibleEventsByDate() {
@@ -3815,11 +3814,7 @@ $(function () {
 
     var groups = [];
     dates.forEach(function (ds) {
-      /* Only include events with Pending approval status */
-      var evts = eventsOn(ds).filter(function (ev) {
-        var approval = (ev.bprFieldValues || {})['beatplanner__Managers_Approval'] || '';
-        return approval === 'Pending';
-      });
+      var evts = eventsOn(ds);
       if (evts.length > 0) {
         groups.push({ date: ds, events: evts });
       }
@@ -6374,10 +6369,18 @@ $(function () {
         .get()
         .filter(function (v) { return v.label && v.apiName; });
 
+      /* Show horizontal loader and disable the button to prevent duplicate submissions */
+      $('#mfProcLoader').show();
+      $('#mfDone').prop('disabled', true);
+
       try {
         await syncMeetingsFor(selectedValues);
       } catch (err) {
         console.error('Failed to sync Meetings For field:', err);
+      } finally {
+        /* Always hide the loader and re-enable the button regardless of outcome */
+        $('#mfProcLoader').hide();
+        $('#mfDone').prop('disabled', false);
       }
 
       $styleBar.show();

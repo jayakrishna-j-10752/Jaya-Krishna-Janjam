@@ -1347,6 +1347,21 @@ input, select, textarea {
   100% { transform: translateX(250%); }
 }
 
+/* ── Meetings For processing horizontal loader (shown beneath .meetings-bar during #mfDone async ops) ── */
+.mf-proc-loader {
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--z-blue) 18%, transparent);
+  flex-shrink: 0;
+}
+.mf-proc-loader-bar {
+  height: 100%;
+  width: 40%;
+  background: var(--z-blue);
+  border-radius: 0 2px 2px 0;
+  animation: modal-loader-slide 1.2s ease-in-out infinite;
+}
+
 .modal-body {
   padding: 18px 20px;
   display: flex;
