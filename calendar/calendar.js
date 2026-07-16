@@ -4334,6 +4334,21 @@ $(function () {
 
     var groups = getVisibleEventsByDate();
 
+    /* Filter events by approval status based on the selected action.
+       mass-approve / mass-reject / mass-delete: show only Pending events.
+       mass-update: show all events regardless of approval status. */
+    if (action === 'mass-approve' || action === 'mass-reject' || action === 'mass-delete') {
+      groups = groups.map(function (group) {
+        return {
+          date: group.date,
+          events: group.events.filter(function (ev) {
+            var approval = ev.bprFieldValues && ev.bprFieldValues['beatplanner__Managers_Approval'];
+            return approval === 'Pending';
+          })
+        };
+      }).filter(function (group) { return group.events.length > 0; });
+    }
+
     /* For all beat-plan actions (mass-update, mass-approve, mass-reject, mass-delete),
        use the original bp-slots-table layout (one table per day via buildMassActionsBodyHtml).
        This is the same event view that was originally used by mass-delete, mass-approve
