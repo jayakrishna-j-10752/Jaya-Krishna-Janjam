@@ -2931,6 +2931,15 @@ input, select, textarea {
   .style-bar    { padding: 6px 14px 12px; }
   .mf-chip { max-width: 120px; }
 
+  /* ── Mobile horizontal scrollability for setup header bars (Issue 2) ── */
+  .meetings-bar,
+  #styleBar,
+  #legendBar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
   .sye-body { grid-template-columns: 1fr; }
   .sye-slots-col {
     border-right: none;
@@ -3139,6 +3148,15 @@ input, select, textarea {
   .mf-chip { max-width: 80px; font-size: 11px; }
   .sye-slot-grid { grid-template-columns: 1fr; }
   .sye-slot-name { font-size: 11px; }
+
+  /* ── Narrower mobile: keep horizontal scrollability for header bars (Issue 2) ── */
+  .meetings-bar,
+  #styleBar,
+  #legendBar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════

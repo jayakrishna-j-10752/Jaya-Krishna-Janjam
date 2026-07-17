@@ -616,11 +616,9 @@ $(function () {
         html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
         if (slotAddAllowed) {
           var evAtSlot = eventAtHour(ds, h);
-          /* When a time-event occupies this slot, show a copy button instead of
-             the add button to prevent the + icon from overlapping the event block. */
-          if (evAtSlot) {
-            html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
-          } else {
+          /* Occupied slots show nothing – the .te-copy-btn on the time-event handles
+             copying and prevents the duplicate-button issue on Working / Leave events. */
+          if (!evAtSlot) {
             html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
             if (shouldShowPasteInSlot(ds)) {
               html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
@@ -718,9 +716,9 @@ $(function () {
       html += '<div class="' + slotCls + '" data-date="' + selDs + '" data-hour="' + h + '">';
       if (slotAddAllowed) {
         var evAtSlot = eventAtHour(selDs, h);
-        if (evAtSlot) {
-          html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
-        } else {
+        /* Occupied slots show nothing – the .te-copy-btn on the time-event handles
+           copying and prevents the duplicate-button issue on Working / Leave events. */
+        if (!evAtSlot) {
           html += '<button class="slot-add-btn" data-date="' + selDs + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
           if (shouldShowPasteInSlot(selDs)) {
             html += '<button class="slot-paste-btn" data-date="' + selDs + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
@@ -797,9 +795,9 @@ $(function () {
       html += '<div class="' + slotCls + '" data-date="' + ds + '" data-hour="' + h + '">';
       if (slotAddAllowed) {
         var evAtSlot = eventAtHour(ds, h);
-        if (evAtSlot) {
-          html += '<button class="slot-copy-btn" data-evid="' + evAtSlot.id + '" title="Copy event">' + SVG.copy + '</button>';
-        } else {
+        /* Occupied slots show nothing – the .te-copy-btn on the time-event handles
+           copying and prevents the duplicate-button issue on Working / Leave events. */
+        if (!evAtSlot) {
           html += '<button class="slot-add-btn" data-date="' + ds + '" data-hour="' + h + '" title="Add event">' + SVG.add + '</button>';
           if (shouldShowPasteInSlot(ds)) {
             html += '<button class="slot-paste-btn" data-date="' + ds + '" data-hour="' + h + '" title="Paste event">' + SVG.paste + '</button>';
@@ -10613,6 +10611,12 @@ $(function () {
         beatPlanModulesList = bpModLabels.map(function (label, i) {
           return { label: label.trim(), api: (bpModApis[i] || '').trim() };
         });
+
+        /* Clear stale module records so the Meeting With dropdown always reflects the
+           latest configured modules – the early-exit guard in fetchAllModuleRecords()
+           would otherwise keep serving outdated data after #setupSave. */
+        moduleRecordsMap = {};
+        fetchAllModuleRecords();
 
         /* Force a fresh fetch of picklist metadata (slot assignments may have changed) */
         bprPicklistFields = null;
