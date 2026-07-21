@@ -10550,6 +10550,8 @@ $(function () {
     $meetingsBar.show();
     $otherContent.hide();
     $('#legendsDisplay').hide();
+    /* Mark the header so mobile CSS can style the settings panel */
+    $('.cal-header').addClass('settings-open');
   }
 
   function showMainContent() {
@@ -10558,6 +10560,8 @@ $(function () {
     $legendBar.hide();
     $settingsBackBtn.hide();
     $otherContent.show();
+    /* Remove settings panel styling when returning to main calendar */
+    $('.cal-header').removeClass('settings-open');
     /* Admin-only toolbar controls must stay hidden for non-administrators */
     if (!loggedInIsAdmin) { $('.toolbar-right').hide(); }
     /* Show the legends display strip only if it has been populated */
