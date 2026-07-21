@@ -4361,7 +4361,8 @@ $(function () {
     /* Filter events by approval status based on the selected action.
        mass-approve / mass-reject / mass-delete: show only Pending events that are
        on or after the current date and current time (upcoming / in-progress).
-       mass-update: show all events regardless of approval status. */
+       mass-update: show only events from the current date and current time onward,
+       regardless of approval status. */
     if (action === 'mass-approve' || action === 'mass-reject' || action === 'mass-delete') {
       groups = groups.map(function (group) {
         return {
@@ -4369,6 +4370,15 @@ $(function () {
           events: group.events.filter(function (ev) {
             var approval = ev.bprFieldValues && ev.bprFieldValues['beatplanner__Managers_Approval'];
             return approval === 'Pending' && isEventEditable(ev);
+          })
+        };
+      }).filter(function (group) { return group.events.length > 0; });
+    } else if (action === 'mass-update') {
+      groups = groups.map(function (group) {
+        return {
+          date: group.date,
+          events: group.events.filter(function (ev) {
+            return isEventEditable(ev);
           })
         };
       }).filter(function (group) { return group.events.length > 0; });
