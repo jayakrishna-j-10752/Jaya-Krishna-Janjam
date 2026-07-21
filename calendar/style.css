@@ -2931,6 +2931,15 @@ input, select, textarea {
   .style-bar    { padding: 6px 14px 12px; }
   .mf-chip { max-width: 120px; }
 
+  /* ── Mobile: make .cal-header vertically scrollable so all sections remain
+        accessible on small screens while the header stays at the top ── */
+  .cal-header {
+    max-height: 50vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
   /* ── Mobile horizontal scrollability for setup header bars (Issue 2) ── */
   .meetings-bar,
   #styleBar,
