@@ -2228,6 +2228,7 @@ $(function () {
     var tablePicklistCols = [];
     var attendanceField   = null;
     var leaveTypeField    = null;
+    var meetingStatusApi  = '';
 
     if (bprPicklistFields && bprPicklistFields.length) {
       bprPicklistFields.forEach(function (f) {
@@ -2235,6 +2236,7 @@ $(function () {
         if (HIDDEN_BPR_LABELS.indexOf(lbl) !== -1) { return; }
         if (lbl === 'attendance')        { attendanceField = f; return; }
         if (lbl === 'leave type')        { leaveTypeField  = f; return; }
+        if (lbl === 'meeting status')    { meetingStatusApi = f.api_name || ''; }
         tablePicklistCols.push(f);
       });
     }
@@ -2382,10 +2384,22 @@ $(function () {
 
       /* ── Dynamic picklist columns ── */
       tablePicklistCols.forEach(function (f) {
+        var isMeetingStatus = meetingStatusApi && f.api_name === meetingStatusApi;
+        var msVal = '';
+        if (isMeetingStatus) {
+          /* Pre-select "Scheduled" for new event rows; find the exact actual value */
+          if (f.options) {
+            f.options.forEach(function (opt) {
+              var a = (typeof opt === 'object') ? opt.actual : opt;
+              if (a === 'Scheduled') { msVal = a; }
+            });
+          }
+          if (!msVal) { msVal = 'Scheduled'; }
+        }
         tableHtml += '<td class="bp-dd-cell">' +
-                     '<div class="bp-dd-wrap" data-row="' + h + '" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
-                     '<div class="bp-dd-trigger" tabindex="0">' +
-                     '<span class="bp-dd-val">Select\u2026</span>' +
+                     '<div class="bp-dd-wrap' + (isMeetingStatus ? ' bp-dd-disabled' : '') + '" data-row="' + h + '" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                     '<div class="bp-dd-trigger" tabindex="' + (isMeetingStatus ? '-1' : '0') + '">' +
+                     '<span class="bp-dd-val"' + (isMeetingStatus ? ' data-actual-val="' + escHtml(msVal) + '"' : '') + '>' + escHtml(isMeetingStatus ? msVal : 'Select\u2026') + '</span>' +
                      chevSvg +
                      '</div>' +
                      '<div class="bp-dd-panel">' +
@@ -2443,6 +2457,7 @@ $(function () {
     var tablePicklistCols = [];
     var attendanceField   = null;
     var leaveTypeField    = null;
+    var meetingStatusApi  = '';
 
     if (bprPicklistFields && bprPicklistFields.length) {
       bprPicklistFields.forEach(function (f) {
@@ -2450,6 +2465,7 @@ $(function () {
         if (HIDDEN_BPR_LABELS.indexOf(lbl) !== -1) { return; }
         if (lbl === 'attendance') { attendanceField = f; return; }
         if (lbl === 'leave type') { leaveTypeField  = f; return; }
+        if (lbl === 'meeting status') { meetingStatusApi = f.api_name || ''; }
         tablePicklistCols.push(f);
       });
     }
@@ -2762,9 +2778,13 @@ $(function () {
         });
       }
 
+      /* Meeting Status: disable unless the event is Approved */
+      var isMeetingStatus = meetingStatusApi && f.api_name === meetingStatusApi;
+      var msDdDisabled    = isMeetingStatus && evApprovalVal !== 'Approved';
+
       tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
-                   '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
-                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<div class="bp-dd-wrap' + (msDdDisabled ? ' bp-dd-disabled' : '') + '" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="' + (msDdDisabled ? '-1' : '0') + '">' +
                    '<span class="bp-dd-val"' +
                    (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
                    escHtml(displayVal || 'Select\u2026') + '</span>' +
@@ -2887,11 +2907,13 @@ $(function () {
          shown as separate columns in the Day Events Modal table) ── */
     var HIDDEN_BPR_LABELS = ['managers approval', 'record status', 'currency', 'unsubscribed mode', 'meetings for', 'attendance', 'leave type'];
     var tablePicklistCols = [];
+    var meetingStatusApi  = '';
 
     if (bprPicklistFields && bprPicklistFields.length) {
       bprPicklistFields.forEach(function (f) {
         var lbl = (f.field_label || '').toLowerCase().trim();
         if (HIDDEN_BPR_LABELS.indexOf(lbl) !== -1) { return; }
+        if (lbl === 'meeting status') { meetingStatusApi = f.api_name || ''; }
         tablePicklistCols.push(f);
       });
     }
@@ -3093,9 +3115,13 @@ $(function () {
           });
         }
 
+        /* Meeting Status: disable unless the event is Approved */
+        var isMeetingStatus = meetingStatusApi && f.api_name === meetingStatusApi;
+        var msDdDisabled    = isMeetingStatus && evApprovalVal !== 'Approved';
+
         tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
-                     '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
-                     '<div class="bp-dd-trigger" tabindex="0">' +
+                     '<div class="bp-dd-wrap' + (msDdDisabled ? ' bp-dd-disabled' : '') + '" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                     '<div class="bp-dd-trigger" tabindex="' + (msDdDisabled ? '-1' : '0') + '">' +
                      '<span class="bp-dd-val"' + (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
                      escHtml(displayVal || 'Select\u2026') + '</span>' +
                      chevSvg + '</div>' +
@@ -3153,6 +3179,7 @@ $(function () {
     var tablePicklistCols = [];
     var attendanceField   = null;
     var leaveTypeField    = null;
+    var meetingStatusApi  = '';
 
     if (bprPicklistFields && bprPicklistFields.length) {
       bprPicklistFields.forEach(function (f) {
@@ -3160,6 +3187,7 @@ $(function () {
         if (HIDDEN_BPR_LABELS_MU.indexOf(lbl) !== -1) { return; }
         if (lbl === 'attendance') { attendanceField = f; return; }
         if (lbl === 'leave type') { leaveTypeField  = f; return; }
+        if (lbl === 'meeting status') { meetingStatusApi = f.api_name || ''; }
         tablePicklistCols.push(f);
       });
     }
@@ -3434,9 +3462,14 @@ $(function () {
           if (a === actualVal || disp === actualVal) { displayVal = disp; }
         });
       }
+
+      /* Meeting Status: disable unless the event is Approved */
+      var isMeetingStatus = meetingStatusApi && f.api_name === meetingStatusApi;
+      var msDdDisabled    = isMeetingStatus && evApprovalVal !== 'Approved';
+
       tableHtml += '<td class="bp-dd-cell"' + (cellBorderTB ? ' style="' + escHtml(cellBorderTB) + '"' : '') + '>' +
-                   '<div class="bp-dd-wrap" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
-                   '<div class="bp-dd-trigger" tabindex="0">' +
+                   '<div class="bp-dd-wrap' + (msDdDisabled ? ' bp-dd-disabled' : '') + '" data-row="edit" data-api="' + escHtml(f.api_name) + '" data-label="' + escHtml(f.field_label) + '">' +
+                   '<div class="bp-dd-trigger" tabindex="' + (msDdDisabled ? '-1' : '0') + '">' +
                    '<span class="bp-dd-val"' + (actualVal ? ' data-actual-val="' + escHtml(actualVal) + '"' : '') + '>' +
                    escHtml(displayVal || 'Select\u2026') + '</span>' +
                    chevSvg + '</div>' +
@@ -7928,6 +7961,7 @@ $(function () {
     $(document).on('click', '#slotPickerGrid .bp-dd-trigger, #demBulkGrid .bp-dd-trigger, #massActionsBody .bp-dd-trigger', function (e) {
       e.stopPropagation();
       var $wrap  = $(this).closest('.bp-dd-wrap');
+      if ($wrap.hasClass('bp-dd-disabled')) { return; }
       var isOpen = $wrap.hasClass('bp-dd-open');
       /* Close any other open dropdown first */
       closeAllBpDropdowns();
@@ -8858,9 +8892,18 @@ $(function () {
         });
 
         /* Check whether any editable field has changed */
-        var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
-        var hasChanges = allKeys.some(function (k) {
+        var allKeys      = Object.keys(origVals).concat(Object.keys(currentVals));
+        var changedKeys  = allKeys.filter(function (k) {
           return (origVals[k] || '') !== (currentVals[k] || '');
+        });
+        var hasChanges   = changedKeys.length > 0;
+
+        /* Resolve Meeting Status API name from metadata */
+        var msBpApi = '';
+        (bprPicklistFields || []).forEach(function (f) {
+          if ((f.field_label || '').toLowerCase().trim() === 'meeting status') {
+            msBpApi = f.api_name || '';
+          }
         });
 
         var existingEv       = findEvent(editId);
@@ -8868,15 +8911,20 @@ $(function () {
           ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
           : '';
 
-        if (hasChanges) {
-          /* Fields changed – reset approval workflow back to Pending */
-          recordData['beatplanner__Managers_Approval'] = 'Pending';
-          bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
-        } else {
-          /* No changes – preserve existing approval status */
+        /* If only Meeting Status changed on an Approved event, preserve the approval.
+           Any other field change (or non-Approved event) resets to Pending. */
+        var onlyMeetingStatusChanged = hasChanges && msBpApi &&
+          changedKeys.every(function (k) { return k === msBpApi; });
+
+        if (!hasChanges || (onlyMeetingStatusChanged && existingApproval === 'Approved')) {
+          /* No changes, or only Meeting Status changed on Approved event – preserve approval */
           if (existingApproval) {
             bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
           }
+        } else {
+          /* Fields changed (beyond Meeting Status) – reset approval workflow back to Pending */
+          recordData['beatplanner__Managers_Approval'] = 'Pending';
+          bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
         }
 
         try {
@@ -9346,9 +9394,18 @@ $(function () {
         });
       }
 
-      var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
-      var hasChanges = allKeys.some(function (k) {
+      var allKeys      = Object.keys(origVals).concat(Object.keys(currentVals));
+      var changedKeys  = allKeys.filter(function (k) {
         return (origVals[k] || '') !== (currentVals[k] || '');
+      });
+      var hasChanges   = changedKeys.length > 0;
+
+      /* Resolve Meeting Status API name from metadata */
+      var msBpApi = '';
+      (bprPicklistFields || []).forEach(function (f) {
+        if ((f.field_label || '').toLowerCase().trim() === 'meeting status') {
+          msBpApi = f.api_name || '';
+        }
       });
 
       var existingEv       = findEvent(editId);
@@ -9356,13 +9413,19 @@ $(function () {
         ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
         : '';
 
-      if (hasChanges) {
-        recordData['beatplanner__Managers_Approval'] = 'Pending';
-        bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
-      } else {
+      /* If only Meeting Status changed on an Approved event, preserve the approval.
+         Any other field change (or non-Approved event) resets to Pending. */
+      var onlyMeetingStatusChanged = hasChanges && msBpApi &&
+        changedKeys.every(function (k) { return k === msBpApi; });
+
+      if (!hasChanges || (onlyMeetingStatusChanged && existingApproval === 'Approved')) {
+        /* No changes, or only Meeting Status changed on Approved event – preserve approval */
         if (existingApproval) {
           bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
         }
+      } else {
+        recordData['beatplanner__Managers_Approval'] = 'Pending';
+        bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
       }
 
       try {
@@ -9678,9 +9741,18 @@ $(function () {
           if (actual && actual !== 'Select\u2026') { currentVals[fieldApi] = actual; }
         });
 
-        var allKeys    = Object.keys(origVals).concat(Object.keys(currentVals));
-        var hasChanges = allKeys.some(function (k) {
+        var allKeys      = Object.keys(origVals).concat(Object.keys(currentVals));
+        var changedKeys  = allKeys.filter(function (k) {
           return (origVals[k] || '') !== (currentVals[k] || '');
+        });
+        var hasChanges   = changedKeys.length > 0;
+
+        /* Resolve Meeting Status API name from metadata */
+        var msBpApi = '';
+        (bprPicklistFields || []).forEach(function (f) {
+          if ((f.field_label || '').toLowerCase().trim() === 'meeting status') {
+            msBpApi = f.api_name || '';
+          }
         });
 
         var existingEv       = findEvent(editId);
@@ -9688,13 +9760,19 @@ $(function () {
           ? (existingEv.bprFieldValues['beatplanner__Managers_Approval'] || '')
           : '';
 
-        if (hasChanges) {
-          recordData['beatplanner__Managers_Approval'] = 'Pending';
-          bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
-        } else {
+        /* If only Meeting Status changed on an Approved event, preserve the approval.
+           Any other field change (or non-Approved event) resets to Pending. */
+        var onlyMeetingStatusChanged = hasChanges && msBpApi &&
+          changedKeys.every(function (k) { return k === msBpApi; });
+
+        if (!hasChanges || (onlyMeetingStatusChanged && existingApproval === 'Approved')) {
+          /* No changes, or only Meeting Status changed on Approved event – preserve approval */
           if (existingApproval) {
             bprFieldValues['beatplanner__Managers_Approval'] = existingApproval;
           }
+        } else {
+          recordData['beatplanner__Managers_Approval'] = 'Pending';
+          bprFieldValues['beatplanner__Managers_Approval'] = 'Pending';
         }
 
         batchItems.push({

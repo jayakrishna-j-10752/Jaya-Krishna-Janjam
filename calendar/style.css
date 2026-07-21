@@ -4433,6 +4433,11 @@ input, select, textarea {
   border-color: var(--accent, #1565C0);
   box-shadow: 0 0 0 2px var(--accent-faint, rgba(21,101,192,.15));
 }
+.bp-dd-wrap.bp-dd-disabled .bp-dd-trigger {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .bp-dd-val {
   flex: 1;
   overflow: hidden;
