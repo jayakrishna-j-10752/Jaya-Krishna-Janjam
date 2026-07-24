@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar – Zoho CRM</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="theme-light">
+
+  <!-- ══════════════════════ APP SHELL ══════════════════════ -->
+  <div class="cal-app" id="calApp">
+
+    <!-- ── TOP HEADER ── -->
+    <header class="cal-header">
+
+      <!-- ── SETTINGS BACK BUTTON ── -->
+      <button class="settings-back-btn" id="settingsBackBtn" style="display:none;" aria-label="Back">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 3L5 8l5 5"/>
+        </svg>
+        Back
+      </button>
+
+      <!-- ── MEETINGS FOR MULTI-SELECT ── -->
+      <div class="meetings-bar">
+        <p class="mf-step-label">Step 1: Meetings For</p>
+        <div class="mf-select" id="mfSelect" tabindex="0" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false" aria-label="Meetings For">
+          <span class="mf-label" id="mfLabel">Meetings For</span>
+          <div class="mf-chips-wrap" id="mfChipsWrap"></div>
+          <span class="mf-arrow" aria-hidden="true">
+            <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── MF PROCESSING LOADER ── -->
+      <div class="mf-proc-loader" id="mfProcLoader" style="display:none;" aria-hidden="true">
+        <div class="mf-proc-loader-bar"></div>
+      </div>
+
+      <!-- ── STYLE YOUR DAILY BEAT (Step 2) ── -->
+      <div class="style-bar" id="styleBar">
+        <p class="mf-step-label">Step 2: Style Your Daily Beat</p>
+        <div class="sye-panel">
+
+          <!-- Panel header -->
+          <div class="sye-head">
+            <div class="sye-head-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </div>
+            <div class="sye-head-text">
+              <h3 class="sye-head-title">Color-code your Daily Beat entries</h3>
+              <p class="sye-head-sub">Map any CRM picklist field to a color slot — your Daily Beat Plan entries are then styled automatically by that field's value.</p>
+            </div>
+          </div>
+
+          <!-- 3-step process indicator -->
+          <div class="sye-process">
+            <div class="sye-proc-step">
+              <span class="sye-proc-num">1</span>
+              <span class="sye-proc-text">Pick a style slot (fill, dot, border…)</span>
+            </div>
+            <span class="sye-proc-sep" aria-hidden="true">›</span>
+            <div class="sye-proc-step">
+              <span class="sye-proc-num">2</span>
+              <span class="sye-proc-text">Map it to a beat plan field</span>
+            </div>
+            <span class="sye-proc-sep" aria-hidden="true">›</span>
+            <div class="sye-proc-step">
+              <span class="sye-proc-num">3</span>
+              <span class="sye-proc-text">Beat entries style themselves automatically</span>
+            </div>
+          </div>
+
+          <!-- Body: slot groups (left) + live preview (right) -->
+          <div class="sye-body">
+
+            <!-- Left: style slots -->
+            <div class="sye-slots-col">
+
+              <p class="sye-group-label">Fill &amp; Marker</p>
+              <div class="sye-slot-grid">
+
+                <button class="sye-slot" data-slot="bg-colour" data-preview="1">
+                  <span class="sye-slot-icon sye-icon-bg" aria-hidden="true"></span>
+                  <span class="sye-slot-info">
+                    <span class="sye-slot-name">Background colour</span>
+                    <span class="sye-slot-field">Choose field…</span>
+                    <span class="sye-slot-clear" role="button" tabindex="0" aria-label="Remove field" style="display:none;">×</span>
+                  </span>
+                  <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+                </button>
+
+                <div class="sye-slot" data-slot="marker" data-preview="1" tabindex="0" role="button">
+                  <span class="sye-slot-icon sye-icon-dot" aria-hidden="true"></span>
+                  <span class="sye-slot-info">
+                    <span class="sye-slot-name">Marker</span>
+                    <span class="sye-slot-field">Choose field…</span>
+                    <span class="sye-slot-clear" role="button" tabindex="0" aria-label="Remove field" style="display:none;">×</span>
+                  </span>
+                  <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+                </div>
+
+              </div>
+
+              <p class="sye-group-label">Borders</p>
+              <div class="sye-slot-grid">
+
+                <button class="sye-slot" data-slot="top-border" data-preview="1">
+                  <span class="sye-slot-icon sye-icon-top" aria-hidden="true"></span>
+                  <span class="sye-slot-info">
+                    <span class="sye-slot-name">Top border</span>
+                    <span class="sye-slot-field">Choose field…</span>
+                    <span class="sye-slot-clear" role="button" tabindex="0" aria-label="Remove field" style="display:none;">×</span>
+                  </span>
+                  <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+                </button>
+
+                <button class="sye-slot" data-slot="bottom-border" data-preview="1">
+                  <span class="sye-slot-icon sye-icon-bottom" aria-hidden="true"></span>
+                  <span class="sye-slot-info">
+                    <span class="sye-slot-name">Bottom border</span>
+                    <span class="sye-slot-field">Choose field…</span>
+                    <span class="sye-slot-clear" role="button" tabindex="0" aria-label="Remove field" style="display:none;">×</span>
+                  </span>
+                  <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+                </button>
+
+                <button class="sye-slot" data-slot="right-border" data-preview="1">
+                  <span class="sye-slot-icon sye-icon-right" aria-hidden="true"></span>
+                  <span class="sye-slot-info">
+                    <span class="sye-slot-name">Right border</span>
+                    <span class="sye-slot-field">Choose field…</span>
+                    <span class="sye-slot-clear" role="button" tabindex="0" aria-label="Remove field" style="display:none;">×</span>
+                  </span>
+                  <svg class="sye-slot-chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>
+                </button>
+
+                <button class="sye-slot sye-slot--locked" data-slot="left-border" data-preview="1"
+                        aria-disabled="true"
+                        aria-describedby="sye-left-border-desc">
+                  <span class="sye-slot-icon sye-icon-left" aria-hidden="true"></span>
+                  <span class="sye-slot-info">
+                    <span class="sye-slot-name">Left border</span>
+                    <span class="sye-slot-field sye-slot-reserved">
+                      <svg viewBox="0 0 12 14" width="12" height="14" fill="none" stroke="currentColor" stroke-width="1.5"
+                           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="2" y="5.5" width="8" height="7.5" rx="1.5"/>
+                        <path d="M4 5.5V4a2 2 0 0 1 4 0v1.5"/>
+                      </svg>
+                      Approval status (reserved)
+                    </span>
+                  </span>
+                </button>
+                <span id="sye-left-border-desc" class="sye-visually-hidden">
+                  This slot is reserved for Approval status and cannot be changed.
+                </span>
+
+              </div>
+
+            </div><!-- /.sye-slots-col -->
+
+            <!-- Right: live preview -->
+            <div class="sye-preview-col">
+
+              <div class="sye-prev-header">
+                <div class="sye-prev-eye" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </div>
+                <div class="sye-prev-head-text">
+                  <p class="sye-prev-title">Live preview</p>
+                  <p class="sye-prev-sub">See how your picks colour real calendar events.</p>
+                </div>
+                <span class="sye-prev-badge">TODAY</span>
+              </div>
+
+              <div class="sye-prev-events">
+                <div class="sye-prev-evt sye-evt--amber" data-evt-index="0">
+                  <span class="sye-prev-time">9:00</span>
+                  <span class="sye-prev-label">Drop · Pending</span>
+                  <span class="sye-prev-dot" style="background:#FF8F00"></span>
+                </div>
+                <div class="sye-prev-evt sye-evt--focus sye-evt--all-borders" data-evt-index="1">
+                  <span class="sye-prev-time">11:30</span>
+                  <span class="sye-prev-label">Sample drop with Raj...</span>
+                  <span class="sye-prev-dot" style="background:#E91E63"></span>
+                </div>
+                <div class="sye-prev-evt sye-evt--green" data-evt-index="2">
+                  <span class="sye-prev-time">2:15</span>
+                  <span class="sye-prev-label">Visit · Approved</span>
+                  <span class="sye-prev-dot" style="background:#43A047"></span>
+                </div>
+                <div class="sye-prev-evt sye-evt--rejected" data-evt-index="3">
+                  <span class="sye-prev-time">4:00</span>
+                  <span class="sye-prev-label">Visit · Rejected</span>
+                  <span class="sye-prev-dot" style="background:#C62828"></span>
+                </div>
+              </div>
+
+              <p class="sye-prev-tip">Tip: hover any slot to see which part of the event it controls.</p>
+
+            </div><!-- /.sye-preview-col -->
+
+          </div><!-- /.sye-body -->
+
+          <!-- Footer actions -->
+          <div class="sye-footer">
+            <button class="btn-primary" id="syeDone">Done</button>
+            <button class="btn-ghost"   id="syeCancel">Cancel</button>
+          </div>
+
+        </div><!-- /.sye-panel -->
+      </div><!-- /.style-bar -->
+
+      <!-- ── SELECT LEGENDS (Step 3) ── -->
+      <div class="legend-bar" id="legendBar">
+        <p class="mf-step-label">Step 3: Select Legends</p>
+        <div class="mf-select mf-active" id="legSelect" tabindex="0" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false" aria-label="Select Legends">
+          <span class="mf-label" id="legLabel">Select Legends</span>
+          <div class="mf-chips-wrap" id="legChipsWrap"></div>
+          <span class="mf-arrow" aria-hidden="true">
+            <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+          </span>
+        </div>
+        <div class="save-setup-actions">
+          <button class="btn-primary" id="setupSave">Save</button>
+          <button class="btn-ghost"   id="setupCancel">Cancel</button>
+        </div>
+      </div><!-- /.legend-bar -->
+
+      <!-- ── TOOLBAR ROW ── -->
+      <div class="header-toolbar">
+        <div class="toolbar-left">
+
+          <!-- ── Actions Dropdown ── -->
+          <div class="cal-actions-wrap" id="calActionsWrap">
+            <button class="toolbar-btn cal-actions-btn" id="calActionsBtn" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="3" y1="4" x2="13" y2="4"/>
+                <line x1="3" y1="8" x2="13" y2="8"/>
+                <line x1="3" y1="12" x2="13" y2="12"/>
+              </svg>
+              Actions
+              <svg class="cal-actions-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="6">
+                <path d="M1 1l4 4 4-4"/>
+              </svg>
+            </button>
+            <div class="cal-actions-menu" id="calActionsMenu" role="menu" aria-labelledby="calActionsBtn" style="display:none;">
+              <!-- Mass Create with submenu -->
+              <div class="cal-actions-item cal-actions-has-sub">
+                <button class="cal-actions-option cal-mass-create-btn" type="button" role="menuitem" aria-haspopup="true" aria-expanded="false">
+                  Mass Create
+                  <svg class="cal-sub-chevron" viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="6" height="10">
+                    <path d="M1 1l4 4-4 4"/>
+                  </svg>
+                </button>
+                <div class="cal-actions-submenu" id="calMassCreateSubmenu" role="menu" style="display:none;">
+                  <button class="cal-actions-option" type="button" role="menuitem" data-mass-create="tomorrow">For Tomorrow</button>
+                  <button class="cal-actions-option" type="button" role="menuitem" data-mass-create="next-week">For Next Week</button>
+                  <button class="cal-actions-option" type="button" role="menuitem" data-mass-create="next-month">For Next Month</button>
+                  <button class="cal-actions-option cal-between-trigger" type="button" role="menuitem" data-mass-create="between">Between</button>
+                </div>
+              </div>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-update">Mass Update</button>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-delete">Mass Delete</button>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-approve">Mass Approve</button>
+              <button class="cal-actions-option" type="button" role="menuitem" data-action="mass-reject">Mass Reject</button>
+            </div>
+          </div>
+        </div>
+        <div class="toolbar-right">
+          <button class="toolbar-settings-btn" id="settingsIconBtn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── MAIN HEADER ROW ── -->
+      <div class="header-main">
+        <div class="header-left">
+          <!-- User Profile -->
+          <button class="user-profile" id="userProfile" aria-label="User menu" aria-haspopup="true" aria-expanded="false">
+            <span class="user-avatar">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="16" cy="16" r="16" fill="#6B9FD4"/>
+                <circle cx="16" cy="12" r="5.5" fill="#D0E8FF" fill-opacity="0.95"/>
+                <path d="M3 30c0-7.18 5.82-12 13-12s13 4.82 13 12" fill="#D0E8FF" fill-opacity="0.95"/>
+              </svg>
+            </span>
+            <span class="user-name">Loading…</span>
+            <svg class="user-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+              <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <!-- User Profile Dropdown -->
+          <div class="user-dropdown" id="userDropdown" role="listbox" aria-label="Select user">
+            <div class="ud-search-wrap">
+              <svg class="ud-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                <circle cx="6.5" cy="6.5" r="4.5"/>
+                <line x1="10" y1="10" x2="14" y2="14"/>
+              </svg>
+              <input type="text" class="ud-search-input" id="udSearch" placeholder="Search users..." autocomplete="off" aria-label="Search users" />
+              <button class="ud-clear-btn" id="udClearBtn" aria-label="Clear search" style="display:none"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="ud-list" id="udList"></div>
+          </div>
+
+          <div class="nav-group">
+            <button class="nav-arrow" id="btnPrev" title="Previous">&#8249;</button>
+            <button class="btn-today" id="btnToday">Today</button>
+            <button class="nav-arrow" id="btnNext" title="Next">&#8250;</button>
+          </div>
+
+        </div>
+
+        <div class="period-group">
+          <svg class="cal-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="4" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2 8h16" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 2v4M14 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h2 class="period-label" id="periodLabel"></h2>
+        </div>
+
+        <div class="header-right">
+          <!-- View Switcher -->
+          <div class="view-tabs" role="tablist" aria-label="Calendar views">
+            <button class="view-tab active" data-view="month" role="tab" aria-selected="true">Month</button>
+            <button class="view-tab" data-view="week"  role="tab" aria-selected="false">Week</button>
+            <button class="view-tab" data-view="day"   role="tab" aria-selected="false">Day</button>
+          </div>
+          <!-- Theme Toggle -->
+          <button class="theme-toggle-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="6"/>
+              <line x1="12" y1="18" x2="12" y2="22"/>
+              <line x1="2" y1="12" x2="6" y2="12"/>
+              <line x1="18" y1="12" x2="22" y2="12"/>
+              <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+              <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+              <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+              <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+            </svg>
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- ── LEGENDS DISPLAY STRIP ── -->
+    <div id="legendsDisplay" class="legends-display" style="display:none;"></div>
+
+    <!-- ── BEAT PLANNER EVENTS HORIZONTAL LOADING BAR ── -->
+    <div id="bpEventsLoader" class="bp-events-loader" style="display:none;" role="status" aria-label="Loading events"></div>
+
+    <!-- ── CALENDAR CANVAS ── -->
+    <div class="cal-body">
+      <div id="bpCalFilterBar" class="bp-cal-filter-bar" style="display:none;"></div>
+      <div class="cal-canvas" id="calCanvas"></div>
+    </div>
+
+  </div><!-- /.cal-app -->
+
+  <!-- ══════════════════════ BETWEEN DATE RANGE MODAL ══════════════════════ -->
+  <div class="cal-between-overlay" id="calBetweenOverlay" role="dialog" aria-modal="true" aria-labelledby="calBetweenHeading" style="display:none;">
+    <div class="cal-between-box">
+      <div class="cal-between-head">
+        <h3 class="cal-between-heading" id="calBetweenHeading">Mass Create – Between</h3>
+        <button class="modal-x" id="calBetweenClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="cal-between-body">
+        <div class="cal-between-field">
+          <label class="cal-between-label" for="calBetweenFrom">From</label>
+          <input type="date" id="calBetweenFrom" class="cal-between-input" />
+          <span class="cal-between-err" id="calBetweenFromErr"></span>
+        </div>
+        <div class="cal-between-field">
+          <label class="cal-between-label" for="calBetweenTo">To</label>
+          <input type="date" id="calBetweenTo" class="cal-between-input" />
+          <span class="cal-between-err" id="calBetweenToErr"></span>
+        </div>
+      </div>
+      <div class="cal-between-foot">
+        <button class="modal-cancel" id="calBetweenCancel" type="button">Cancel</button>
+        <button class="modal-save" id="calBetweenSubmit" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════ EVENT MODAL ══════════════════════ -->
+  <div class="modal-backdrop" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
+    <div class="modal-box">
+
+      <div class="modal-head">
+        <h3 class="modal-heading" id="modalHeading">Create Event</h3>
+        <button class="modal-x" id="modalClose" aria-label="Close">&times;</button>
+      </div>
+
+      <!-- ── HORIZONTAL LOADER (shown during async modal initialization) ── -->
+      <div class="modal-init-loader" id="modalInitLoader" style="display:none;" role="status" aria-live="polite" aria-label="Loading…">
+        <div class="modal-init-loader-bar"></div>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- ── TIME SLOT PICKER (phase 1) ── -->
+        <div id="slotPickerSection" style="display:none">
+          <div class="time-slot-grid" id="slotPickerGrid"></div>
+        </div>
+
+        <!-- ── EVENT FORM (phase 2 / edit) ── -->
+        <div id="eventFormSection">
+          <div class="field-group">
+            <label for="fTitle">Event Title <span class="req">*</span></label>
+            <input type="text" id="fTitle" class="field-input" placeholder="Add a title" autocomplete="off" />
+            <span class="field-error" id="fTitleErr">Title is required</span>
+          </div>
+
+          <div class="field-group">
+            <label for="fDate">Date</label>
+            <input type="date" id="fDate" class="field-input" />
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label for="fStart">Start Time</label>
+              <input type="time" id="fStart" class="field-input" value="09:00" />
+            </div>
+            <div class="field-group">
+              <label for="fEnd">End Time</label>
+              <input type="time" id="fEnd" class="field-input" value="10:00" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="fDesc">Description</label>
+            <textarea id="fDesc" class="field-input field-textarea" rows="3" placeholder="Add description (optional)"></textarea>
+          </div>
+
+          <div class="field-group">
+            <label>Color</label>
+            <div class="color-row" id="colorRow">
+              <span class="color-dot active" data-color="#1565C0" style="background:#1565C0" title="Blue"></span>
+              <span class="color-dot" data-color="#2E7D32" style="background:#2E7D32" title="Green"></span>
+              <span class="color-dot" data-color="#E65100" style="background:#E65100" title="Orange"></span>
+              <span class="color-dot" data-color="#C62828" style="background:#C62828" title="Red"></span>
+              <span class="color-dot" data-color="#6A1B9A" style="background:#6A1B9A" title="Purple"></span>
+              <span class="color-dot" data-color="#00838F" style="background:#00838F" title="Teal"></span>
+              <span class="color-dot" data-color="#F57F17" style="background:#F57F17" title="Amber"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-foot" id="eventFormFoot">
+        <button class="btn-ghost" id="modalCancel">Cancel</button>
+        <button class="btn-primary" id="modalSave">Save Event</button>
+      </div>
+      <div class="modal-foot" id="slotPickerFoot" style="display:none">
+        <button class="btn-ghost" id="slotPickerCancel">Cancel</button>
+      </div>
+
+    </div>
+  </div><!-- /#eventModal -->
+
+
+  <!-- ══════════════════════ BEAT PLAN FILTER PANEL ══════════════════════ -->
+  <div class="bpf-overlay" id="bpFilterOverlay" aria-hidden="true">
+    <div class="bpf-backdrop" id="bpFilterBackdrop"></div>
+    <div class="bpf-panel" id="bpFilterPanel" role="dialog" aria-modal="true" aria-label="Filter Records">
+      <div class="bpf-head">
+        <h3 class="bpf-title">Filter Records</h3>
+        <button class="bpf-close-btn" id="bpFilterClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="bpf-body" id="bpFilterBody">
+        <p class="bpf-loading">Loading filters&hellip;</p>
+      </div>
+      <div class="bpf-foot">
+        <button class="btn-ghost" id="bpFilterClear">Clear All</button>
+        <button class="btn-primary" id="bpFilterApply">Apply Filters</button>
+      </div>
+    </div>
+  </div><!-- /#bpFilterOverlay -->
+
+
+
+
+  <!-- ══════════════════════ TIME SLOT MENU ══════════════════════ -->
+  <div class="slot-menu" id="slotMenu" role="listbox" aria-label="Choose time slot"></div>
+
+  <!-- ══════════════════════ TOAST NOTIFICATION ══════════════════════ -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ══════════════════════ HOVER PREVIEW CARD ══════════════════════ -->
+  <div class="evt-hover-card" id="evtHoverCard" role="tooltip" aria-label="Event preview" aria-hidden="true"></div>
+  <div id="hcArrow" class="hc-arrow-el" aria-hidden="true"></div>
+
+  <!-- ══════════════════════ MONTH/YEAR PICKER ══════════════════════ -->
+  <div class="cal-picker" id="calPicker" role="dialog" aria-label="Date picker" aria-modal="true">
+    <div class="cp-header">
+      <div class="cp-header-btns">
+        <button class="cp-range-btn" id="cpMonthBtn" aria-label="Switch to month view"></button>
+        <button class="cp-range-btn" id="cpRangeBtn"></button>
+      </div>
+      <div class="cp-nav">
+        <button class="cp-nav-btn" id="cpPrev" aria-label="Previous">&#8249;</button>
+        <button class="cp-nav-btn" id="cpNext" aria-label="Next">&#8250;</button>
+      </div>
+    </div>
+    <div class="cp-day-names" id="cpDayNames"></div>
+    <div class="cp-grid" id="cpGrid"></div>
+    <div class="cp-footer" id="cpFooter">
+      <button class="cp-footer-btn" id="cpFooterBtn"></button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ DAY EVENTS MODAL ══════════════════════ -->
+  <div class="day-events-modal-overlay" id="dayEventsModal" role="dialog" aria-modal="true" aria-labelledby="demDate">
+    <div class="day-events-modal-box">
+      <div class="dem-head">
+        <span class="dem-date" id="demDate"></span>
+        <button class="dem-close" id="demClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="dem-list" id="demList"></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════ MEETINGS-FOR DROPDOWN ══════════════════════ -->
+  <div class="mf-dropdown" id="mfDropdown" role="listbox" aria-multiselectable="true" aria-label="Select modules for meetings">
+    <div class="mf-actions">
+      <div class="mf-search-wrap">
+        <svg class="mf-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="4.5"/>
+          <line x1="10" y1="10" x2="14" y2="14"/>
+        </svg>
+        <input type="text" id="mfSearch" class="mf-search-input" placeholder="Search modules…" autocomplete="off" aria-label="Search modules" />
+      </div>
+      <div class="mf-action-btns">
+        <button class="mf-action-btn" id="mfSelectAll">Select All</button>
+        <button class="mf-action-btn" id="mfClearAll">Clear All</button>
+      </div>
+    </div>
+    <div class="mf-list" id="mfList"></div>
+    <div class="mf-footer">
+      <button class="mf-action-btn" id="mfCancel">Cancel</button>
+      <button class="mf-action-btn mf-btn-done" id="mfDone">Done</button>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════ LEGENDS DROPDOWN ══════════════════════ -->
+  <div class="mf-dropdown leg-dropdown" id="legDropdown" role="listbox" aria-multiselectable="true" aria-label="Select Legends">
+    <div class="mf-list" id="legList"></div>
+  </div>
+
+
+  <!-- ══════════════════════ CHIP COLOR PICKER ══════════════════════ -->
+  <div class="mcp-panel" id="mfChipColorPicker" role="dialog" aria-label="Choose chip color" aria-modal="true">
+    <div class="mcp-canvas-wrap">
+      <canvas class="mcp-canvas" id="mcpCanvas" width="260" height="160"></canvas>
+      <div class="mcp-pointer" id="mcpPointer"></div>
+    </div>
+    <div class="mcp-controls">
+      <button class="mcp-eyedrop" id="mcpEyedrop" title="Pick color from screen" aria-label="Eyedropper">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.5 2.5a2.121 2.121 0 0 1 3 3l-2 2-3-3 2-2z"/>
+          <path d="M5 14l-2 3 3-2 9-9-1-1-9 9z"/>
+          <line x1="11.5" y1="5.5" x2="14.5" y2="8.5"/>
+        </svg>
+      </button>
+      <div class="mcp-preview" id="mcpPreview"></div>
+      <div class="mcp-hue-wrap">
+        <input type="range" class="mcp-hue-slider" id="mcpHueSlider" min="0" max="360" value="0" aria-label="Hue" />
+      </div>
+    </div>
+    <div class="mcp-presets" id="mcpPresets"></div>
+    <div class="mcp-rgb-row">
+      <div class="mcp-rgb-field">
+        <input type="number" id="mcpR" min="0" max="255" class="mcp-rgb-in" aria-label="Red" />
+        <span class="mcp-rgb-lbl">R</span>
+      </div>
+      <div class="mcp-rgb-field">
+        <input type="number" id="mcpG" min="0" max="255" class="mcp-rgb-in" aria-label="Green" />
+        <span class="mcp-rgb-lbl">G</span>
+      </div>
+      <div class="mcp-rgb-field">
+        <input type="number" id="mcpB" min="0" max="255" class="mcp-rgb-in" aria-label="Blue" />
+        <span class="mcp-rgb-lbl">B</span>
+      </div>
+      <button class="mcp-mode-btn" id="mcpModeBtn" title="Switch to HEX" aria-label="Switch input mode">
+        <svg viewBox="0 0 10 14" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="2,5 5,2 8,5"/>
+          <polyline points="2,9 5,12 8,9"/>
+        </svg>
+      </button>
+    </div>
+    <div class="mcp-hex-row" id="mcpHexRow" style="display:none">
+      <input type="text" id="mcpHex" class="mcp-hex-in" maxlength="7" placeholder="#1565C0" aria-label="Hex color" />
+      <span class="mcp-rgb-lbl">HEX</span>
+      <button class="mcp-mode-btn" id="mcpModeBtnHex" title="Switch to RGB" aria-label="Switch input mode">
+        <svg viewBox="0 0 10 14" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="2,5 5,2 8,5"/>
+          <polyline points="2,9 5,12 8,9"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ SYE FIELD PICKER POPUP ══════════════════════ -->
+  <div class="sfp-backdrop" id="sfpBackdrop" role="dialog" aria-modal="true" aria-labelledby="sfpTitle">
+    <div class="sfp-box">
+      <div class="sfp-head">
+        <p class="sfp-title" id="sfpTitle">Choose a picklist field</p>
+        <span class="sfp-slot-name" id="sfpSlotName"></span>
+        <button class="sfp-close" id="sfpClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="sfp-body" id="sfpBody">
+        <p class="sfp-loading" id="sfpLoading">Loading fields…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ LOCKED SLOT INFO POPUP ══════════════════════ -->
+  <div class="sfp-backdrop" id="lockedInfoBackdrop" role="dialog" aria-modal="true" aria-labelledby="lockedInfoTitle">
+    <div class="sfp-box sfp-box--info">
+      <div class="sfp-head">
+        <p class="sfp-title" id="lockedInfoTitle">Left Border</p>
+        <button class="sfp-close" id="lockedInfoClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="sfp-body">
+        <p class="sfp-locked-msg">Border Left is reserved for Approved, Rejected, or Pending status indicators.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════ WIDGET LOADER OVERLAY ══════════════════════ -->
+  <div class="widget-loader-overlay" id="widgetLoaderOverlay" style="display:none;" role="status" aria-live="polite" aria-label="Loading">
+    <div class="widget-loader-box">
+      <div class="widget-loader-icon">
+        <!-- Calendar outline -->
+        <svg class="wl-calendar-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Calendar body -->
+          <rect x="8" y="14" width="64" height="58" rx="7" ry="7" stroke="#3a82f7" stroke-width="4.5" fill="#f0f6ff"/>
+          <!-- Top bar / header -->
+          <rect x="8" y="14" width="64" height="20" rx="7" ry="7" fill="#3a82f7"/>
+          <rect x="8" y="26" width="64" height="8" fill="#3a82f7"/>
+          <!-- Page ring left -->
+          <rect x="24" y="8" width="6" height="16" rx="3" fill="#3a82f7"/>
+          <!-- Page ring right -->
+          <rect x="50" y="8" width="6" height="16" rx="3" fill="#3a82f7"/>
+        </svg>
+        <!-- Spinning reload arrow (centered over calendar) -->
+        <svg class="wl-spinner-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M18 6 A12 12 0 1 1 6.7 24.5" stroke="#3a82f7" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+          <polyline points="6,18 6.7,24.5 13,22" stroke="#3a82f7" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ MASS ACTIONS POPUP ══════════════════════ -->
+  <div class="mass-actions-overlay" id="massActionsOverlay" role="dialog" aria-modal="true" aria-labelledby="massActionsTitle" style="display:none;">
+    <div class="mass-actions-box">
+      <div class="mass-actions-head">
+        <h3 class="mass-actions-title" id="massActionsTitle">Mass Delete</h3>
+        <button class="modal-x" id="massActionsClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="mass-actions-select-all-row">
+        <label class="map-cb-label">
+          <input type="checkbox" id="massActionsSelectAll" class="map-cb" />
+          <span class="map-cb-text">Select All Days</span>
+        </label>
+      </div>
+      <div class="mass-actions-fixed-row mass-actions-filter-btn-row" id="massActionsFilterBtnRow" style="display:none;"></div>
+      <div class="mass-actions-fixed-row mass-actions-filter-bar-row" id="massActionsFilterBarRow" style="display:none;"></div>
+      <div class="mass-actions-body" id="massActionsBody"></div>
+      <div class="mass-actions-foot">
+        <span class="map-sel-count" id="mapSelCount"></span>
+        <button class="btn-ghost" id="massActionsCancel">Cancel</button>
+        <button class="btn-primary" id="massActionsConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ IMAGE PREVIEW OVERLAY ══════════════════════ -->
+  <div class="img-preview-overlay" id="imgPreviewOverlay" role="dialog" aria-modal="true" aria-label="Image preview">
+    <div class="img-preview-backdrop"></div>
+    <div class="img-preview-box">
+      <button class="img-preview-close" id="imgPreviewClose" aria-label="Close">&times;</button>
+      <img class="img-preview-img" id="imgPreviewImg" src="" alt="" />
+    </div>
+  </div>
+
+  <script src="https://live.zwidgets.com/js-sdk/1.5/ZohoEmbededAppSDK.min.js"></script>
+  <script src="jquery.min.js"></script>
+  <script src="calendar.js"></script>
+</body>
+</html>
