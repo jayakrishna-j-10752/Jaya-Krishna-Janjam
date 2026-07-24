@@ -9591,9 +9591,14 @@ $(function () {
         if (ev && ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Approved'; }
         saveEvents();
         refreshCalendarCell($row.data('date') || '');
-        /* Update action buttons in-place (search container to cover attend-bar buttons too) */
-        var $btnsScope = $btn.closest('.bp-plan-container, .map-event-container');
-        if (!$btnsScope.length) { $btnsScope = $row; }
+        /* Update action buttons in-place – scope to the individual row when the button
+           is inside a .bp-slot-row (Working mode); fall back to the event container only
+           for Leave-mode attend-bar buttons where the row element is a sibling. */
+        var $btnsScope = $btn.closest('.bp-slot-row');
+        if (!$btnsScope.length) {
+          $btnsScope = $btn.closest('.bp-plan-container, .map-event-container');
+          if (!$btnsScope.length) { $btnsScope = $row; }
+        }
         $btnsScope.find('.bp-row-approve').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
         $btnsScope.find('.bp-row-reject').prop('disabled', true).addClass('is-approved').removeClass('is-rejected');
         $btnsScope.find('.bp-row-delete').prop('disabled', true);
@@ -9627,9 +9632,14 @@ $(function () {
         if (ev && ev.bprFieldValues) { ev.bprFieldValues['beatplanner__Managers_Approval'] = 'Rejected'; }
         saveEvents();
         refreshCalendarCell($row.data('date') || '');
-        /* Update action buttons in-place (search container to cover attend-bar buttons too) */
-        var $btnsScope2 = $btn.closest('.bp-plan-container, .map-event-container');
-        if (!$btnsScope2.length) { $btnsScope2 = $row; }
+        /* Update action buttons in-place – scope to the individual row when the button
+           is inside a .bp-slot-row (Working mode); fall back to the event container only
+           for Leave-mode attend-bar buttons where the row element is a sibling. */
+        var $btnsScope2 = $btn.closest('.bp-slot-row');
+        if (!$btnsScope2.length) {
+          $btnsScope2 = $btn.closest('.bp-plan-container, .map-event-container');
+          if (!$btnsScope2.length) { $btnsScope2 = $row; }
+        }
         $btnsScope2.find('.bp-row-reject').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
         $btnsScope2.find('.bp-row-approve').prop('disabled', true).addClass('is-rejected').removeClass('is-approved');
         $btnsScope2.find('.bp-row-delete').prop('disabled', true);

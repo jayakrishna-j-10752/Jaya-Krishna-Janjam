@@ -5867,7 +5867,7 @@ input, select, textarea {
 
 /* Accordion body */
 .map-day-events {
-  overflow: hidden;
+  overflow: auto;
 }
 .map-day-group.map-day-collapsed .map-day-events {
   display: none;
